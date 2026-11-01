@@ -3,7 +3,7 @@ import {
   BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X,
 } from "lucide-react";
 import { useStore } from "./store";
-import { RELEASES_URL, isOnlineDemo } from "./platform";
+import { RELEASES_URL, isDesktopApp, isOnlineDemo } from "./platform";
 import { findIssues } from "./coverage";
 import type { Page } from "./types";
 import { Wordmark, LogoMark } from "./components/Logo";
@@ -43,6 +43,11 @@ export default function App() {
   const collapsed = data.settings.sidebarCollapsed;
   const issues = useMemo(() => findIssues(data), [data]);
   const problems = issues.filter((i) => i.severity === "danger").length;
+
+  // Desktop app: keep the Excel copy for Teams up to date, if a folder is picked.
+  useEffect(() => {
+    if (isDesktopApp) void import("./excelCopy").then((m) => m.startExcelCopy());
+  }, []);
 
   // Theme lives on <html> so the tokens pick it up.
   useEffect(() => {

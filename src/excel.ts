@@ -5,6 +5,7 @@ import { findIssues, missionCoverage, neededTraining, trainingStatus } from "./c
 import { dayUse, fleetUse } from "./fleet";
 import { DAY, dayAt, ms, today } from "./time";
 import { textOn } from "./look";
+import { saveFile } from "./files";
 
 /**
  * The whole plan as an Excel workbook, to post in a Teams channel or open anywhere:
@@ -170,13 +171,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
 /** The file name for an export made today. */
 export const workbookName = () => `zoms-mrp-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
 
-/** Build the workbook and hand it to the browser as a download. */
+/** Build the workbook and hand it over (a download, or the Downloads folder in the desktop app). */
 export async function downloadWorkbook(data: AppData) {
-  const blob = await buildWorkbook(data);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = workbookName();
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return saveFile(workbookName(), await buildWorkbook(data));
 }
