@@ -5,9 +5,11 @@ import { useStore } from "../store";
 import { Field } from "../components/ui";
 import { migrate } from "../migrate";
 import { downloadWorkbook } from "../excel";
+import { saveFile, showInFolder } from "../files";
 import { isDesktopApp, isOnlineDemo, isServerBuild } from "../platform";
 import { serverUser } from "../backends/server";
 import { ServerSettings } from "./ServerSettings";
+import { ExcelCopySettings } from "./ExcelCopySettings";
 import { SHORTCUTS } from "./Help";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
@@ -15,14 +17,9 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   const { theme, rules } = data.settings;
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const backup = () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `zoms-mrp-backup-${format(new Date(), "yyyy-MM-dd")}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("Saved to Downloads");
+  const backup = async () => {
+    const where = await saveFile(`zoms-mrp-backup-${format(new Date(), "yyyy-MM-dd")}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    showToast("Saved to Downloads", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
   };
   const restore = async (f: File) => {
     try {
@@ -95,7 +92,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           </p>
           <div className="row gap wrap">
             <button className="btn" onClick={backup}><Download size={14} /> Save a backup</button>
-            <button className="btn" onClick={() => downloadWorkbook(data).then(() => showToast("Saved to Downloads. Post it in a Teams channel to share it."), () => showToast("Couldn't make the Excel file. Try again."))}>
+            <button className="btn" onClick={() => downloadWorkbook(data).then((where) => showToast("Saved to Downloads. Post it in a Teams channel to share it.", where ? { label: "Show", run: () => showInFolder(where) } : undefined), () => showToast("Couldn't make the Excel file. Try again."))}>
               <FileSpreadsheet size={14} /> Export to Excel
             </button>
             {/* On the server these replace the whole team's plan, so only admins get them. */}
@@ -108,6 +105,8 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             )}
           </div>
         </section>
+
+        {isDesktopApp && <ExcelCopySettings />}
 
         <section className="panel kbd-hint">
           <h3><Keyboard size={16} /> Shortcuts</h3>

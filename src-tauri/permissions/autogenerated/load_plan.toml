@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-load-plan"
+description = "Enables the load_plan command without any pre-configured scope."
+commands.allow = ["load_plan"]
+
+[[permission]]
+identifier = "deny-load-plan"
+description = "Denies the load_plan command without any pre-configured scope."
+commands.deny = ["load_plan"]

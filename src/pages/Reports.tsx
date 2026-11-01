@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { FileSpreadsheet, Printer } from "lucide-react";
 import { downloadWorkbook } from "../excel";
+import { showInFolder } from "../files";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
 import { dutyOf, missionCoverage } from "../coverage";
@@ -77,8 +78,8 @@ export function Reports() {
   const exportExcel = async () => {
     setExporting(true);
     try {
-      await downloadWorkbook(data);
-      useStore.getState().showToast("Saved to Downloads. Post it in a Teams channel to share it.");
+      const where = await downloadWorkbook(data);
+      useStore.getState().showToast("Saved to Downloads. Post it in a Teams channel to share it.", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
     } catch {
       useStore.getState().showToast("Couldn't make the Excel file. Try again.");
     } finally {

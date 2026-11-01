@@ -9,6 +9,10 @@
 - Sign-in is locked for 5 minutes after 5 wrong passwords. The server keeps a copy of everything every day, and admins can download one.
 - Runs with Docker, behind Caddy for https.
 
+**Desktop app**
+- Zom's MRP installs on Windows, macOS and Linux with a double-click. The plan is saved in a file on that computer, with a copy kept every day for a month.
+- **Settings > Excel copy for Teams** keeps an up-to-date Excel copy in a folder you pick, such as a Teams channel's folder synced by OneDrive.
+
 **Sharing**
 - **Export to Excel** (Reports, or Settings > Your data) makes one workbook to post in Teams or open anywhere.
 - The online demo at zombeatz.github.io/Zoms_MRP.

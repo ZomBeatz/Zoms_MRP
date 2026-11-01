@@ -12,13 +12,13 @@
 
 ## Quick start
 
-**Just want to look around?** Start it and pick **Try it with demo data**.
+**Just want to look around?** Try the [online demo](https://zombeatz.github.io/Zoms_MRP/). It runs in your browser with made-up data.
 
-1. Install [Node.js](https://nodejs.org) 22 or newer.
-2. In this folder, run `npm install`, then `npm run dev`.
-3. Open http://localhost:1430 and choose **Start empty** or **Try it with demo data**.
+1. Download Zom's MRP for your computer from the [latest release](https://github.com/ZomBeatz/Zoms_MRP/releases/latest): **Windows** (`.exe`), **Mac** (`.dmg`) or **Linux** (`.deb`, `.rpm` or `.AppImage`).
+2. Install it with a double-click and open it.
+3. Choose **Try it with demo data** to look around, or **Start empty** to plan your own operation.
 
-Everything is saved in your browser on this computer.
+Everything stays on that computer. For a team, see [Server](#server) below.
 
 ## What it does
 
@@ -45,10 +45,6 @@ Like a fleet board, a crew roster and a Gantt chart in one, with the checks buil
 | **Fleet** | Who's flying which tail, inspections, repairs, aircraft use |
 | **Training** | NVG, mountain flying, over water, renewals coming up |
 
-## Try it online
-
-**Just want to look around?** The [online demo](https://zombeatz.github.io/Zoms_MRP/) runs in your browser with made-up data from an operator in Alaska. Anything you change stays in your browser.
-
 ## Server
 
 For a team: everyone signs in to the same plan from their own browser. Admins decide who has access.
@@ -71,7 +67,19 @@ Open `https://your-domain` and create the admin account right away. Caddy gets t
 <details>
 <summary><b>Where is my data saved?</b></summary>
 
-In your browser's storage on this computer. Use **Settings > Your data > Save a backup** now and then. Clearing the browser's site data removes it.
+In the desktop app, in a file in the app's data folder on that computer, with a copy kept every day for a month. On the server, in the server's database. In a browser, in that browser's storage. Use **Settings > Your data > Save a backup** now and then.
+</details>
+
+<details>
+<summary><b>How do I share the plan in Teams?</b></summary>
+
+**Export to Excel** (Reports or Settings) makes a workbook to post in a channel. In the desktop app, **Settings > Excel copy for Teams** keeps one up to date in a folder: pick a Teams channel's folder that OneDrive syncs, and the team always has the latest.
+</details>
+
+<details>
+<summary><b>Windows or macOS warns about the installer</b></summary>
+
+The installers aren't signed with a paid certificate yet. On Windows choose **More info > Run anyway**; on a Mac, right-click the app and choose **Open**.
 </details>
 
 <details>
@@ -123,6 +131,7 @@ npm run build:server && cargo test --manifest-path server/Cargo.toml   # the ser
 - `src/backends/`: where the data is kept: this browser, this computer (desktop app) or the server.
 - `src/excel.ts`: **Export to Excel**.
 - `server/`: the server (Rust: axum and SQLite), with the web app built in. `Dockerfile` and `docker-compose.yml` package it with Caddy.
+- `src-tauri/`: the desktop app (Tauri 2). `npm run app` runs it; `npm run bundle` makes the installer.
 </details>
 
 ## License
