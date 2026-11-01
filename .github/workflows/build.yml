@@ -1,5 +1,5 @@
 # Builds the Zom's MRP desktop app on GitHub's machines: Windows, macOS and Linux installers.
-# Run it from the Actions tab ("Run workflow"), or push a tag like v0.3.0.
+# Run it from the Actions tab ("Run workflow"), or push a tag like v0.1.0.
 # Every run keeps the files under the run's "Artifacts"; a tag also makes a draft release with them.
 name: Desktop app
 

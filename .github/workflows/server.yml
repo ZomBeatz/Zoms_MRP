@@ -1,5 +1,5 @@
 # The server: tests on every push, and the Docker image published to GitHub's container registry as
-# ghcr.io/zombeatz/zoms-mrp-server (amd64 and arm64) on pushes to main and on version tags like v0.3.0.
+# ghcr.io/zombeatz/zoms-mrp-server (amd64 and arm64) on pushes to main and on version tags like v0.1.0.
 name: Server
 
 on:
