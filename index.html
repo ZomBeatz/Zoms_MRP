@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#2580c3" />
+    <title>Zom's MRP</title>
+    <link rel="icon" type="image/svg+xml" href="/app-icon.svg" />
+    <script>
+      // Apply the saved theme before the page draws, so there's no flash of the wrong one.
+      try {
+        var t = localStorage.getItem("zoms-mrp:theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

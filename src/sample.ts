@@ -1,0 +1,337 @@
+import { addMonths, format } from "date-fns";
+import type { Aircraft, AppData, Booking, MaintenanceJob, Mission, Pattern, Person, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
+import { booking } from "./bookings";
+import { DAY, dayAt, overlaps, toWhen, today } from "./time";
+
+export const defaultSettings = (): Settings => ({
+  theme: "system",
+  rules: { maxDaysOn: 21, minDaysOff: 7 },
+  sidebarCollapsed: false,
+  scheduleSpan: 30,
+  scheduleGroup: "aircraft",
+  expiryWarningDays: 30,
+});
+
+export const emptyData = (): AppData => ({
+  version: 1,
+  aircraft: [],
+  trainings: [],
+  people: [],
+  missions: [],
+  seasons: [],
+  shifts: [],
+  jobs: [],
+  timeOff: [],
+  settings: defaultSettings(),
+});
+
+/** A small seeded random, so the demo comes out the same every time. */
+function seeded(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const HITCH = 14; // days per hitch in the demo
+
+/**
+ * Made-up demo data for a helicopter operator in Alaska (names, tails and customers are invented,
+ * per DESIGN.md "Demo"). It covers the past 12 months as history and the next 12 months as plans,
+ * with seasonal contracts (fire, survey, tours, fisheries, North Slope winters) and year-round ones
+ * (medevac). Crew rotations are generated from each mission's regular crew, respecting type ratings,
+ * training, time off and days off, so the gaps that remain are real ones. A few problems are left on purpose.
+ */
+export function sampleData(settings = defaultSettings()): AppData {
+  const rnd = seeded(907);
+  const t0 = today().getTime();
+  const windowFrom = dayAt(t0, -365), windowTo = dayAt(t0, 365);
+  const date = (y: number, m: number, d: number) => new Date(y, m - 1, d).getTime();
+  const iso = (t: number) => format(t, "yyyy-MM-dd");
+
+  // ---- training
+  const course = (name: string, validMonths: number, appliesTo: Training["appliesTo"]): Training =>
+    ({ id: `t-${name.toLowerCase().replace(/\W+/g, "-")}`, name, validMonths, appliesTo, notes: "" });
+  const tMtn = course("Mountain flying", 12, "Pilot");
+  const tFire = course("Fire bucket operations", 12, "Pilot");
+  const tWater = course("Over water and HUET", 24, "Pilot");
+  const tNvg = course("Night vision goggles (NVG)", 12, "Pilot");
+  const tHoist = course("Hoist rescue", 12, "Pilot");
+  const tArctic = course("Arctic survival", 24, "Both");
+  const tCold = course("Cold weather maintenance", 24, "Maintainer");
+  const tFuel = course("Fuel and hazmat handling", 24, "Maintainer");
+  const trainings = [tMtn, tFire, tWater, tNvg, tHoist, tArctic, tCold, tFuel];
+
+  // ---- fleet: twelve tails, three of each type
+  const ac = (tail: string, type: string, seats: number, base: string): Aircraft => ({ id: `a-${tail}`, tail, type, seats, base, status: "Ready", notes: "" });
+  const B412 = "Bell 412", AW = "AW139", AS = "AS350 B3", B407 = "Bell 407";
+  const n412 = ac("N412AK", B412, 2, "Anchorage");
+  const n413 = ac("N413AK", B412, 2, "Fairbanks");
+  const n414 = ac("N414AK", B412, 2, "Deadhorse");
+  const n139 = ac("N139AK", AW, 2, "Palmer");
+  const n140 = ac("N140AK", AW, 2, "Bethel");
+  const n141 = ac("N141AK", AW, 2, "Nome");
+  const n350 = ac("N350AK", AS, 1, "Fairbanks");
+  const n351 = ac("N351AK", AS, 1, "Juneau");
+  const n352 = ac("N352AK", AS, 1, "Dillingham");
+  const n407 = ac("N407AK", B407, 1, "Kodiak");
+  const n408 = ac("N408AK", B407, 1, "Anchorage");
+  const n409 = ac("N409AK", B407, 1, "Sitka");
+  const aircraft = [n412, n413, n414, n139, n140, n141, n350, n351, n352, n407, n408, n409];
+
+  // ---- crew: 34 pilots, 12 maintainers
+  const person = (name: string, role: Person["role"], quals: string[], base: string): Person =>
+    ({ id: `p-${name.split(" ")[0].toLowerCase()}`, name, role, quals, training: [], missionIds: [], base, phone: "", notes: "" });
+  const P = {
+    alex: person("Alex Rivera", "Pilot", [B412, AW], "Anchorage"),
+    maya: person("Maya Chen", "Pilot", [B412, AS], "Fairbanks"),
+    sam: person("Sam Patel", "Pilot", [B412, AW, B407], "Anchorage"),
+    jamie: person("Jamie Ortiz", "Pilot", [B412, AW], "Anchorage"),
+    owen: person("Owen Larsen", "Pilot", [B412], "Deadhorse"),
+    priya: person("Priya Nair", "Pilot", [B412, AW], "Fairbanks"),
+    eli: person("Eli Swanson", "Pilot", [B412, AS], "Fairbanks"),
+    tess: person("Tess Johansen", "Pilot", [B412, B407], "Kodiak"),
+    riley: person("Riley Brooks", "Pilot", [AW], "Palmer"),
+    quinn: person("Quinn Hayes", "Pilot", [AW, B412], "Palmer"),
+    marcus: person("Marcus Reyes", "Pilot", [AW, AS], "Bethel"),
+    hana: person("Hana Sato", "Pilot", [AW, AS], "Bethel"),
+    jordan: person("Jordan Okafor", "Pilot", [AS, B407], "Fairbanks"),
+    casey: person("Casey Morgan", "Pilot", [AS, B407], "Anchorage"),
+    ezra: person("Ezra Whitfield", "Pilot", [AS, B407], "Juneau"),
+    mia: person("Mia Kowalski", "Pilot", [AS, B407, B412], "Juneau"),
+    leah: person("Leah Tanaka", "Pilot", [AW, B412], "Nome"),
+    noah: person("Noah Ahlberg", "Pilot", [AW], "Nome"),
+    nora: person("Nora Fitzgerald", "Pilot", [AW, B412], "Nome"),
+    ivy: person("Ivy Lindqvist", "Pilot", [B412, AW], "Deadhorse"),
+    grace: person("Grace Muller", "Pilot", [AS, B407], "Dillingham"),
+    ruben: person("Ruben Castro", "Pilot", [AS], "Dillingham"),
+    victor: person("Victor Kim", "Pilot", [B407, AS], "Sitka"),
+    ana: person("Ana Volkov", "Pilot", [B407], "Sitka"),
+    dana: person("Dana Okonkwo", "Pilot", [AW, B412], "Anchorage"),
+    theo: person("Theo Martin", "Pilot", [B412, AS], "Fairbanks"),
+    sofia: person("Sofia Haugen", "Pilot", [AW, B412], "Bethel"),
+    luke: person("Luke Brennan", "Pilot", [AS, B407], "Juneau"),
+    iris: person("Iris Delacroix", "Pilot", [B407, AS], "Kodiak"),
+    paul: person("Paul Nakamura", "Pilot", [AW, B412], "Palmer"),
+    wes: person("Wes Carter", "Pilot", [B412, AW], "Deadhorse"),
+    elena: person("Elena Rossi", "Pilot", [B412, AW], "Deadhorse"),
+    kofi: person("Kofi Mensah", "Pilot", [B412, AW], "Anchorage"),
+    liam: person("Liam O'Neill", "Pilot", [B412, AW], "Palmer"),
+    taylor: person("Taylor Nguyen", "Maintainer", [B412, AW], "Anchorage"),
+    morgan: person("Morgan Lee", "Maintainer", [AS, B407], "Fairbanks"),
+    drew: person("Drew Santos", "Maintainer", [B412, AS, B407], "Anchorage"),
+    kai: person("Kai Peterson", "Maintainer", [AW, B412], "Palmer"),
+    rosa: person("Rosa Delgado", "Maintainer", [AS, B407, AW], "Juneau"),
+    ben: person("Ben Ivanoff", "Maintainer", [B412, AW], "Bethel"),
+    lena: person("Lena Holt", "Maintainer", [AW, B412], "Nome"),
+    felix: person("Felix Romero", "Maintainer", [AS, B407], "Sitka"),
+    aiden: person("Aiden Clarke", "Maintainer", [AW, B412], "Bethel"),
+    june: person("June Park", "Maintainer", [AS, B407], "Kodiak"),
+    omar: person("Omar Haddad", "Maintainer", [B412, AW], "Deadhorse"),
+    sasha: person("Sasha Petrov", "Maintainer", [AS, B407, B412], "Dillingham"),
+  };
+  const people = Object.values(P);
+
+  // ---- customers and their seasons. A mission is one customer's job for one season.
+  interface Contract {
+    name: string; contact: string; color: string; pattern: Pattern; tail: Aircraft; pilots: number; maint: number;
+    training: Training[]; location: string; crew: Person[];
+    /** The seasons in a given year: [first day, midnight after the last day, label]. */
+    seasons: (y: number) => [number, number, string][];
+  }
+  const season = (sm: number, sd: number, em: number, ed: number) => (y: number): [number, number, string][] => [[date(y, sm, sd), date(y, em, ed + 1), `${y}`]];
+  const winter = (sm: number, sd: number, em: number, ed: number) => (y: number): [number, number, string][] =>
+    [[date(y, sm, sd), date(y + 1, em, ed + 1), `winter ${y}-${String(y + 1).slice(2)}`]];
+  const named = (...parts: [number, number, number, number, string][]) => (y: number) =>
+    parts.map(([sm, sd, em, ed, label]): [number, number, string] => [date(y, sm, sd), date(y, em, ed + 1), `${label} ${y}`]);
+  const contracts: Contract[] = [
+    { name: "Interior Fire Service", contact: "Fire dispatch, (907) 555-0142", color: "#c2410c", pattern: "stripes", tail: n413, pilots: 2, maint: 1, training: [tMtn, tFire],
+      location: "Fairbanks and Interior fire zones", crew: [P.maya, P.jamie, P.priya, P.tess, P.eli, P.theo, P.owen, P.dana, P.mia, P.kofi, P.taylor, P.drew, P.omar], seasons: season(5, 15, 9, 15) },
+    { name: "Interior Fire Service, initial attack", contact: "Fire dispatch, (907) 555-0142", color: "#ea580c", pattern: "dots", tail: n350, pilots: 1, maint: 0, training: [tMtn, tFire],
+      location: "Tanana Valley", crew: [P.jordan, P.casey, P.eli, P.maya, P.theo, P.luke], seasons: season(6, 1, 8, 31) },
+    { name: "North Slope Energy", contact: "Logistics desk, (907) 555-0177", color: "#0f766e", pattern: "solid", tail: n412, pilots: 2, maint: 1, training: [tArctic, tCold],
+      location: "Deadhorse", crew: [P.wes, P.elena, P.kofi, P.alex, P.sam, P.owen, P.quinn, P.ivy, P.dana, P.sofia, P.paul, P.drew, P.ben, P.omar, P.lena], seasons: winter(11, 15, 4, 30) },
+    { name: "Prudhoe pipeline patrol", contact: "Pipeline control, (907) 555-0181", color: "#115e59", pattern: "dashes", tail: n414, pilots: 1, maint: 0, training: [tArctic],
+      location: "Prudhoe Bay to Atigun Pass", crew: [P.ivy, P.nora, P.owen, P.leah, P.mia, P.dana, P.wes, P.elena], seasons: named([2, 1, 5, 31, "spring"], [9, 1, 10, 31, "fall"]) },
+    { name: "Alaska Range Survey", contact: "Survey office, (907) 555-0119", color: "#a16207", pattern: "grid", tail: n412, pilots: 1, maint: 0, training: [tMtn],
+      location: "Talkeetna", crew: [P.alex, P.sam, P.owen, P.mia, P.dana], seasons: season(6, 15, 8, 31) },
+    { name: "Denali Park research", contact: "Research station, (907) 555-0128", color: "#4d7c0f", pattern: "dots", tail: n414, pilots: 1, maint: 0, training: [tMtn],
+      location: "Denali backcountry", crew: [P.ivy, P.nora, P.jamie, P.owen, P.theo], seasons: season(6, 10, 8, 25) },
+    { name: "Kenai Electric line patrol", contact: "Line crew lead, (907) 555-0163", color: "#854d0e", pattern: "dashes", tail: n413, pilots: 1, maint: 0, training: [tMtn],
+      location: "Kenai Peninsula", crew: [P.maya, P.priya, P.tess, P.eli, P.theo], seasons: season(1, 10, 3, 31) },
+    { name: "Mat-Su Medevac", contact: "Flight desk, (907) 555-0150", color: "#be123c", pattern: "solid", tail: n139, pilots: 2, maint: 1, training: [tNvg, tHoist],
+      location: "Palmer", crew: [P.riley, P.quinn, P.marcus, P.paul, P.liam, P.alex, P.dana, P.hana, P.leah, P.kai, P.taylor, P.aiden, P.lena], seasons: season(1, 5, 12, 20) },
+    { name: "YK Delta Health", contact: "Transport desk, (907) 555-0188", color: "#1e3a8a", pattern: "zigzag", tail: n140, pilots: 2, maint: 0, training: [tNvg, tArctic, tWater],
+      location: "Bethel and villages", crew: [P.hana, P.marcus, P.sofia, P.priya, P.sam, P.jamie], seasons: season(1, 5, 12, 20) },
+    { name: "Nome Regional Medevac", contact: "Dispatch, (907) 555-0193", color: "#9f1239", pattern: "stripes", tail: n141, pilots: 2, maint: 0, training: [tNvg, tArctic, tWater],
+      location: "Nome and Seward Peninsula", crew: [P.leah, P.noah, P.nora, P.ivy, P.sofia, P.paul, P.liam, P.kofi], seasons: season(1, 5, 12, 20) },
+    { name: "Tanana Wildlife Survey", contact: "Field biologist, (907) 555-0124", color: "#15803d", pattern: "dots", tail: n350, pilots: 1, maint: 0, training: [],
+      location: "Tanana Flats", crew: [P.jordan, P.casey, P.marcus, P.luke], seasons: named([4, 1, 5, 20, "spring"], [9, 10, 10, 25, "fall"]) },
+    { name: "Copper River seismic survey", contact: "Survey lead, (907) 555-0135", color: "#57534e", pattern: "grid", tail: n350, pilots: 1, maint: 0, training: [tMtn],
+      location: "Copper River basin", crew: [P.jordan, P.maya, P.eli, P.theo], seasons: season(2, 1, 3, 15) },
+    { name: "Juneau Icefield Tours", contact: "Tour office, (907) 555-0131", color: "#0369a1", pattern: "stripes", tail: n351, pilots: 1, maint: 0, training: [tMtn, tWater],
+      location: "Juneau Icefield", crew: [P.ezra, P.mia, P.casey, P.luke, P.iris], seasons: season(5, 15, 9, 15) },
+    { name: "Southeast Avalanche Program", contact: "Avalanche center, (907) 555-0109", color: "#6d28d9", pattern: "grid", tail: n351, pilots: 1, maint: 0, training: [tMtn],
+      location: "Juneau and Haines", crew: [P.ezra, P.mia, P.jordan, P.luke], seasons: winter(12, 1, 3, 31) },
+    { name: "Bristol Bay Fisheries Survey", contact: "Fisheries office, (907) 555-0146", color: "#0891b2", pattern: "zigzag", tail: n352, pilots: 1, maint: 0, training: [tWater],
+      location: "Bristol Bay", crew: [P.grace, P.ruben, P.victor, P.iris], seasons: season(6, 10, 8, 20) },
+    { name: "Bristol Bay hunting charters", contact: "Lodge office, (907) 555-0158", color: "#78350f", pattern: "solid", tail: n352, pilots: 1, maint: 0, training: [],
+      location: "Dillingham", crew: [P.ruben, P.grace, P.iris], seasons: season(9, 1, 10, 15) },
+    { name: "Kodiak Fisheries Patrol", contact: "Patrol office, (907) 555-0156", color: "#0e7490", pattern: "dashes", tail: n407, pilots: 1, maint: 0, training: [tWater],
+      location: "Kodiak Island", crew: [P.tess, P.sam, P.ezra, P.casey, P.iris], seasons: season(6, 1, 9, 30) },
+    { name: "Sitka Search and Rescue support", contact: "SAR coordinator, (907) 555-0115", color: "#b91c1c", pattern: "dots", tail: n409, pilots: 1, maint: 0, training: [tWater],
+      location: "Sitka Sound", crew: [P.ana, P.victor, P.grace, P.iris], seasons: season(1, 5, 12, 20) },
+    { name: "Chugach Power line patrol", contact: "Grid operations, (907) 555-0170", color: "#9d174d", pattern: "solid", tail: n408, pilots: 1, maint: 0, training: [],
+      location: "Anchorage to Seward", crew: [P.jordan, P.casey, P.tess, P.sam, P.victor, P.luke],
+      seasons: (y) => [3, 6, 9, 12].map((m): [number, number, string] => [date(y, m, 1), date(y, m, 22), format(date(y, m, 1), "MMM yyyy")]) },
+    { name: "Kachemak Bay film shoot", contact: "Production office, (907) 555-0102", color: "#c026d3", pattern: "stripes", tail: n408, pilots: 1, maint: 0, training: [tWater],
+      location: "Homer", crew: [P.casey, P.victor, P.ana], seasons: season(7, 1, 7, 12) },
+  ];
+
+  // ---- missions: one per customer, with every season that falls in the two-year window
+  const y0 = new Date(t0).getFullYear();
+  const missionList: Mission[] = [];
+  const seasons: Season[] = [];
+  const contractOf = new Map<string, Contract>(); // by mission id and by season id
+  for (const c of contracts) {
+    const mission: Mission = {
+      id: `m-${missionList.length + 1}`, name: c.name, contact: c.contact, location: c.location, notes: "",
+      requiredTrainingIds: c.training.map((t) => t.id), color: c.color, pattern: c.pattern,
+    };
+    missionList.push(mission);
+    contractOf.set(mission.id, c);
+    for (const p of c.crew) p.missionIds.push(mission.id);
+    for (const y of [y0 - 2, y0 - 1, y0, y0 + 1])
+      for (const [a0, b0] of c.seasons(y)) {
+        const a = Math.max(a0, windowFrom), b = Math.min(b0, windowTo);
+        if (b - a < 3 * DAY) continue;
+        const status: Season["status"] = b <= t0 ? "Done" : a <= t0 ? "Flying" : a - t0 < 60 * DAY ? "Confirmed" : "Planned";
+        const season: Season = {
+          id: `se-${seasons.length + 1}`, missionId: mission.id, start: toWhen(a), end: toWhen(b), aircraftId: c.tail.id,
+          pilotsNeeded: c.pilots, maintainersNeeded: c.maint, status, notes: "",
+        };
+        seasons.push(season);
+        contractOf.set(season.id, c);
+      }
+  }
+  seasons.sort((x, y) => x.start.localeCompare(y.start));
+  // The seasons with their mission's details, for the steps below.
+  const missions: Booking[] = seasons.map((x) => booking(missionList.find((m) => m.id === x.missionId)!, x));
+
+  // ---- training records: a chain of courses so everyone is current across the window, with the
+  // next renewal already booked, except a few left to show what MRP warns about.
+  const unbooked = new Set([`${P.riley.id}:${tNvg.id}`, `${P.casey.id}:${tWater.id}`, `${P.owen.id}:${tArctic.id}`, `${P.morgan.id}:${tFuel.id}`, `${P.noah.id}:${tNvg.id}`]);
+  for (const p of people) {
+    const needed = new Set<Training>(p.role === "Maintainer" ? [tFuel] : []);
+    for (const id of p.missionIds)
+      for (const t of contractOf.get(id)!.training) if (t.appliesTo === "Both" || t.appliesTo === p.role) needed.add(t);
+    for (const t of needed) {
+      // The most recent course, 20 to 300 days ago, with a few set up to run out.
+      let done = dayAt(t0, -20 - Math.floor(rnd() * 280));
+      if (p === P.owen && t === tArctic) done = dayAt(t0, -t.validMonths * 30 - 15); // has run out
+      if (p === P.riley && t === tNvg) done = dayAt(t0, -350); // runs out in about two weeks
+      if (p === P.noah && t === tNvg) done = dayAt(t0, -300); // runs out in about two months
+      if (p === P.casey && t === tWater) done = dayAt(t0, -705);
+      const rec = (d: number): TrainingRecord => ({ trainingId: t.id, completed: iso(d), expires: iso(addMonths(d, t.validMonths).getTime()) });
+      p.training.push(rec(addMonths(done, -t.validMonths).getTime() + 10 * DAY), rec(done));
+      // The next one is booked a couple of weeks before this one runs out.
+      const next = addMonths(done, t.validMonths).getTime() - 14 * DAY;
+      if (next < windowTo && !unbooked.has(`${p.id}:${t.id}`)) p.training.push(rec(next));
+    }
+  }
+  const trainedFor = (p: Person, m: Booking, a: number, b: number) =>
+    m.requiredTrainingIds.every((id) => {
+      const t = trainings.find((x) => x.id === id)!;
+      if (t.appliesTo !== "Both" && t.appliesTo !== p.role) return true;
+      return p.training.some((r) => r.trainingId === id && new Date(`${r.completed}T00:00`).getTime() <= a && (!r.expires || new Date(`${r.expires}T00:00`).getTime() >= b));
+    });
+
+  // ---- time off: two breaks a year for everyone
+  const timeOff: TimeOff[] = [];
+  const reasons = ["Vacation", "Family time", "Vacation", "Training course", "Medical", "Vacation"];
+  people.forEach((p, i) => {
+    for (const offset of [-330 + ((i * 37) % 300), 25 + ((i * 29) % 300)]) {
+      const a = dayAt(t0, offset);
+      timeOff.push({ id: `o-${timeOff.length + 1}`, personId: p.id, start: toWhen(a), end: toWhen(dayAt(a, 7 + Math.floor(rnd() * 8))), reason: reasons[(i + timeOff.length) % reasons.length] });
+    }
+  });
+
+  // Everyone's bookings so far, so the generated roster never double books anyone.
+  const booked = new Map<string, [number, number][]>(people.map((p) => [p.id, []]));
+  for (const o of timeOff) booked.get(o.personId)!.push([new Date(o.start).getTime(), new Date(o.end).getTime()]);
+  const worked = new Map<string, number>(people.map((p) => [p.id, 0]));
+  const rest = settings.rules.minDaysOff;
+  const free = (p: Person, a: number, b: number, gap = rest) => !booked.get(p.id)!.some(([x, y]) => overlaps(dayAt(a, -gap), dayAt(b, gap), x, y));
+  const book = (p: Person, a: number, b: number) => {
+    booked.get(p.id)!.push([a, b]);
+    worked.set(p.id, worked.get(p.id)! + (b - a) / DAY);
+  };
+
+  // ---- maintenance: an annual and a 100 hour inspection for each tail every year, in its quiet time
+  const jobs: MaintenanceJob[] = [];
+  const time = (w: string) => new Date(w).getTime();
+  const tailBusy = (a: Aircraft, from: number, to: number) =>
+    missions.some((m) => m.aircraftId === a.id && overlaps(from, to, time(m.start), time(m.end))) ||
+    jobs.some((j) => j.aircraftId === a.id && j.grounds && overlaps(dayAt(from, -5), dayAt(to, 5), time(j.start), time(j.end)));
+  const addJob = (a: Aircraft, title: string, kind: MaintenanceJob["kind"], from: number, days: number, grounds = true) => {
+    const to = dayAt(from, days);
+    const who = people
+      .filter((p) => p.role === "Maintainer" && p.quals.includes(a.type) && free(p, from, to, grounds ? rest : 2))
+      .sort((x, y) => worked.get(x.id)! - worked.get(y.id)!)
+      .slice(0, days > 3 ? 2 : 1);
+    who.forEach((p) => book(p, from, to));
+    jobs.push({ id: `j-${jobs.length + 1}`, aircraftId: a.id, title, kind, start: toWhen(from), end: toWhen(to), maintainerIds: who.map((p) => p.id), grounds, done: to <= t0, notes: "" });
+  };
+  /** The longest stretch in [from, to) when the tail has no mission or grounding job. */
+  const longestQuiet = (a: Aircraft, from: number, to: number): [number, number] | null => {
+    let best: [number, number] | null = null, runStart = -1;
+    for (let d = from; d <= to; d = dayAt(d, 1)) {
+      const quiet = d < to && !tailBusy(a, d, dayAt(d, 1));
+      if (quiet && runStart < 0) runStart = d;
+      if (!quiet && runStart >= 0) {
+        if (!best || d - runStart > best[1] - best[0]) best = [runStart, d];
+        runStart = -1;
+      }
+    }
+    return best;
+  };
+  for (const a of aircraft)
+    for (const [from, to] of [[windowFrom, t0], [t0, windowTo]])
+      for (const [title, days] of [["Annual inspection", 7], ["100 hour inspection", 2]] as const) {
+        const quiet = longestQuiet(a, from, to);
+        if (quiet && quiet[1] - quiet[0] >= (days + 6) * DAY)
+          addJob(a, title, "Inspection", dayAt(quiet[0], Math.floor(((quiet[1] - quiet[0]) / DAY - days) / 2)), days);
+      }
+  // On purpose: a gearbox overhaul that lands in the middle of the North Slope season.
+  const slope = missions.find((m) => m.name === "North Slope Energy" && time(m.end) > t0)!;
+  addJob(n412, "Tail rotor gearbox overhaul", "Repair", dayAt(time(slope.start), 10), 3);
+
+  // ---- rotations: hitches of 14 days, filled in date order across all missions, from each mission's
+  // regular crew first, then anyone else rated on the type and current on its training
+  const shifts: Shift[] = [];
+  const hitches: { m: Booking; a: number; b: number }[] = [];
+  for (const m of missions)
+    for (let h = time(m.start); h < time(m.end); h = dayAt(h, HITCH)) hitches.push({ m, a: h, b: Math.min(time(m.end), dayAt(h, HITCH)) });
+  hitches.sort((x, y) => x.a - y.a || contractOf.get(x.m.id)!.crew.length - contractOf.get(y.m.id)!.crew.length);
+  for (const { m, a: h, b: he } of hitches) {
+    const a = aircraft.find((x) => x.id === m.aircraftId)!;
+    const regulars = contractOf.get(m.id)!.crew;
+    for (const role of ["Pilot", "Maintainer"] as const) {
+      const need = role === "Pilot" ? m.pilotsNeeded : m.maintainersNeeded;
+      const pick = people
+        .filter((p) => p.role === role && p.quals.includes(a.type) && trainedFor(p, m, h, he) && free(p, h, he))
+        .sort((x, y) => Number(regulars.includes(y)) - Number(regulars.includes(x)) || worked.get(x.id)! - worked.get(y.id)! || x.name.localeCompare(y.name))
+        .slice(0, need);
+      for (const p of pick) {
+        book(p, h, he);
+        if (!p.missionIds.includes(m.missionId)) p.missionIds.push(m.missionId);
+        shifts.push({ id: `s-${shifts.length + 1}`, seasonId: m.id, personId: p.id, start: toWhen(h), end: toWhen(he) });
+      }
+    }
+  }
+
+  return { version: 1, aircraft, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, settings };
+}
