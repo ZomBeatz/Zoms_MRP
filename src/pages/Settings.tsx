@@ -1,9 +1,10 @@
 import { useRef } from "react";
-import { Download, FlaskConical, Keyboard, Palette, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { Download, FileSpreadsheet, FlaskConical, Keyboard, Palette, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { Field } from "../components/ui";
 import { migrate } from "../migrate";
+import { downloadWorkbook } from "../excel";
 import { isOnlineDemo } from "../platform";
 import { SHORTCUTS } from "./Help";
 
@@ -83,6 +84,9 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           <p className="small muted" style={{ marginTop: 0 }}>Everything is saved on this computer, in this browser. Save a backup now and then.</p>
           <div className="row gap wrap">
             <button className="btn" onClick={backup}><Download size={14} /> Save a backup</button>
+            <button className="btn" onClick={() => downloadWorkbook(data).then(() => showToast("Saved to Downloads. Post it in a Teams channel to share it."), () => showToast("Couldn't make the Excel file. Try again."))}>
+              <FileSpreadsheet size={14} /> Export to Excel
+            </button>
             <button className="btn" onClick={() => fileRef.current?.click()}><Upload size={14} /> Restore a backup…</button>
             <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
             <button className="btn danger" onClick={() => clearAll()}>Clear all {demo ? "demo " : ""}data</button>

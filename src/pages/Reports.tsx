@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Download, Printer } from "lucide-react";
-import { format } from "date-fns";
+import { FileSpreadsheet, Printer } from "lucide-react";
+import { downloadWorkbook } from "../excel";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
 import { dutyOf, missionCoverage } from "../coverage";
@@ -73,29 +73,26 @@ export function Reports() {
   const crewShare = r.crew.length ? crewDays / (r.crew.length * r.days) : 0;
   const maxMission = Math.max(1, ...r.byMission.map((x) => x.days));
 
-  const exportCsv = () => {
-    const q = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-    const lines = [
-      ["Mission", "Contact", "Aircraft", "First day", "Last day", "Days in period", "Crewed %", "Status"].map(q).join(","),
-      ...r.missions.map((m) => [
-        m.name, m.contact, data.aircraft.find((a) => a.id === m.aircraftId)?.tail ?? "",
-        m.start.slice(0, 10), format(ms(m.end) - 1, "yyyy-MM-dd"), Math.round(clip(ms(m.start), ms(m.end), from, to) / DAY), Math.round(missionCoverage(data, m).covered * 100), m.status,
-      ].map(q).join(",")),
-    ];
-    const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mrp-report-${format(from, "yyyy-MM-dd")}-to-${format(to - 1, "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    useStore.getState().showToast("Saved to Downloads");
+  const [exporting, setExporting] = useState(false);
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      await downloadWorkbook(data);
+      useStore.getState().showToast("Saved to Downloads. Post it in a Teams channel to share it.");
+    } catch {
+      useStore.getState().showToast("Couldn't make the Excel file. Try again.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
     <>
       <div className="page-head">
         <h1>Reports</h1>
-        <button className="btn" onClick={exportCsv}><Download size={16} /> Export CSV</button>
+        <button className="btn" onClick={exportExcel} disabled={exporting} title="The fleet board, seasons, crew roster, training, maintenance and problems, one sheet each">
+          <FileSpreadsheet size={16} /> {exporting ? "Making the file…" : "Export to Excel"}
+        </button>
         <button className="btn" onClick={() => window.print()}><Printer size={16} /> Print</button>
       </div>
       <div className="row gap wrap" style={{ marginBottom: 16 }}>

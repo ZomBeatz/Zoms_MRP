@@ -10,3 +10,6 @@ server/data
 
 # Local editor/assistant settings
 .claude/
+
+# Exports made while testing
+*.xlsx

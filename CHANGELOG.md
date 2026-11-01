@@ -21,6 +21,10 @@
 - **Copy to next season** adds next year's dates in one click, ready to crew.
 - Renaming a mission renames every season, and saves from earlier versions are converted automatically.
 
+**Sharing**
+- **Export to Excel** (Reports, or Settings > Your data) makes one workbook to post in Teams or open anywhere: a fleet board by week in mission colors, fleet use, seasons, the crew roster, training, maintenance and the problems Zom's MRP found.
+- An online demo, with the Alaska data, that anyone can try in their browser.
+
 **Also**
 - Maintenance has its own thin row under each tail on the Fleet page, and any maintenance takes the day out of a free window.
 - Click the logo to go back to the Overview.
