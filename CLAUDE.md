@@ -1,0 +1,12 @@
+# Zom's MRP
+
+Zom's MRP (Mission Ready Planner) is a ZomBeatz Media app for scheduling helicopter missions: aircraft by tail number, pilots rotating through hitches, maintainers, maintenance and training. React + TypeScript + Vite, built like Zomello.
+
+- **Design and wording:** follow the ZomBeatz design system: https://github.com/ZomBeatz/zombeatz-docs/blob/main/design/DESIGN.md (locally `../zombeatz-docs/design/`). `src/tokens.css` is a copy of its `tokens.css`; build styles from the `--zb-*` variables.
+- **Data** stays on one device for now: one JSON document in the browser's storage (`src/store.ts`). The demo lives in its own slot and never touches the person's own data.
+- **Missions are customers; seasons are dates.** A `Mission` holds what stays the same (name, contact, look, training, crew via `Person.missionIds`). Each `Season` is one stretch of dates on one aircraft; shifts point at seasons. Pages and checks work with `bookings(data)` from `src/bookings.ts` (a season joined with its mission). Older saves are converted in `src/migrate.ts`; add to it when the data changes shape.
+- **Fleet first.** The Fleet page (`src/pages/Aircraft.tsx`, logic in `src/fleet.ts`) is the main view of what can be supported. Timelines share `src/components/timeline.tsx`.
+- **Training is set by missions.** People only need the training of the missions they work (`Person.missionIds`) or are booked on (`neededTraining` in `src/coverage.ts`).
+- **Everything is whole days.** Starts are midnights and ends are the midnight after the last day. Use the calendar helpers in `src/time.ts` (`dayAt`, `dateToStart`, `dateToEnd`), never fixed 24-hour steps, so days that change the clock still line up.
+- **Checks** (gaps, double bookings, qualifications, training, hitch length) are pure functions in `src/coverage.ts` with tests in `src/coverage.test.ts`. Add a test when you add a check.
+- Run `npm run dev` (port 1430), `npm test`, and `npm run build` before calling something done.

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232833"/>
+      <stop offset="1" stop-color="#12151b"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fb0ec"/>
+      <stop offset="1" stop-color="#2580c3"/>
+    </linearGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="208" fill="url(#bg)"/>
+  <!-- headband: orange inner arc over a dark outer arc, like the ZomBeatz mark -->
+  <path d="M 214 600 A 298 298 0 0 1 810 600" fill="none" stroke="#0a0c10" stroke-width="64" stroke-linecap="round"/>
+  <path d="M 214 600 A 298 298 0 0 1 810 600" fill="none" stroke="#ec6a3f" stroke-width="30" stroke-linecap="round"/>
+  <!-- ear cups -->
+  <rect x="196" y="500" width="84" height="264" rx="30" fill="#ec6a3f"/>
+  <rect x="150" y="522" width="86" height="220" rx="30" fill="#0a0c10"/>
+  <rect x="744" y="500" width="84" height="264" rx="30" fill="#ec6a3f"/>
+  <rect x="788" y="522" width="86" height="220" rx="30" fill="#0a0c10"/>
+  <!-- schedule bars (a little Gantt chart): three bookings, the top one with a highlight -->
+  <rect x="326" y="398" width="284" height="110" rx="55" fill="url(#blue)"/>
+  <rect x="404" y="530" width="320" height="110" rx="55" fill="url(#blue)" opacity=".88"/>
+  <rect x="320" y="668" width="250" height="110" rx="55" fill="url(#blue)" opacity=".75"/>
+  <rect x="364" y="436" width="96" height="34" rx="17" fill="#ffffff" opacity=".85"/>
+  <rect x="444" y="568" width="96" height="34" rx="17" fill="#ffffff" opacity=".85"/>
+  <rect x="360" y="706" width="96" height="34" rx="17" fill="#ffffff" opacity=".85"/>
+  <circle cx="566" cy="453" r="24" fill="#ec6a3f"/>
+</svg>

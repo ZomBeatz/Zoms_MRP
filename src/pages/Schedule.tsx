@@ -1,0 +1,357 @@
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } from "../components/timeline";
+import { Printer, Search, Wrench } from "lucide-react";
+import { bookings } from "../bookings";
+import { byId, useStore } from "../store";
+import { missionCoverage, type Issue } from "../coverage";
+import { dayAt, fmtDates, fmtRange, ms, overlaps, toWhen } from "../time";
+import { missionLook, slotStyle } from "../look";
+import { Avatar, StatusPill } from "../components/ui";
+import type { AppData, Booking, Settings } from "../types";
+
+/**
+ * The Gantt chart: time runs left to right, one row per mission, aircraft or person.
+ * Each slot is drawn in its mission's color and pattern.
+ */
+
+interface Bar {
+  key: string;
+  a: number;
+  b: number;
+  title: string;
+  sub?: string;
+  tip: string;
+  className?: string;
+  style?: CSSProperties;
+  onClick: () => void;
+  icon?: ReactNode;
+}
+
+interface Row {
+  key: string;
+  label: ReactNode;
+  sub?: boolean;
+  bars: Bar[];
+  /** Spans drawn behind the bars (time off). */
+  shade?: [number, number][];
+  /** Clicking empty space here adds a mission with these values. */
+  addDefaults?: Record<string, unknown>;
+  onLabel?: () => void;
+}
+
+type Section = { heading?: string; rows: Row[] };
+
+const VIEWS: { id: Settings["scheduleGroup"]; label: string }[] = [
+  { id: "aircraft", label: "Aircraft" },
+  { id: "missions", label: "Missions" },
+  { id: "people", label: "Crew" },
+];
+
+/** Put overlapping bars on separate tracks so none hide another. */
+function pack(bars: Bar[]): { bar: Bar; track: number }[] & { tracks?: number } {
+  const ends: number[] = [];
+  const out = [...bars].sort((x, y) => x.a - y.a).map((bar) => {
+    let t = ends.findIndex((e) => e <= bar.a);
+    if (t < 0) t = ends.length;
+    ends[t] = bar.b;
+    return { bar, track: t };
+  }) as { bar: Bar; track: number }[] & { tracks?: number };
+  out.tracks = Math.max(1, ends.length);
+  return out;
+}
+
+export function Schedule({ issues }: { issues: Issue[] }) {
+  const { data, open, updateSettings } = useStore();
+  const { scheduleSpan: span, scheduleGroup: view } = data.settings;
+  // Opens a couple of days back, so what's running now shows where it started.
+  const tl = useTimeline(span, (n) => updateSettings({ scheduleSpan: n }));
+  const { from, to, pct, justDragged } = tl;
+  const [filter, setFilter] = useState("");
+
+  const sections = useMemo(() => buildRows(data, view, from, to, issues, open), [data, view, from, to, issues, open]);
+  const q = filter.trim().toLowerCase();
+  const shown = sections
+    .map((s) => ({ ...s, rows: q ? s.rows.filter((r) => rowText(r).includes(q)) : s.rows }))
+    .filter((s) => s.rows.length);
+
+  const lane = (r: Row) => {
+    const packed = pack(r.bars.filter((b) => b.b > from && b.a < to));
+    const tracks = packed.tracks ?? 1;
+    const minH = r.sub ? 34 : 44;
+    const trackH = tracks > 1 ? 26 : minH - 10;
+    const height = Math.max(minH, tracks * trackH + 10);
+    return (
+      <div
+        className={`g-lane ${r.sub ? "sub" : ""}`}
+        style={{ height }}
+        title={r.addDefaults ? "Drag to move through time. Click empty space to add a mission here." : "Drag to move through time."}
+        onClick={(e) => {
+          if (justDragged.current || !r.addDefaults || e.target !== e.currentTarget) return;
+          const day = tl.dayAtX(e.clientX, e.currentTarget.getBoundingClientRect());
+          open("season", "new", { ...r.addDefaults, start: toWhen(day), end: toWhen(dayAt(day, 14)) });
+        }}
+      >
+        <LaneBackdrop tl={tl} />
+        {r.shade?.map(([a, b], i) => b > from && a < to && <div key={i} className="g-off" style={{ left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%` }} />)}
+        {packed.map(({ bar, track }) => (
+          <button
+            key={bar.key}
+            className={`slot ${bar.className ?? ""}`}
+            title={bar.tip}
+            onClick={bar.onClick}
+            style={{
+              ...bar.style,
+              left: `${pct(bar.a)}%`,
+              width: `max(4px, calc(${pct(bar.b) - pct(bar.a)}% - 2px))`,
+              ...(tracks > 1 ? { top: 5 + track * trackH, bottom: "auto", height: trackH - 3 } : {}),
+            }}
+          >
+            <span className="t">{bar.icon}{bar.title}</span>
+            {bar.sub && trackH > 30 && <span className="s">{bar.sub}</span>}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div className="page-head">
+        <h1>Schedule</h1>
+        <div className="seg" role="tablist" aria-label="Rows">
+          {VIEWS.map((v) => (
+            <button key={v.id} className={view === v.id ? "active" : ""} onClick={() => updateSettings({ scheduleGroup: v.id })}>{v.label}</button>
+          ))}
+        </div>
+      </div>
+      <div className="sched-bar">
+        <TimelineControls tl={tl} />
+        <span className="grow" />
+        <label className="row gap-sm" style={{ position: "relative" }}>
+          <Search size={14} className="muted" style={{ position: "absolute", left: 9 }} />
+          <input placeholder="Filter rows" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ paddingLeft: 28, width: 180 }}
+            onKeyDown={(e) => e.key === "Escape" && setFilter("")} />
+        </label>
+        <button className="btn sm" onClick={() => window.print()}><Printer size={14} /> Print</button>
+      </div>
+
+      <div className="gantt" ref={tl.ref} {...tl.handlers}>
+        <div className="gantt-grid">
+          <div className="g-corner">{VIEWS.find((v) => v.id === view)?.label}</div>
+          <TimeHead tl={tl} />
+          {shown.length === 0 && (
+            <div style={{ gridColumn: "1 / -1" }} className="empty">
+              <p>{q ? "Nothing matches that filter." : emptyText(view)}</p>
+              {!q && <button className="btn primary" onClick={() => open(view === "aircraft" ? "aircraft" : view === "people" ? "person" : "mission", "new")}>{addText(view)}</button>}
+            </div>
+          )}
+          {shown.map((s, si) => (
+            <Fragment key={s.heading ?? si}>
+              {s.heading && <div className="g-group">{s.heading}</div>}
+              {s.rows.map((r) => (
+                <Fragment key={r.key}>
+                  {r.onLabel ? (
+                    <button className={`g-label ${r.sub ? "sub" : ""}`} onClick={r.onLabel}>{r.label}</button>
+                  ) : (
+                    <div className={`g-label ${r.sub ? "sub" : ""}`}>{r.label}</div>
+                  )}
+                  {lane(r)}
+                </Fragment>
+              ))}
+            </Fragment>
+          ))}
+        </div>
+      </div>
+      <TimelineHint />
+      <Legend data={data} view={view} />
+    </>
+  );
+}
+
+
+const emptyText = (v: Settings["scheduleGroup"]) =>
+  ({ missions: "No missions in these days.", aircraft: "No aircraft yet.", people: "No crew yet." })[v];
+const addText = (v: Settings["scheduleGroup"]) =>
+  ({ missions: "New mission…", aircraft: "Add aircraft…", people: "Add a person…" })[v];
+
+function rowText(r: Row): string {
+  const label = typeof r.label === "string" ? r.label : "";
+  return (r.key + " " + label + " " + r.bars.map((b) => b.title + " " + (b.sub ?? "")).join(" ")).toLowerCase();
+}
+
+function Legend({ data, view }: { data: AppData; view: Settings["scheduleGroup"] }) {
+  return (
+    <div className="legend">
+      {data.missions.map((m) => (
+        <span key={m.id}><span className="swatch" style={slotStyle(missionLook(m))} />{m.name}</span>
+      ))}
+      {<span><span className="swatch" style={{ background: "var(--zb-surface-3)", border: "1px dashed var(--zb-text-2)" }} />Maintenance</span>}
+      {<span><span className="swatch" style={{ background: "color-mix(in srgb, var(--zb-warn) 22%, var(--zb-surface))", border: "1px dashed var(--zb-warn)" }} />Grounds the aircraft</span>}
+      <span><span className="swatch" style={{ border: "2px dashed var(--zb-danger)" }} />Open seat</span>
+      {view === "people" && <span><span className="swatch g-off" style={{ position: "static" }} />Time off</span>}
+      <span><span className="swatch" style={{ background: "var(--zb-orange)", width: 3 }} />Today</span>
+    </div>
+  );
+}
+
+function buildRows(
+  data: AppData, view: Settings["scheduleGroup"], from: number, to: number, issues: Issue[],
+  open: (kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "support", id: string, defaults?: Record<string, unknown>) => void,
+): Section[] {
+  const aircraft = byId(data.aircraft);
+  const people = byId(data.people);
+  const missions = byId(bookings(data));
+  const inView = (a: string, b: string) => overlaps(ms(a), ms(b), from, to);
+  const troubled = new Set(issues.filter((i) => i.severity === "danger" && i.seasonId).map((i) => i.seasonId));
+  const personTrouble = new Set(issues.filter((i) => i.severity === "danger" && i.personId).map((i) => `${i.personId}:${i.seasonId ?? ""}`));
+
+  const missionBar = (m: Booking): Bar => {
+    const ac = aircraft.get(m.aircraftId ?? "");
+    return {
+      key: `m-${m.id}`, a: ms(m.start), b: ms(m.end), title: m.name,
+      sub: `${ac?.tail ?? "No aircraft"} · ${fmtDates(m.start, m.end)}`,
+      tip: `${m.name}${m.contact ? `\n${m.contact}` : ""}\n${fmtRange(m.start, m.end)}\nAircraft: ${ac ? `${ac.tail} (${ac.type})` : "none"}\nStatus: ${m.status}`,
+      className: `${m.status === "Cancelled" ? "cancelled" : ""} ${troubled.has(m.id) ? "problem" : ""}`,
+      style: slotStyle(missionLook(m)),
+      onClick: () => open("season", m.id),
+    };
+  };
+  const jobBar = (j: AppData["jobs"][0]): Bar => {
+    const ac = aircraft.get(j.aircraftId);
+    return {
+      key: `j-${j.id}`, a: ms(j.start), b: ms(j.end), title: j.title, icon: <Wrench size={11} />,
+      sub: `${ac?.tail ?? ""} · ${j.kind}${j.grounds ? " · grounded" : ""}`,
+      tip: `${j.title} (${j.kind})\n${ac?.tail ?? ""}\n${fmtRange(j.start, j.end)}${j.grounds ? "\nThe aircraft can't fly during this job." : ""}`,
+      className: `job ${j.grounds ? "grounds" : ""}`,
+      onClick: () => open("job", j.id),
+    };
+  };
+  const gapBars = (m: Booking): Bar[] =>
+    m.status === "Cancelled" || m.status === "Done"
+      ? []
+      : missionCoverage(data, m).pilotGaps.map((g) => ({
+          key: `g-${m.id}-${g.a}`, a: g.a, b: g.b, title: `${g.short} open`, tip: `${m.name}: ${g.short} pilot seat${g.short > 1 ? "s" : ""} open, ${fmtDates(toWhen(g.a), toWhen(g.b))}`,
+          onClick: () => open("season", m.id),
+        }));
+
+  const visibleMissions = bookings(data).filter((m) => inView(m.start, m.end)).sort((x, y) => ms(x.start) - ms(y.start));
+
+  if (view === "missions") {
+    return [{
+      rows: visibleMissions.flatMap((m) => {
+        const ac = aircraft.get(m.aircraftId ?? "");
+        // Only the people with a shift in the dates on screen get a row.
+        const shifts = data.shifts.filter((s) => s.seasonId === m.id && inView(s.start, s.end));
+        const crew = [...new Set(shifts.map((s) => s.personId))]
+          .map((id) => people.get(id)!)
+          .filter(Boolean)
+          .sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === "Pilot" ? -1 : 1));
+        const gaps = gapBars(m).filter((g) => overlaps(g.a, g.b, from, to)).map(asGap);
+        const rows: Row[] = [{
+          key: m.id,
+          label: (
+            <>
+              <span className="t ellipsis"><span className="swatch" style={{ ...slotStyle(missionLook(m)), width: 12, height: 12 }} />{m.name}</span>
+              <span className="small muted ellipsis">{ac?.tail ?? "No aircraft"} · <StatusPill status={m.status} /></span>
+            </>
+          ),
+          bars: [missionBar(m)],
+          onLabel: () => open("season", m.id),
+        }];
+        for (const p of crew)
+          rows.push({
+            key: `${m.id}-${p.id}`, sub: true,
+            label: <span className="t ellipsis"><Avatar person={p} />{p.name}</span>,
+            onLabel: () => open("person", p.id),
+            bars: shifts.filter((s) => s.personId === p.id).map((s) => ({
+              key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: p.role === "Pilot" ? "Flying" : "On call", sub: fmtDates(s.start, s.end),
+              tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}`,
+              className: personTrouble.has(`${p.id}:${m.id}`) || personTrouble.has(`${p.id}:`) ? "problem" : "",
+              style: slotStyle(missionLook(m)), onClick: () => open("season", m.id),
+            })),
+            shade: data.timeOff.filter((t) => t.personId === p.id).map((t) => [ms(t.start), ms(t.end)]),
+          });
+        if (gaps.length)
+          rows.push({
+            key: `${m.id}-gaps`, sub: true,
+            label: <span className="t" style={{ color: "var(--zb-danger)" }}>Open pilot seats</span>,
+            bars: gaps,
+          });
+        return rows;
+      }),
+    }];
+  }
+
+  if (view === "aircraft") {
+    return [{
+      rows: data.aircraft
+        .filter((a) => a.status !== "Retired")
+        .sort((a, b) => a.tail.localeCompare(b.tail))
+        .map((a) => ({
+          key: a.id,
+          label: (
+            <>
+              <span className="t">{a.tail}</span>
+              <span className="small muted ellipsis">{a.type} · <StatusPill status={a.status} /></span>
+            </>
+          ),
+          onLabel: () => open("aircraft", a.id),
+          addDefaults: { aircraftId: a.id },
+          bars: [
+            ...visibleMissions.filter((m) => m.aircraftId === a.id).map(missionBar),
+            ...data.jobs.filter((j) => j.aircraftId === a.id && !j.done && inView(j.start, j.end)).map(jobBar),
+          ],
+        })),
+    }];
+  }
+
+  // Crew: pilots, then maintainers.
+  const personRows = (role: "Pilot" | "Maintainer"): Row[] =>
+    data.people
+      .filter((p) => p.role === role)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((p) => {
+        const off = data.timeOff.filter((t) => t.personId === p.id);
+        return {
+          key: p.id,
+          label: (
+            <>
+              <span className="t ellipsis"><Avatar person={p} />{p.name}</span>
+              <span className="small muted ellipsis">{p.quals.join(", ") || "No qualifications yet"}</span>
+            </>
+          ),
+          onLabel: () => open("person", p.id),
+          shade: off.map((t) => [ms(t.start), ms(t.end)] as [number, number]),
+          bars: [
+            ...data.shifts
+              .filter((s) => s.personId === p.id && inView(s.start, s.end))
+              .map((s): Bar | null => {
+                const m = missions.get(s.seasonId);
+                if (!m) return null;
+                const ac = aircraft.get(m.aircraftId ?? "");
+                return {
+                  key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: m.name, sub: ac?.tail ?? "No aircraft",
+                  tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}\n${ac ? `${ac.tail} (${ac.type})` : "No aircraft"}`,
+                  className: `${m.status === "Cancelled" ? "cancelled" : ""} ${personTrouble.has(`${p.id}:${m.id}`) || personTrouble.has(`${p.id}:`) ? "problem" : ""}`,
+                  style: slotStyle(missionLook(m)), onClick: () => open("season", m.id),
+                };
+              })
+              .filter((b): b is Bar => !!b),
+            ...data.jobs.filter((j) => j.maintainerIds.includes(p.id) && !j.done && inView(j.start, j.end)).map(jobBar),
+            ...off.filter((t) => inView(t.start, t.end)).map((t): Bar => ({
+              key: `o-${t.id}`, a: ms(t.start), b: ms(t.end), title: t.reason || "Time off", tip: `${p.name}: ${t.reason || "Time off"}\n${fmtRange(t.start, t.end)}`,
+              className: "off", onClick: () => open("timeOff", t.id),
+            })),
+          ],
+        };
+      });
+  return [
+    { heading: "Pilots", rows: personRows("Pilot") },
+    { heading: "Maintainers", rows: personRows("Maintainer") },
+  ];
+}
+
+/** Open seats are drawn as dashed red outlines, not filled slots. */
+function asGap(b: Bar): Bar {
+  return { ...b, className: "gap-outline", style: { background: "color-mix(in srgb, var(--zb-danger) 8%, transparent)", border: "2px dashed var(--zb-danger)", color: "var(--zb-danger)", boxShadow: "none" } };
+}

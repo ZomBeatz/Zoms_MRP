@@ -1,0 +1,12 @@
+node_modules
+dist
+demo-site
+src-tauri/target
+src-tauri/gen/schemas
+server/target
+server/data
+*.log
+.DS_Store
+
+# Local editor/assistant settings
+.claude/
