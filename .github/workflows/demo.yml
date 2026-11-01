@@ -1,4 +1,4 @@
-# Publishes the online demo to GitHub Pages: https://zombeatz.github.io/Zoms-MRP/
+# Publishes the online demo to GitHub Pages: https://zombeatz.github.io/Zoms_MRP/
 # It's the web version of the app with the Alaska demo data. Each visitor's changes stay in their own browser.
 # One-time setup: repository Settings > Pages > Source: "GitHub Actions".
 name: Online demo

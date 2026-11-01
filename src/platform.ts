@@ -5,4 +5,10 @@
 export const isOnlineDemo = import.meta.env.VITE_DEMO === "1";
 
 /** Where people get the real thing: installers and the server, from the latest release. */
-export const RELEASES_URL = "https://github.com/ZomBeatz/Zoms-MRP/releases/latest";
+export const RELEASES_URL = "https://github.com/ZomBeatz/Zoms_MRP/releases/latest";
+
+/** Inside the desktop app (Tauri adds its bridge to the window). */
+export const isDesktopApp = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/** The web version served by the secure server, built with VITE_SERVER=1. */
+export const isServerBuild = import.meta.env.VITE_SERVER === "1";

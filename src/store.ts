@@ -3,15 +3,15 @@ import type { AppData, Page, Settings } from "./types";
 import { emptyData, sampleData } from "./sample";
 import { migrate } from "./migrate";
 import { isOnlineDemo } from "./platform";
+import { demoBackend, ownBackend, type Backend } from "./backends";
+import { browserBackend } from "./backends/browser";
 
 /**
- * All of MRP's data lives on this device, in the browser's storage (one JSON document).
- * Every change goes through `change`, which keeps an undo history and saves.
+ * All of MRP's data is one document, kept by a backend (see src/backends): this browser, a file on
+ * this computer, or the secure server. Every change goes through `change`, which keeps an undo
+ * history and saves. The demo always stays in this browser, apart from the person's own data.
  */
 
-const REAL_KEY = "zoms-mrp:data";
-/** The demo lives in its own slot, so turning it on never touches the person's own data (DESIGN.md "Demo"). */
-const DEMO_KEY = "zoms-mrp:demo";
 const MODE_KEY = "zoms-mrp:mode";
 const THEME_KEY = "zoms-mrp:theme"; // read by index.html before the page draws
 
@@ -27,28 +27,47 @@ const read = (k: string) => {
 };
 // The online demo is always the demo.
 let demo = isOnlineDemo || read(MODE_KEY) === "demo";
-const key = () => (demo ? DEMO_KEY : REAL_KEY);
 
-function load(): AppData | null {
-  try {
-    const raw = localStorage.getItem(key());
-    if (!raw) return null;
-    return migrate(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+// Where data goes right now (the demo or the person's own), set up by `boot`.
+let own: Backend = browserBackend("zoms-mrp:data");
+const demoStore: Backend = demoBackend();
+const current = () => (demo ? demoStore : own);
 
-let saveError: string | null = null;
+// Saves go out one at a time; while one is on its way, only the newest waiting document is kept.
+let waiting: AppData | null = null;
+let saving = false;
 function save(d: AppData) {
   try {
-    localStorage.setItem(key(), JSON.stringify(d));
     localStorage.setItem(THEME_KEY, d.settings.theme);
-    saveError = null;
-  } catch {
-    saveError = "Couldn't save on this device. The browser's storage may be full or turned off.";
-  }
+  } catch { /* only a convenience */ }
+  if (!current().canEdit) return; // someone who may only look never saves
+  waiting = d;
+  if (!saving) void flush();
 }
+async function flush() {
+  saving = true;
+  while (waiting) {
+    const d = waiting;
+    waiting = null;
+    const to = current();
+    try {
+      await to.save(d);
+      useStore.setState({ saveError: null });
+    } catch (e) {
+      useStore.setState({ saveError: e instanceof Error ? e.message : "Couldn't save." });
+    }
+  }
+  saving = false;
+}
+/** Wait until everything sent has been saved (before switching between the demo and own data). */
+const settled = async () => {
+  while (saving) await new Promise((r) => setTimeout(r, 20));
+};
+
+const loadFrom = async (b: Backend) => {
+  const raw = await b.load().catch(() => null);
+  return raw ? migrate(raw) : null;
+};
 
 export interface Toast { id: number; text: string; action?: { label: string; run: () => void } }
 
@@ -58,6 +77,8 @@ interface State {
   started: boolean;
   /** Showing the demo data instead of the person's own. */
   demo: boolean;
+  /** False for someone who may only look (a Viewer on the server). */
+  canEdit: boolean;
   page: Page;
   /** What's open in a dialog: a kind and an id ("new" for a new one), plus defaults for new items. */
   editing: { kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "support"; id: string; defaults?: Record<string, unknown> } | null;
@@ -75,16 +96,14 @@ interface State {
   updateSettings: (patch: Partial<Settings>) => void;
   undo: () => void;
   redo: () => void;
-  start: (withDemo: boolean) => void;
-  setDemo: (on: boolean) => void;
+  start: (withDemo: boolean) => Promise<void>;
+  setDemo: (on: boolean) => Promise<void>;
   resetDemo: () => void;
   /** Replace everything with an empty start (own data only). */
   clearAll: () => void;
   showToast: (text: string, action?: Toast["action"]) => void;
 }
 
-// The online demo opens straight into fresh demo data the first time.
-const saved = load() ?? (isOnlineDemo ? sampleData() : null);
 const LAST_PAGE = "zoms-mrp:page";
 const lastPage = (() => {
   try {
@@ -97,9 +116,10 @@ const lastPage = (() => {
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useStore = create<State>((set, get) => ({
-  data: saved ?? emptyData(),
-  started: !!saved || !!read(REAL_KEY),
+  data: emptyData(), // filled in by `boot`, before the first screen draws
+  started: false,
   demo,
+  canEdit: true,
   page: lastPage,
   editing: null,
   past: [],
@@ -120,7 +140,7 @@ export const useStore = create<State>((set, get) => ({
     const before = get().data;
     const data = fn(before);
     save(data);
-    set({ data, past: [...get().past.slice(-49), before], future: [], saveError });
+    set({ data, past: [...get().past.slice(-49), before], future: [] });
     if (message) get().showToast(message, { label: "Undo", run: () => get().undo() });
   },
 
@@ -161,7 +181,7 @@ export const useStore = create<State>((set, get) => ({
   updateSettings: (patch) => {
     const data = { ...get().data, settings: { ...get().data.settings, ...patch } };
     save(data);
-    set({ data, saveError });
+    set({ data });
   },
 
   undo: () => {
@@ -178,13 +198,11 @@ export const useStore = create<State>((set, get) => ({
     set({ data: future[0], past: [...past, data], future: future.slice(1) });
   },
 
-  start: (withDemo) => {
+  start: async (withDemo) => {
     if (withDemo) {
-      // Keep an empty slot for the person's own data, so turning the demo off lands somewhere.
-      try {
-        if (!localStorage.getItem(REAL_KEY)) localStorage.setItem(REAL_KEY, JSON.stringify(emptyData()));
-      } catch { /* the demo still works */ }
-      get().setDemo(true);
+      // Keep an empty document for the person's own data, so turning the demo off lands somewhere.
+      if (own.canEdit && !(await own.load().catch(() => null))) await own.save(emptyData()).catch(() => {});
+      await get().setDemo(true);
     } else {
       demo = false;
       const data = { ...emptyData(), settings: get().data.settings };
@@ -193,17 +211,18 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  setDemo: (on) => {
+  setDemo: async (on) => {
     const settings = get().data.settings;
     save(get().data);
+    await settled();
     demo = on;
     try {
       localStorage.setItem(MODE_KEY, on ? "demo" : "real");
     } catch { /* only a convenience */ }
-    const loaded = load();
+    const loaded = await loadFrom(current());
     const data = { ...(loaded ?? (on ? sampleData(settings) : emptyData())), settings };
-    save(data);
-    set({ data, demo: on, started: true, past: [], future: [], page: "overview" });
+    if (!loaded) save(data);
+    set({ data, demo: on, canEdit: current().canEdit, started: true, past: [], future: [], page: "overview" });
     get().showToast(on ? "Showing demo data. Your own data is kept apart." : "Back to your own data.");
   },
 
@@ -226,3 +245,15 @@ export const useStore = create<State>((set, get) => ({
 
 /** Look things up by id without scanning arrays in every row. */
 export const byId = <T extends { id: string }>(list: T[]) => new Map(list.map((x) => [x.id, x]));
+
+/**
+ * Pick the backend for this build and load the document, before the first screen draws.
+ * The online demo opens straight into fresh demo data the first time.
+ */
+export async function boot() {
+  own = await ownBackend();
+  const loaded = await loadFrom(current());
+  const data = loaded ?? (demo ? sampleData() : null);
+  const started = !!loaded || isOnlineDemo || (demo && !!(await own.load().catch(() => null)));
+  useStore.setState({ data: data ?? emptyData(), started, demo, canEdit: current().canEdit });
+}
