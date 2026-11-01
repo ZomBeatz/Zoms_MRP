@@ -3,6 +3,7 @@ import {
   BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X,
 } from "lucide-react";
 import { useStore } from "./store";
+import { RELEASES_URL, isOnlineDemo } from "./platform";
 import { findIssues } from "./coverage";
 import type { Page } from "./types";
 import { Wordmark, LogoMark } from "./components/Logo";
@@ -135,7 +136,9 @@ export default function App() {
           <div className="banner">
             <span className="grow"><b>Live demo.</b> Try anything. Changes are only saved in this browser.</span>
             <button className="btn sm" onClick={resetDemo}>Reset demo</button>
-            <button className="btn sm primary" onClick={() => setDemo(false)}>Use my own data</button>
+            {isOnlineDemo
+              ? <a className="btn sm primary" href={RELEASES_URL} target="_blank" rel="noreferrer">Get Zom's MRP</a>
+              : <button className="btn sm primary" onClick={() => setDemo(false)}>Use my own data</button>}
           </div>
         )}
         <div className="page">
