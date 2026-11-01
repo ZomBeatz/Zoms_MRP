@@ -1,14 +1,15 @@
 {
   "name": "zoms-mrp",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:server": "tsc --noEmit && VITE_SERVER=1 vite build --outDir dist-server --emptyOutDir"
   },
   "dependencies": {
     "date-fns": "^4.4.0",

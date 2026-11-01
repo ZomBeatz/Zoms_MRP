@@ -45,6 +45,27 @@ Like a fleet board, a crew roster and a Gantt chart in one, with the checks buil
 | **Fleet** | Who's flying which tail, inspections, repairs, aircraft use |
 | **Training** | NVG, mountain flying, over water, renewals coming up |
 
+## Try it online
+
+**Just want to look around?** The [online demo](https://zombeatz.github.io/Zoms_MRP/) runs in your browser with made-up data from an operator in Alaska. Anything you change stays in your browser.
+
+## Server
+
+For a team: everyone signs in to the same plan from their own browser. Admins decide who has access.
+
+- Accounts with roles: **Admin** (manages people), **Scheduler** (changes the plan), **Viewer** (looks only).
+- Two people saving at once can't overwrite each other, and changes others make show up on their own.
+- Locked after repeated wrong passwords, an activity log, and a copy of everything every day.
+- **Export to Excel** for anyone who'd rather see it in Teams.
+
+**With Docker** (any Linux server or VPS, with a domain name pointed at it): put your domain in `deploy/Caddyfile`, then
+
+```bash
+docker compose up -d
+```
+
+Open `https://your-domain` and create the admin account right away. Caddy gets the https certificate by itself. More in [SECURITY.md](SECURITY.md).
+
 ## Questions
 
 <details>
@@ -68,7 +89,13 @@ They need to be qualified on the aircraft's type, free (not booked elsewhere or 
 <details>
 <summary><b>Can several people use it at once?</b></summary>
 
-Not yet. For now it runs on one device.
+Yes, with the server (above). Everyone signs in to the same plan. On one computer, use the app on its own and **Export to Excel** to share it.
+</details>
+
+<details>
+<summary><b>I forgot the admin password</b></summary>
+
+On the server, run `docker exec -it mrp zoms-mrp-server reset-password <username>` and type a new one.
 </details>
 
 ## For developers
@@ -81,6 +108,7 @@ npm install
 npm run dev      # http://localhost:1430
 npm test         # coverage and conflict checks
 npm run build    # type-check and build into dist/
+npm run build:server && cargo test --manifest-path server/Cargo.toml   # the server
 ```
 
 - `src/types.ts`: the data model. `src/store.ts`: state, saving, undo and the demo slot. `src/migrate.ts`: opens saves from older versions.
@@ -92,6 +120,9 @@ npm run build    # type-check and build into dist/
 - `src/sample.ts`: the demo, an operator in Alaska over the past and next 12 months.
 - `src/dialogs.tsx`: the forms for each kind of item.
 - `src/tokens.css`: the ZomBeatz design tokens.
+- `src/backends/`: where the data is kept: this browser, this computer (desktop app) or the server.
+- `src/excel.ts`: **Export to Excel**.
+- `server/`: the server (Rust: axum and SQLite), with the web app built in. `Dockerfile` and `docker-compose.yml` package it with Caddy.
 </details>
 
 ## License

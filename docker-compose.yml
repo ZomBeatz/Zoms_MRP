@@ -1,0 +1,42 @@
+# Zom's MRP Server, behind https.
+#
+#   1. Point a domain name at this server (an A record), e.g. mrp.example.com.
+#   2. Put that name in deploy/Caddyfile (replace mrp.example.com).
+#   3. docker compose up -d
+#   4. Open https://mrp.example.com and create the admin account. Do this right away: until there's
+#      an admin, whoever opens the page first can make one.
+#
+# Caddy gets and renews the https certificate by itself. Zom's MRP isn't reachable except through it.
+# Everything (database and daily backups) lives in the mrp-data volume.
+services:
+  mrp:
+    image: ghcr.io/zombeatz/zoms-mrp-server:latest
+    build: .
+    container_name: mrp
+    restart: unless-stopped
+    volumes:
+      - mrp-data:/data
+    environment:
+      MRP_TRUST_PROXY: "on" # Caddy in front handles https
+      # MRP_NAME: "Northern Rotor scheduling"   # shown on the sign-in page
+    # No ports here on purpose: only Caddy talks to it.
+
+  caddy:
+    image: caddy:2
+    container_name: mrp-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - mrp
+
+volumes:
+  mrp-data:
+  caddy-data:
+  caddy-config:

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+**Server**
+- A secure server for a team: everyone signs in to the same plan from their own browser.
+- Admins add people as **Admin**, **Scheduler** (changes the plan) or **Viewer** (looks only), turn accounts off, reset passwords, and see what's been happening in **Settings**.
+- Two people saving at once can't overwrite each other: the second one is told and can reload. Changes others save show up on their own.
+- Sign-in is locked for 5 minutes after 5 wrong passwords. The server keeps a copy of everything every day, and admins can download one.
+- Runs with Docker, behind Caddy for https.
+
+**Sharing**
+- **Export to Excel** (Reports, or Settings > Your data) makes one workbook to post in Teams or open anywhere.
+- The online demo at zombeatz.github.io/Zoms_MRP.
+
 ## 0.2.0
 
 **Fleet**
@@ -20,10 +33,6 @@
 - A mission is now one customer's work, with its name, contact, look, training and crew in one place. Its dates are its seasons, each with its own aircraft, crew sizes, status and shifts.
 - **Copy to next season** adds next year's dates in one click, ready to crew.
 - Renaming a mission renames every season, and saves from earlier versions are converted automatically.
-
-**Sharing**
-- **Export to Excel** (Reports, or Settings > Your data) makes one workbook to post in Teams or open anywhere: a fleet board by week in mission colors, fleet use, seasons, the crew roster, training, maintenance and the problems Zom's MRP found.
-- An online demo, with the Alaska data, that anyone can try in their browser.
 
 **Also**
 - Maintenance has its own thin row under each tail on the Fleet page, and any maintenance takes the day out of a free window.

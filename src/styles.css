@@ -43,6 +43,7 @@ kbd { font: 11px var(--zb-font-mono); background: var(--zb-surface-2); border: 1
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--zb-radius-sm);
   background: var(--zb-surface); border: 1px solid var(--zb-border); font-weight: 500; white-space: nowrap;
 }
+a.btn { color: inherit; text-decoration: none; }
 .btn:hover { background: var(--zb-surface-2); }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn.sm { padding: 4px 10px; font-size: 13px; }
@@ -340,3 +341,7 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 .slot.job.light .t { font-weight: 500; }
 .link { color: var(--zb-accent); text-align: left; font-weight: 500; }
 .link:hover { text-decoration: underline; }
+
+/* ---------- server sign-in ---------- */
+.signin { max-width: 400px; margin: 10vh auto; padding: 28px; }
+.signin .brand { padding: 0 0 18px; }
