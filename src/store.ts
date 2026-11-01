@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AppData, Page, Settings } from "./types";
 import { emptyData, sampleData } from "./sample";
 import { migrate } from "./migrate";
+import { isOnlineDemo } from "./platform";
 
 /**
  * All of MRP's data lives on this device, in the browser's storage (one JSON document).
@@ -24,7 +25,8 @@ const read = (k: string) => {
     return null;
   }
 };
-let demo = read(MODE_KEY) === "demo";
+// The online demo is always the demo.
+let demo = isOnlineDemo || read(MODE_KEY) === "demo";
 const key = () => (demo ? DEMO_KEY : REAL_KEY);
 
 function load(): AppData | null {
@@ -81,7 +83,8 @@ interface State {
   showToast: (text: string, action?: Toast["action"]) => void;
 }
 
-const saved = load();
+// The online demo opens straight into fresh demo data the first time.
+const saved = load() ?? (isOnlineDemo ? sampleData() : null);
 const LAST_PAGE = "zoms-mrp:page";
 const lastPage = (() => {
   try {

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { useStore } from "../store";
 import { Field } from "../components/ui";
 import { migrate } from "../migrate";
+import { isOnlineDemo } from "../platform";
 import { SHORTCUTS } from "./Help";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
@@ -46,17 +47,20 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           </div>
         </section>
 
-        <section className="panel">
-          <h3><FlaskConical size={16} /> Demo data</h3>
-          <label className="check">
-            <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} />
-            Show demo data
-          </label>
-          <p className="small muted" style={{ margin: "6px 0 0" }}>
-            Fills Zom's MRP with made-up aircraft, crew, training and missions so you can see how it works. Your own data is kept apart and comes back when you turn this off.
-          </p>
-          {demo && <button className="btn sm" style={{ marginTop: 10 }} onClick={resetDemo}>Reset demo</button>}
-        </section>
+        {/* The online demo is only the demo; there's no own data to switch to. */}
+        {!isOnlineDemo && (
+          <section className="panel">
+            <h3><FlaskConical size={16} /> Demo data</h3>
+            <label className="check">
+              <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} />
+              Show demo data
+            </label>
+            <p className="small muted" style={{ margin: "6px 0 0" }}>
+              Fills Zom's MRP with made-up aircraft, crew, training and missions so you can see how it works. Your own data is kept apart and comes back when you turn this off.
+            </p>
+            {demo && <button className="btn sm" style={{ marginTop: 10 }} onClick={resetDemo}>Reset demo</button>}
+          </section>
+        )}
 
         <section className="panel">
           <h3><ShieldCheck size={16} /> Hitches and days off</h3>
