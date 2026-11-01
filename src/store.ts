@@ -137,6 +137,10 @@ export const useStore = create<State>((set, get) => ({
   close: () => set({ editing: null }),
 
   change: (fn, message) => {
+    if (!get().canEdit) {
+      get().showToast("You can look but not change things. Ask an admin for scheduler access.");
+      return;
+    }
     const before = get().data;
     const data = fn(before);
     save(data);
@@ -252,6 +256,15 @@ export const byId = <T extends { id: string }>(list: T[]) => new Map(list.map((x
  */
 export async function boot() {
   own = await ownBackend();
+  // On the server, show what others save while this page is open.
+  if (own.kind === "server") {
+    const { watchServer } = await import("./backends/server");
+    watchServer((raw, by) => {
+      if (demo || !raw) return;
+      useStore.setState({ data: migrate(raw), past: [], future: [] });
+      useStore.getState().showToast(by ? `Updated with ${by}'s changes.` : "Updated with the latest changes.");
+    });
+  }
   const loaded = await loadFrom(current());
   const data = loaded ?? (demo ? sampleData() : null);
   const started = !!loaded || isOnlineDemo || (demo && !!(await own.load().catch(() => null)));

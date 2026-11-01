@@ -9,4 +9,6 @@ Zom's MRP (Mission Ready Planner) is a ZomBeatz Media app for scheduling helicop
 - **Training is set by missions.** People only need the training of the missions they work (`Person.missionIds`) or are booked on (`neededTraining` in `src/coverage.ts`).
 - **Everything is whole days.** Starts are midnights and ends are the midnight after the last day. Use the calendar helpers in `src/time.ts` (`dayAt`, `dateToStart`, `dateToEnd`), never fixed 24-hour steps, so days that change the clock still line up.
 - **Checks** (gaps, double bookings, qualifications, training, hitch length) are pure functions in `src/coverage.ts` with tests in `src/coverage.test.ts`. Add a test when you add a check.
-- Run `npm run dev` (port 1430), `npm test`, and `npm run build` before calling something done.
+- **Three builds of one app.** The web/desktop app (`npm run build`), the online demo (`VITE_DEMO=1`, GitHub Pages) and the server's app (`npm run build:server`, `VITE_SERVER=1`, built into `server/`). Data goes through `src/backends/`; the demo always stays in the browser.
+- **The server** (`server/`, Rust: axum, SQLite, Argon2) keeps the plan as one versioned document. Any change to sign-in, roles or headers needs a test in `server/src/tests.rs`; see SECURITY.md for what it promises.
+- Run `npm run dev` (port 1430), `npm test`, and `npm run build` before calling something done; for the server also `npm run build:server && cargo test --manifest-path server/Cargo.toml`.

@@ -37,7 +37,7 @@ const typing = (e: KeyboardEvent) => {
 };
 
 export default function App() {
-  const { data, started, demo, page, go, open, editing, toast, saveError, updateSettings, undo, redo, resetDemo, setDemo } = useStore();
+  const { data, started, demo, canEdit, page, go, open, editing, toast, saveError, updateSettings, undo, redo, resetDemo, setDemo } = useStore();
   const [drawer, setDrawer] = useState(false);
   const [help, setHelp] = useState(false);
   const collapsed = data.settings.sidebarCollapsed;
@@ -131,7 +131,17 @@ export default function App() {
       </aside>
 
       <main className="main">
-        {saveError && <div className="save-error">{saveError}</div>}
+        {saveError && (
+          <div className="save-error row gap">
+            <span className="grow">{saveError}</span>
+            {/reload/i.test(saveError) && <button className="btn sm" onClick={() => location.reload()}>Reload</button>}
+          </div>
+        )}
+        {!canEdit && !demo && (
+          <div className="banner">
+            <span className="grow"><b>View only.</b> You can look at everything but not change it. Ask an admin for scheduler access.</span>
+          </div>
+        )}
         {demo && (
           <div className="banner">
             <span className="grow"><b>Live demo.</b> Try anything. Changes are only saved in this browser.</span>

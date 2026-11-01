@@ -1,0 +1,33 @@
+[package]
+name = "zoms-mrp-server"
+version = "0.3.0"
+edition = "2021"
+description = "Zom's MRP Server: the Mission Ready Planner for a team, on your own server, behind sign-in"
+license = "MIT"
+
+[dependencies]
+axum = { version = "0.8", features = ["json", "query", "http1", "tokio"], default-features = false }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+argon2 = "0.5"
+getrandom = "0.3"
+sha2 = "0.10"
+rust-embed = "8"
+mime_guess = "2"
+# https with your own certificate files (or run it behind Caddy, which gets certificates for you)
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+hyper = { version = "1", features = ["http1", "server"] }
+hyper-util = { version = "0.1", features = ["tokio", "service"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

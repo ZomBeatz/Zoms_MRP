@@ -1,0 +1,6 @@
+# Replace mrp.example.com with your own domain name (pointed at this server).
+# Caddy gets a certificate for it from Let's Encrypt and renews it by itself.
+mrp.example.com {
+	encode zstd gzip
+	reverse_proxy mrp:7430
+}
