@@ -34,7 +34,7 @@ Like a fleet board, a crew roster and a Gantt chart in one, with the checks buil
 | **Training** | Courses that need renewing, set by each mission. People only need what their missions ask for, and "Who's current" shows where everyone stands. |
 | **Maintenance** | Jobs on an aircraft with the maintainers on them. A job can ground the aircraft. |
 | **Overview** | Every open seat, double booking, missing qualification, expired training and too-long hitch, with a click to fix it. |
-| **Reports** | Days per mission, aircraft use, how busy each person is, and how much mission time was fully crewed. Export to CSV or print. |
+| **Reports** | Days per mission, aircraft use, how busy each person is, and how much mission time was fully crewed. Print it, or **Export to Excel** to share in Teams. |
 
 ## What people use it for
 
