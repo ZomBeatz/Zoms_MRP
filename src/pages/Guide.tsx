@@ -346,7 +346,7 @@ export function Guide() {
       <p className="muted" style={{ marginTop: -4 }}>
         Short lessons you do yourself on the demo, a few minutes each. Every step says what to tap and moves on when you've done it; <b>Do it for me</b> does it for you.
         Each lesson starts from a fresh copy of the demo and puts it back when it's over, so try anything. Take a break between lessons any time: finished ones are ticked off here.
-        {demo || isOnlineDemo ? "" : " Starting one switches to the demo; your own data is kept apart."}
+        {demo || isOnlineDemo ? "" : " Starting one switches to the demo, and you're back on your own data when it ends. Your data isn't touched."}
       </p>
       <TourCards tours={LESSONS} onStart={start} numbered />
 

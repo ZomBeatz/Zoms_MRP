@@ -660,6 +660,9 @@ interface TourState {
   next: (id: string) => Tour | undefined;
 }
 
+// Someone who starts a walkthrough from their own data goes back to it when the walkthrough ends.
+let backToOwn = false;
+
 export const useTour = create<TourState>((set, get) => ({
   tour: null,
   step: 0,
@@ -669,7 +672,10 @@ export const useTour = create<TourState>((set, get) => ({
     if (!tour) return;
     void (async () => {
       // The walkthroughs need the demo's data.
-      if (!store().demo) await store().setDemo(true);
+      if (!store().demo) {
+        backToOwn = true;
+        await store().setDemo(true);
+      }
       if (store().editing) store().close();
       // Each walkthrough begins on a fresh demo, so it goes the same way every time.
       store().resetDemo(true);
@@ -683,8 +689,10 @@ export const useTour = create<TourState>((set, get) => ({
     // Every walkthrough leaves the demo the way it found it.
     if (store().demo) {
       store().resetDemo(true);
-      store().showToast("The demo is back the way it was.");
+      if (backToOwn) void store().setDemo(false); // says "Back to your own data."
+      else store().showToast("The demo is back the way it was.");
     }
+    backToOwn = false;
     set({ tour: null, step: 0 });
   },
   go: (n) => {
@@ -699,6 +707,11 @@ export const useTour = create<TourState>((set, get) => ({
   },
   next: (id) => { const i = LESSONS.findIndex((t) => t.id === id); return i >= 0 ? LESSONS[i + 1] : undefined; },
 }));
+
+// Walkthroughs only ever touch the demo: switching to your own data mid-way ends the walkthrough.
+useStore.subscribe((now, before) => {
+  if (before.demo && !now.demo && useTour.getState().tour) useTour.getState().stop();
+});
 
 /**
  * The highlight and the card. Mounted once in the app. The page stays usable underneath: it can be
