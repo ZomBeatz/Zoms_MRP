@@ -20,6 +20,17 @@ export interface Aircraft {
 
 export type Role = "Pilot" | "Maintainer";
 
+/** A hitch pattern in days: 21 on, 14 off. */
+export interface Rotation {
+  on: number;
+  off: number;
+}
+
+/** Someone's own fixed rotation, counted from `start` ("2026-11-02", the first day of an on stretch). */
+export interface PersonRotation extends Rotation {
+  start: string;
+}
+
 /** A course or certification some missions need ("NVG", "Over water"). */
 export interface Training {
   id: ID;
@@ -47,6 +58,8 @@ export interface Person {
   training: TrainingRecord[];
   /** Missions this person works. They only need the training those missions (and any they're booked on) ask for. */
   missionIds: ID[];
+  /** A fixed rotation: they're only available on their on days. null = available any day. */
+  rotation: PersonRotation | null;
   base: string;
   phone: string;
   notes: string;
@@ -75,17 +88,23 @@ export interface Mission {
   notes: string;
 }
 
-/** One stretch of dates a mission is flown, on one aircraft: a fire season, a year of medevac standby. */
+/**
+ * One stretch of dates a mission is flown: a fire season, a year of medevac standby. It can have
+ * several aircraft, picked when they're known. Crew numbers are for the whole job at any time.
+ */
 export interface Season {
   id: ID;
   missionId: ID;
   start: When;
   end: When;
-  aircraftId: ID | null;
-  /** Pilots who must be on board at every moment. */
+  aircraftIds: ID[];
+  /** Pilots working the job at every moment (across all its aircraft). */
   pilotsNeeded: number;
-  /** Maintainers on call (pre-flight, turnarounds). 0 = none. */
+  /** Maintainers on the job at every moment. 0 = none. */
   maintainersNeeded: number;
+  /** How pilots and maintainers rotate through the job (they can differ). null = no set pattern. */
+  pilotRotation: Rotation | null;
+  maintainerRotation: Rotation | null;
   status: MissionStatus;
   notes: string;
 }

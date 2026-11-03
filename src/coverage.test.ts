@@ -6,14 +6,14 @@ import type { AppData, Person } from "./types";
 const DAY = 86_400_000;
 /** Midnight on Nov `n`, 2030 (well clear of today, so nothing "runs out soon"). */
 const d = (n: number) => `2030-11-${String(n).padStart(2, "0")}T00:00`;
-const pilot = (id: string, name: string, quals: string[]): Person => ({ id, name, role: "Pilot", quals, training: [], missionIds: [], base: "", phone: "", notes: "" });
+const pilot = (id: string, name: string, quals: string[]): Person => ({ id, name, role: "Pilot", quals, training: [], missionIds: [], rotation: null, base: "", phone: "", notes: "" });
 
 function base(): AppData {
   const data = emptyData();
   data.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" }];
   data.people = [pilot("p1", "Alex", ["Bell 412"]), pilot("p2", "Maya", ["Bell 412"]), pilot("p3", "Sam", ["AS350"])];
   data.missions = [{ id: "fire", name: "Fire season", contact: "", requiredTrainingIds: [], location: "", color: "#c2410c", pattern: "solid", notes: "" }];
-  data.seasons = [{ id: "m1", missionId: "fire", start: d(1), end: d(29), aircraftId: "a1", pilotsNeeded: 1, maintainersNeeded: 0, status: "Confirmed", notes: "" }];
+  data.seasons = [{ id: "m1", missionId: "fire", start: d(1), end: d(29), aircraftIds: ["a1"], pilotRotation: null, maintainerRotation: null, pilotsNeeded: 1, maintainersNeeded: 0, status: "Confirmed", notes: "" }];
   return data;
 }
 
@@ -47,7 +47,7 @@ describe("coverage", () => {
     const data = base();
     data.settings.rules.maxDaysOn = 21;
     data.missions.push({ ...data.missions[0], id: "other", name: "Other" });
-    data.seasons.push({ ...data.seasons[0], id: "m2", missionId: "other", aircraftId: null, start: d(3), end: d(5) });
+    data.seasons.push({ ...data.seasons[0], id: "m2", missionId: "other", aircraftIds: [], start: d(3), end: d(5) });
     data.shifts = [
       { id: "s1", seasonId: "m1", personId: "p3", start: d(1), end: d(29) },
       { id: "s2", seasonId: "m2", personId: "p3", start: d(3), end: d(5) },

@@ -241,6 +241,7 @@ button.g-label:hover { background: var(--zb-surface-2); }
 .g-line.minor { opacity: .45; }
 .g-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--zb-orange); z-index: 0; pointer-events: none; }
 .g-off { position: absolute; top: 0; bottom: 0; pointer-events: none; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--zb-muted) 22%, transparent) 0 5px, transparent 5px 10px); }
+.g-offrot { position: absolute; top: 0; bottom: 0; pointer-events: none; background: color-mix(in srgb, var(--zb-muted) 16%, transparent) repeating-linear-gradient(90deg, color-mix(in srgb, var(--zb-muted) 22%, transparent) 0 2px, transparent 2px 6px); }
 .slot {
   position: absolute; top: 5px; bottom: 5px; border-radius: 6px; padding: 2px 7px; font-size: 12px; line-height: 1.25;
   overflow: hidden; text-align: left; box-shadow: var(--zb-shadow); display: flex; flex-direction: column; justify-content: center; cursor: pointer; z-index: 1;

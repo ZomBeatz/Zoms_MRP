@@ -5,7 +5,7 @@ import type { AppData, Person } from "./types";
 
 const d = (n: number) => `2030-11-${String(n).padStart(2, "0")}T00:00`;
 const t = (n: number) => new Date(d(n)).getTime();
-const pilot = (id: string, quals: string[]): Person => ({ id, name: id, role: "Pilot", quals, training: [], missionIds: [], base: "", phone: "", notes: "" });
+const pilot = (id: string, quals: string[]): Person => ({ id, name: id, role: "Pilot", quals, training: [], missionIds: [], rotation: null, base: "", phone: "", notes: "" });
 
 function base(): AppData {
   const data = emptyData();
@@ -15,7 +15,7 @@ function base(): AppData {
   ];
   data.people = [pilot("p1", ["Bell 412"]), pilot("p2", ["Bell 412"])];
   data.missions = [{ id: "fire", name: "Fire", contact: "", requiredTrainingIds: [], location: "", color: "#c2410c", pattern: "solid", notes: "" }];
-  data.seasons = [{ id: "m1", missionId: "fire", start: d(1), end: d(11), aircraftId: "a1", pilotsNeeded: 2, maintainersNeeded: 0, status: "Confirmed", notes: "" }];
+  data.seasons = [{ id: "m1", missionId: "fire", start: d(1), end: d(11), aircraftIds: ["a1"], pilotRotation: null, maintainerRotation: null, pilotsNeeded: 2, maintainersNeeded: 0, status: "Confirmed", notes: "" }];
   data.jobs = [{ id: "j1", aircraftId: "a2", title: "Inspection", kind: "Inspection", start: d(5), end: d(7), maintainerIds: [], grounds: true, done: false, notes: "" }];
   return data;
 }

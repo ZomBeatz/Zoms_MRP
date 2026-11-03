@@ -57,7 +57,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
               </thead>
               <tbody>
                 {list.map(({ m, seasons, current, active, crew, cov }) => {
-                  const ac = current ? aircraft.get(current.aircraftId ?? "") : undefined;
+                  const tails = current ? current.aircraftIds.map((id) => aircraft.get(id)).filter((x) => !!x) : [];
                   return (
                     <tr key={m.id} onClick={() => open("mission", m.id)}>
                       <td className="name"><span className="row gap-sm"><span className="swatch" style={slotStyle(missionLook(m))} />{m.name}</span></td>
@@ -70,7 +70,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
                           </span>
                         ) : <span className="muted">No seasons yet</span>}
                       </td>
-                      <td>{ac ? <><b>{ac.tail}</b> <span className="muted small">{ac.type}</span></> : current ? <span className="pill warn">No aircraft</span> : null}</td>
+                      <td>{tails.length ? tails.map((x) => <span key={x.id} style={{ marginRight: 8 }}><b>{x.tail}</b> <span className="muted small">{x.type}</span></span>) : current ? <span className="pill warn">No aircraft</span> : null}</td>
                       <td className="r">
                         {!active ? <span className="muted">Not running</span>
                           : problems.has(current!.id) && cov === 1 ? <span className="pill danger">Conflict</span>

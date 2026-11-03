@@ -1,13 +1,14 @@
 import { useMemo } from "react";
 import { AlertTriangle, CheckCircle2, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
-import { byId, useStore } from "../store";
+import { useStore } from "../store";
 import { missionCoverage, type Issue } from "../coverage";
 import { format } from "date-fns";
 import { dayAt, fmtRange, ms, overlaps, plural, today } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { StatusPill } from "../components/ui";
 import { fleetUse } from "../fleet";
+import { seasonTails } from "../rotation";
 
 /** Open whatever an issue is about, so it can be fixed in one click. */
 export function useOpenIssue() {
@@ -51,7 +52,6 @@ export function Overview({ issues }: { issues: Issue[] }) {
   const now = Date.now();
   const d0 = today().getTime();
   const weekEnd = dayAt(d0, 30);
-  const aircraft = byId(data.aircraft);
 
   const stats = useMemo(() => {
     const live = bookings(data).filter((m) => m.status !== "Cancelled");
@@ -121,7 +121,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
                 <span className="grow">
                   <b>{m.name}</b>
                   <div className="small muted">
-                    {fmtRange(m.start, m.end)} · {aircraft.get(m.aircraftId ?? "")?.tail ?? "No aircraft"}
+                    {fmtRange(m.start, m.end)} · {seasonTails(data, m, "No aircraft")}
                   </div>
                 </span>
                 <span className={`pill ${pct === 100 ? "ok" : "danger"}`}>{pct === 100 ? "Crewed" : `${pct}% crewed`}</span>

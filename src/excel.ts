@@ -6,6 +6,7 @@ import { dayUse, fleetUse } from "./fleet";
 import { DAY, dayAt, ms, today } from "./time";
 import { textOn } from "./look";
 import { saveFile } from "./files";
+import { seasonTails } from "./rotation";
 
 /**
  * The whole plan as an Excel workbook, to post in a Teams channel or open anywhere:
@@ -99,7 +100,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
     for (const b of [...all].sort((x, y) => x.start.localeCompare(y.start))) {
       const row = ws.addRow({
         name: b.name, contact: b.contact, start: day(b.start), end: lastDay(b.end), days: Math.round((ms(b.end) - ms(b.start)) / DAY),
-        tail: aircraft.get(b.aircraftId ?? "")?.tail ?? "", status: b.status, pilots: b.pilotsNeeded, crewed: missionCoverage(data, b).covered,
+        tail: seasonTails(data, b, ""), status: b.status, pilots: b.pilotsNeeded, crewed: missionCoverage(data, b).covered,
       });
       row.getCell(1).fill = fill(b.color);
       row.getCell(1).font = { bold: true, color: { argb: argb(textOn(b.color)) } };
@@ -118,7 +119,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
       const b = seasons.get(s.seasonId);
       const p = people.get(s.personId);
       if (!b || !p) continue;
-      ws.addRow({ person: p.name, role: p.role, mission: b.name, tail: aircraft.get(b.aircraftId ?? "")?.tail ?? "", start: day(s.start), end: lastDay(s.end), days: Math.round((ms(s.end) - ms(s.start)) / DAY) });
+      ws.addRow({ person: p.name, role: p.role, mission: b.name, tail: seasonTails(data, b, ""), start: day(s.start), end: lastDay(s.end), days: Math.round((ms(s.end) - ms(s.start)) / DAY) });
     }
   }
 
