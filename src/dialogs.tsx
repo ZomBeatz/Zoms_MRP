@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, CopyPlus, Plus, Trash2, Wand2 } from "lucide-react";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
-import { useStore } from "./store";
+import { keepForm, keptForm, useStore } from "./store";
 import { findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
 import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, plural, startToDate, toWhen, today, uid } from "./time";
@@ -30,6 +30,14 @@ export function Dialogs() {
 }
 
 type Props = { id: string; defaults: Record<string, unknown> };
+
+/** Leaves this form's unsaved state behind when it opens another form, so it comes back as it was. */
+function useKeep(state: object) {
+  useEffect(() => {
+    keepForm(() => state);
+    return () => keepForm(null);
+  });
+}
 
 const tomorrow = () => dayAt(Date.now(), 1);
 
@@ -92,8 +100,9 @@ function MissionDialog({ id, defaults }: Props) {
   const { data, change, remove, close, open } = useStore();
   const existing = data.missions.find((m) => m.id === id);
   const isNew = !existing;
-  const [tab, setTab] = useState("details");
-  const [m, setM] = useState<Mission>(() => existing ?? {
+  const [kept] = useState(() => keptForm<{ tab: string; m: Mission; pool: Set<string> }>());
+  const [tab, setTab] = useState(kept.tab ?? "details");
+  const [m, setM] = useState<Mission>(() => kept.m ?? existing ?? {
     id: uid(), name: "", contact: "", location: "", notes: "",
     requiredTrainingIds: (defaults.requiredTrainingIds as string[] | undefined) ?? [],
     // A new mission takes the next color nobody is using yet.
@@ -105,7 +114,8 @@ function MissionDialog({ id, defaults }: Props) {
     pilotsNeeded: 1, maintainersNeeded: 0, pilotRotation: null, maintainerRotation: null, status: "Planned", notes: "",
     ...(defaults as Partial<Season>),
   }));
-  const [pool, setPool] = useState<Set<string>>(() => new Set(data.people.filter((p) => p.missionIds.includes(id)).map((p) => p.id)));
+  const [pool, setPool] = useState<Set<string>>(() => kept.pool ?? new Set(data.people.filter((p) => p.missionIds.includes(id)).map((p) => p.id)));
+  useKeep({ tab, m, pool });
   const set = (patch: Partial<Mission>) => setM((x) => ({ ...x, ...patch }));
   const setF = (patch: Partial<Season>) => setFirst((x) => ({ ...x, ...patch }));
   const seasons = seasonsOf(data, m.id);
@@ -352,7 +362,9 @@ function SeasonDialog({ id, defaults }: Props) {
   const { data, change, remove, close, open } = useStore();
   const existing = data.seasons.find((x) => x.id === id);
   const isNew = !existing;
+  const [kept] = useState(() => keptForm<{ tab: string; season: Season; shifts: Shift[] }>());
   const [season, setSeason] = useState<Season>(() => {
+    if (kept.season) return kept.season;
     if (existing) return existing;
     const missionId = (defaults.missionId as string) ?? data.missions[0]?.id ?? "";
     // A new season starts from the mission's latest one: same aircraft, crew numbers and rotations.
@@ -365,8 +377,9 @@ function SeasonDialog({ id, defaults }: Props) {
     };
   });
   // Open on the crew, where most of the work is, unless the season is new.
-  const [tab, setTab] = useState(() => (isNew ? "details" : existing!.pilotsNeeded > 0 ? "pilots" : existing!.maintainersNeeded > 0 ? "maintainers" : "details"));
-  const [shifts, setShifts] = useState<Shift[]>(() => data.shifts.filter((s) => s.seasonId === id));
+  const [tab, setTab] = useState(() => kept.tab ?? (isNew ? "details" : existing!.pilotsNeeded > 0 ? "pilots" : existing!.maintainersNeeded > 0 ? "maintainers" : "details"));
+  const [shifts, setShifts] = useState<Shift[]>(() => kept.shifts ?? data.shifts.filter((s) => s.seasonId === id));
+  useKeep({ tab, season, shifts });
   const [editingShift, setEditingShift] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const set = (patch: Partial<Season>) => setSeason((x) => ({ ...x, ...patch }));
@@ -403,7 +416,7 @@ function SeasonDialog({ id, defaults }: Props) {
     const shift = { id: uid(), seasonId: season.id, personId, start: toWhen(a), end: toWhen(b) };
     setShifts((s) => [...s, shift]);
     setEditingShift(shift.id);
-    if (!free) useStore.getState().showToast("Nobody can take all of those days. Pick someone, or shorten the dates.");
+    if (!free) useStore.getState().showToast("Nobody rated, current and free can take all of those days. Shorten the dates, or turn on Show everyone to pick someone anyway.");
   };
 
   /** Fill the open seats for one role on the job's rotation (see src/fill.ts). */
@@ -638,9 +651,11 @@ function AircraftDialog({ id }: Props) {
 function PersonDialog({ id, defaults }: Props) {
   const { data, upsert, remove, close, showToast, open } = useStore();
   const existing = data.people.find((p) => p.id === id);
-  const [tab, setTab] = useState("details");
-  const [p, setP] = useState<Person>(() => existing ?? { id: uid(), name: "", role: "Pilot", quals: [], training: [], missionIds: [], rotation: null, base: "", phone: "", notes: "", ...(defaults as Partial<Person>) });
+  const [kept] = useState(() => keptForm<{ tab: string; p: Person }>());
+  const [tab, setTab] = useState(kept.tab ?? "details");
+  const [p, setP] = useState<Person>(() => kept.p ?? existing ?? { id: uid(), name: "", role: "Pilot", quals: [], training: [], missionIds: [], rotation: null, base: "", phone: "", notes: "", ...(defaults as Partial<Person>) });
   const set = (patch: Partial<Person>) => setP((x) => ({ ...x, ...patch }));
+  useKeep({ tab, p });
   const [newQual, setNewQual] = useState("");
   const types = [...new Set([...typesOf(data), ...p.quals])].sort();
   const word = p.role === "Pilot" ? "pilot" : "maintainer";

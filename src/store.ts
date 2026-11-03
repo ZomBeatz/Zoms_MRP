@@ -132,6 +132,22 @@ function pushHistory(shown: Shown) {
     history.pushState({ mrp: true, ...shown }, "");
   } catch { /* history can be unavailable in some embeds; back then just leaves */ }
 }
+/**
+ * A form that opens another (a mission opening one of its seasons) is closed while the other one is
+ * open. It can leave its unsaved draft and tab on its history entry with `keepForm`, and `keptForm`
+ * hands them back when the back button (or Close) returns to it.
+ */
+let keeper: (() => object) | null = null;
+export function keepForm(fn: (() => object) | null) {
+  keeper = fn;
+}
+export function keptForm<T extends object>(): Partial<T> {
+  try {
+    return (history.state?.kept as Partial<T> | undefined) ?? {};
+  } catch {
+    return {};
+  }
+}
 if (typeof window !== "undefined") {
   try {
     history.replaceState({ mrp: true, page: lastPage, editing: null }, "");
@@ -171,6 +187,11 @@ export const useStore = create<State>((set, get) => ({
   open: (kind, id, defaults) => {
     if (afterStep(() => get().open(kind, id, defaults))) return;
     const editing = { kind, id, defaults };
+    if (get().editing && keeper) {
+      try {
+        history.replaceState({ ...history.state, kept: keeper() }, "");
+      } catch { /* the form just opens fresh when it's returned to */ }
+    }
     pushHistory({ page: get().page, editing });
     set({ editing });
   },

@@ -93,7 +93,7 @@ a.btn { color: inherit; text-decoration: none; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .page { padding: 28px 36px 60px; overflow-y: auto; flex: 1; min-height: 0; }
 .page-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-.page-head h1 { flex: 1; min-width: 0; }
+.page-head h1 { flex: 1 0 auto; }
 .save-error { background: var(--zb-danger); color: #fff; padding: 6px 14px; font-size: 13px; }
 .phone-top { display: none; }
 
@@ -388,7 +388,7 @@ button.g-label:hover { background: var(--zb-surface-2); }
 .legend > span { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ---------- phones (under 700 px) ---------- */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .app { flex-direction: column; }
   .phone-top {
     display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 6px) 10px 6px;
@@ -431,14 +431,22 @@ button.g-label:hover { background: var(--zb-surface-2); }
   .dialog-tabs .chip { display: none; }
   /* Keep messages clear of a form's buttons. */
   .toast { bottom: calc(env(safe-area-inset-bottom) + 74px); max-width: calc(100vw - 32px); }
-  .table-wrap { display: none; }
-  .cards-list { display: flex; flex-direction: column; gap: 8px; }
-  .list-card { background: var(--zb-surface); border-radius: var(--zb-radius); box-shadow: var(--zb-shadow); padding: 12px 14px; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 4px; }
   .shift-row { grid-template-columns: 1fr 1fr; }
   .shift-row > :first-child { grid-column: 1 / -1; }
   .gantt-grid { grid-template-columns: 130px 1fr; }
   .kbd-hint { display: none; }
 }
+/* Tables need room: on phones and tablets the lists show as cards instead (two across on a tablet). */
+@media (max-width: 1000px) {
+  .table-wrap { display: none; }
+  .cards-list { display: flex; flex-direction: column; gap: 8px; }
+  .list-card { background: var(--zb-surface); border-radius: var(--zb-radius); box-shadow: var(--zb-shadow); padding: 12px 14px; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 4px; }
+}
+@media (min-width: 701px) and (max-width: 1000px) {
+  .cards-list { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .demo-banner .banner-note { display: none; }
+}
+.list-card .chip { white-space: normal; }
 @media (pointer: coarse) { .table td { height: 44px; } .kbd-hint { display: none; } }
 /* Fingers: everything tappable at least 36 px, and text fields at 16 px so phones don't zoom in on them. */
 @media (max-width: 700px), (pointer: coarse) {
@@ -451,11 +459,15 @@ button.g-label:hover { background: var(--zb-surface-2); }
   .chip.pick { min-height: 36px; padding: 6px 13px; font-size: 14px; }
   .tag { min-height: 36px; }
   .tag .icon-btn { width: 30px; height: 30px; justify-content: center; }
-  .field .tags select.add-tag { min-height: 36px; }
+  .field .tags select.add-tag { min-height: 36px; font-size: 16px; }
   .pattern-btn { height: 38px; }
   input[type="color"] { width: 44px; height: 40px; }
   .guide-toc a { padding: 8px 13px; font-size: 14px; }
   .icon-btn { min-width: 36px; min-height: 36px; justify-content: center; }
+  .swatch-btn { width: 34px; height: 34px; }
+  button.link { padding: 9px 0; }
+  .dialog-body summary { padding: 10px 0; }
+  .zoom-slider { height: 32px; }
 }
 
 /* ---------- printing: always light, no frame or buttons ---------- */
@@ -480,7 +492,7 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 .hbar-track.stack > span { height: 100%; min-width: 0; }
 .hbar-track.stack > span:first-child { border-radius: 0; }
 .hbar-track.stack > span:last-child { border-radius: 0 4px 4px 0; }
-@media (max-width: 700px) { .report-grid { grid-template-columns: 1fr; } .hbar { grid-template-columns: 110px 1fr 44px; } }
+@media (max-width: 700px), (max-height: 500px) { .report-grid { grid-template-columns: 1fr; } .hbar { grid-template-columns: 110px 1fr 44px; } }
 
 /* ---------- fleet timeline ---------- */
 .g-weekend { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--zb-text) 4%, transparent); pointer-events: none; }
