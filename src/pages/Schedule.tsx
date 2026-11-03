@@ -84,7 +84,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
       <div
         className={`g-lane ${r.sub ? "sub" : ""}`}
         style={{ height }}
-        title={r.addDefaults ? "Drag to move through time. Click empty space to add a mission here." : "Drag to move through time."}
+        title={r.addDefaults ? "Drag to move through time. Tap empty space to add a mission here." : "Drag to move through time."}
         onClick={(e) => {
           if (justDragged.current || !r.addDefaults || e.target !== e.currentTarget) return;
           const day = tl.dayAtX(e.clientX, e.currentTarget.getBoundingClientRect());

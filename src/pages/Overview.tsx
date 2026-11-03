@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
 import { missionCoverage, type Issue } from "../coverage";
@@ -77,6 +77,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
         <h1>Overview</h1>
         <button className="btn" onClick={() => go("schedule")}>Open schedule</button>
       </div>
+      {!data.aircraft.length && !data.missions.length && <GettingStarted />}
       <div className="tiles">
         <button className="tile" onClick={() => go("missions")}>
           <div className="label"><Plane size={14} /> Missions now or in the next 30 days</div>
@@ -168,5 +169,24 @@ function FleetNow() {
         <button className="btn sm" onClick={() => open("support", "new")}><SearchCheck size={14} /> Can we take a job?…</button>
       </div>
     </>
+  );
+}
+
+/** With nothing set up yet, say where to begin instead of showing empty numbers. */
+function GettingStarted() {
+  const { go, demo, setDemo } = useStore();
+  const toSetup = () => {
+    go("guide");
+    setTimeout(() => document.getElementById("guide-setup")?.scrollIntoView({ block: "start" }), 300);
+  };
+  return (
+    <section className="panel getting-started">
+      <h3><BookOpen size={16} /> Getting started</h3>
+      <p>Nothing is set up yet. The Guide lists what to add, in order, with a button for each step: aircraft, training, crew, then each customer as a mission.</p>
+      <div className="row gap-sm wrap">
+        <button className="btn primary" onClick={toSetup}>Set up step by step</button>
+        {!demo && <button className="btn" onClick={() => setDemo(true)}>Look at the demo first</button>}
+      </div>
+    </section>
   );
 }

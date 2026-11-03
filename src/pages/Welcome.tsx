@@ -14,7 +14,7 @@ export function Welcome() {
           Plan missions for days or months, put aircraft on them by tail number, rotate pilots through hitches, book maintainers and keep training current.
           Zom's MRP shows you every gap and conflict before it becomes a problem.
         </p>
-        <p className="small muted">{isServerBuild ? "The plan is saved on this server, for everyone you add." : "Everything is saved on this computer."}</p>
+        <p className="small muted">{isServerBuild ? "The plan is saved on this server, for everyone you add." : "Everything is saved on this device. The Guide shows how it all works, with short hands-on lessons."}</p>
         <div className="row gap" style={{ justifyContent: "center", marginTop: 20 }}>
           <button className="btn" onClick={() => start(false)}>Start empty</button>
           <button className="btn primary" onClick={() => start(true)}>Try it with demo data</button>

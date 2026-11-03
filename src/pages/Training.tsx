@@ -75,7 +75,7 @@ export function TrainingPage() {
           <>
             <p className="small muted" style={{ marginTop: 0 }}>
               {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their missions need. "}
-              People need only the training their missions ask for. Click a person to record training or change what they work on.
+              People need only the training their missions ask for. Tap a person to record training or change what they work on.
             </p>
             <div className="table-wrap">
               <table className="table">

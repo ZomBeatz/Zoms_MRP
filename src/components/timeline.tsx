@@ -136,6 +136,17 @@ export function TimelineControls({ tl }: { tl: Timeline }) {
   );
 }
 
+/** A month over the dates. A month the range only clips gets a short name, or none, so it isn't cut off. */
+function MonthLabel({ d, left, width }: { d: number; left: number; width: number }) {
+  // The board is at least 680 px wide beside the names, so this is the narrowest a month can be.
+  const px = (width / 100) * 680;
+  return (
+    <div className="g-day" style={{ left: `${left}%`, width: `${width}%` }} title={format(d, "MMMM yyyy")}>
+      {px < 34 ? "" : px < 120 ? format(d, "MMM") : format(d, "MMMM yyyy")}
+    </div>
+  );
+}
+
 /** The date header: days for short spans, months over day numbers or week starts for longer ones. */
 export function TimeHead({ tl }: { tl: Timeline }) {
   const { span, pct, to, scale } = tl;
@@ -150,7 +161,7 @@ export function TimeHead({ tl }: { tl: Timeline }) {
             </div>
           ))
         : (span > 120 ? [] : scale.months).map((d, i) => (
-            <div key={d} className="g-day" style={{ left: `${pct(d)}%`, width: `${pct(scale.months[i + 1] ?? to) - pct(d)}%` }}>{format(d, "MMMM yyyy")}</div>
+            <MonthLabel key={d} d={d} left={pct(d)} width={pct(scale.months[i + 1] ?? to) - pct(d)} />
           ))}
       {span > 120 && <div className="g-day" style={{ left: 0, width: "100%" }}>{[...new Set(scale.days.map((d) => new Date(d).getFullYear()))].join(" to ")}</div>}
       {scale.ticks.map((t, i) => (

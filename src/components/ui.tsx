@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import type { AircraftStatus, MissionStatus, Person } from "../types";
 import { PATTERNS, SWATCHES, slotStyle } from "../look";
@@ -50,13 +50,35 @@ export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs,
   );
 }
 
+/**
+ * A whole number that can be cleared and typed again. It keeps what's typed, passes on numbers that
+ * fit, and settles between min and max when you leave it (an empty box goes back to what it was).
+ */
+export function NumberInput({ value, onChange, min = 0, max = 365, ...rest }: { value: number; onChange: (n: number) => void; min?: number; max?: number } & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "min" | "max" | "type">) {
+  const [text, setText] = useState<string | null>(null);
+  return (
+    <input {...rest} type="number" inputMode="numeric" min={min} max={max} value={text ?? value}
+      onFocus={(e) => { setText(String(value)); e.target.select(); }}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = Math.round(parseFloat(e.target.value));
+        if (n >= min && n <= max) onChange(n);
+      }}
+      onBlur={() => {
+        const n = Math.round(parseFloat(text ?? ""));
+        if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
+        setText(null);
+      }} />
+  );
+}
+
 /** A number with − and + buttons, easy to hit on a phone. */
 export function Stepper({ value, onChange, min = 0, max = 20, label }: { value: number; onChange: (n: number) => void; min?: number; max?: number; label: string }) {
   const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n) || 0));
   return (
     <span className="stepper">
       <button type="button" aria-label={`Fewer ${label}`} disabled={value <= min} onClick={() => onChange(clamp(value - 1))}>−</button>
-      <input type="number" inputMode="numeric" aria-label={label} min={min} max={max} value={value} onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      <NumberInput aria-label={label} min={min} max={max} value={value} onChange={onChange} />
       <button type="button" aria-label={`More ${label}`} disabled={value >= max} onClick={() => onChange(clamp(value + 1))}>+</button>
     </span>
   );

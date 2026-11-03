@@ -18,6 +18,93 @@ export const SHORTCUTS: [string, string][] = [
   ["Esc", "Close a form"],
 ];
 
+/** Everyday jobs, as short step lists. Keep the names of buttons and tabs exactly as they are in the app. */
+const RECIPES: { q: string; steps: ReactNode[] }[] = [
+  {
+    q: "A customer wants more days",
+    steps: [
+      <>Go to <b>Missions</b> and tap the mission.</>,
+      <>Open the <b>Seasons</b> tab and tap the season.</>,
+      <>On <b>Details</b>, change the <b>Last day</b> (or First day).</>,
+      <>Go to <b>Pilots</b> and press <b>Fill the schedule</b> to crew the new days. Do the same on <b>Maintainers</b>.</>,
+      <>Press <b>Save</b>.</>,
+    ],
+  },
+  {
+    q: "Swap one pilot for another",
+    steps: [
+      <>Open the season: tap its bar on the <b>Schedule</b>, or go through <b>Missions</b> › the mission › <b>Seasons</b>.</>,
+      <>Go to the <b>Pilots</b> tab and tap the shift you want to change.</>,
+      <>Pick the other person. The list says who isn't rated, current or free.</>,
+      <>Change the days too if only part of the shift moves, then press <b>Done</b> and <b>Save</b>.</>,
+    ],
+  },
+  {
+    q: "Someone is sick or on leave",
+    steps: [
+      <>Go to <b>Crew</b> and press <b>Add time off</b>.</>,
+      <>Pick who, the first and last day, and a reason. Press <b>Add time off</b>.</>,
+      <>Any shift they had on those days now shows under <b>Needs attention</b> on the <b>Overview</b>. Tap it to open the season, then swap someone in (see above).</>,
+    ],
+  },
+  {
+    q: "An aircraft breaks down",
+    steps: [
+      <>Go to <b>Maintenance</b> and press <b>New job</b>.</>,
+      <>Name it, pick the tail and the days it will be down.</>,
+      <>Tick <b>The aircraft can't fly during this job</b> and save.</>,
+      <>Any mission booked on it shows on the <b>Overview</b>. Open it, and on the season's <b>Details</b> take that tail off and add a free one. The <b>Fleet</b> page shows which tails are free.</>,
+    ],
+  },
+  {
+    q: "Someone finished or renewed a course",
+    steps: [
+      <>Go to <b>Training</b> and tap the person (or <b>Crew</b> › the person).</>,
+      <>Open their <b>Training</b> tab and tap the course. If it isn't there, press <b>Add training</b>.</>,
+      <>Set <b>Completed</b> to the day they did it. <b>Runs out</b> moves on by itself.</>,
+      <>Press <b>Done</b>, then <b>Save</b>.</>,
+    ],
+  },
+  {
+    q: "Book the same job again next year",
+    steps: [
+      <>Go to <b>Missions</b> and tap the mission.</>,
+      <>On the <b>Seasons</b> tab press <b>Copy to next season</b>. It copies the dates a year on, with the same aircraft, crew numbers and rotation.</>,
+      <>The new season opens by itself. Change anything that's different, crew it on <b>Pilots</b> with <b>Fill the schedule</b>, and press <b>Save</b>.</>,
+    ],
+  },
+  {
+    q: "Add someone to a mission's regular crew",
+    steps: [
+      <>Go to <b>Missions</b>, tap the mission and open the <b>Crew</b> tab.</>,
+      <>Tap their name under <b>Could join</b> to tick it, and press <b>Save</b>.</>,
+      <>They now get first pick when the schedule is filled, and they need the mission's training.</>,
+    ],
+  },
+  {
+    q: "Find who can cover some dates",
+    steps: [
+      <>Go to <b>Schedule</b> and pick <b>Crew</b> at the top.</>,
+      <>Pick the mission in the list. Under its own crew you'll see the people who are rated and current but not on it yet, with their days already booked.</>,
+    ],
+  },
+  {
+    q: "Share the plan with the team",
+    steps: [
+      <>On <b>Reports</b>, press <b>Export to Excel</b> for one workbook to post in Teams or email.</>,
+      <>Or on the <b>Schedule</b>, press <b>Print</b> for a paper copy of what's on screen.</>,
+    ],
+  },
+  {
+    q: "Get around on a phone",
+    steps: [
+      <>The <b>☰</b> button at the top left opens the menu of pages. The <b>+</b> at the top right starts a new mission.</>,
+      <>Charts are wider than a phone: swipe them sideways to move through time and pinch to zoom.</>,
+      <>Forms open full screen. Their tabs are along the top, <b>Save</b> and <b>Cancel</b> along the bottom. The phone's back button closes a form without saving.</>,
+    ],
+  },
+];
+
 const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] = [
   {
     id: "flow", title: "How it's meant to be used",
@@ -38,6 +125,37 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
   {
     id: "setup", title: "Set up your own operation", tour: "add-mission",
     body: <Setup />,
+  },
+  {
+    id: "howto", title: "How do I…",
+    body: (
+      <>
+        <p>The everyday jobs, step by step. Tap one to open it.</p>
+        <div className="recipes">
+          {RECIPES.map((r) => (
+            <details key={r.q} className="recipe">
+              <summary>{r.q}</summary>
+              <ol>{r.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
+            </details>
+          ))}
+        </div>
+      </>
+    ),
+  },
+  {
+    id: "colors", title: "What the colors mean",
+    body: (
+      <ul className="color-key">
+        <li><span className="pill ok">Green</span> All good: ready, crewed, current.</li>
+        <li><span className="pill warn">Amber</span> Look soon: training runs out soon, or a job is missing something it will need.</li>
+        <li><span className="pill danger">Red</span> Fix it: an open seat, someone booked twice, training that ran out, a grounded aircraft that's booked.</li>
+        <li><span className="pill accent">Blue</span> Planned, not confirmed yet. Blue buttons are the next thing to press.</li>
+        <li><span className="swatch-dash free" /> Green dashed block: an aircraft that's free. Tap it to book that window.</li>
+        <li><span className="swatch-dash open" /> Red dashed block: an open seat a job still needs filled.</li>
+        <li>Each mission has its own color and pattern on the charts, so you can tell them apart even printed in grey. The list under each chart says which is which.</li>
+        <li>The colored line down a chart is the start of today.</li>
+      </ul>
+    ),
   },
   {
     id: "words", title: "Words used here",
@@ -238,7 +356,7 @@ export function Guide() {
 
       <nav className="guide-toc" aria-label="Contents">
         {SECTIONS.map((s) => <a key={s.id} href={`#guide-${s.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(`guide-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{s.title}</a>)}
-        <a href="#guide-shortcuts" onClick={(e) => { e.preventDefault(); document.getElementById("guide-shortcuts")?.scrollIntoView({ behavior: "smooth" }); }}>Shortcuts</a>
+        <a href="#guide-shortcuts" className="kbd-hint" onClick={(e) => { e.preventDefault(); document.getElementById("guide-shortcuts")?.scrollIntoView({ behavior: "smooth" }); }}>Shortcuts</a>
       </nav>
 
       {SECTIONS.map((s) => (
