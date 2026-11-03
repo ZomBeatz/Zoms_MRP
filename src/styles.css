@@ -281,6 +281,12 @@ button.line:hover { background: var(--zb-surface-2); }
 .tour-spot { position: absolute; border-radius: 10px; box-shadow: 0 0 0 3px var(--zb-accent), 0 0 0 9999px #0007; transition: top .2s, left .2s, width .2s, height .2s; pointer-events: none; }
 .tour-card { position: absolute; pointer-events: auto; background: var(--zb-surface); color: var(--zb-text); border-radius: var(--zb-radius-lg); box-shadow: var(--zb-shadow-lg); padding: 14px 16px 12px; border: 1px solid var(--zb-border); }
 .tour-card.docked { left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 16px); }
+/* On a phone: small, leading with what to do. */
+.tour-card.compact { padding: 8px 12px 10px; }
+.tour-card.compact h3 { font-size: 15px; }
+.tour-card.compact p { font-size: 13.5px; margin-bottom: 8px; }
+.tour-card.compact .tour-task { font-size: 15px; padding: 10px 12px; margin: 6px 0 8px; }
+.tour-card.compact .btn.sm { padding: 6px 12px; }
 /* On a phone, out of the way of what it points at. */
 .tour-card.docked.top { bottom: auto; top: calc(env(safe-area-inset-top) + 12px); }
 .tour-card p { margin: 0 0 10px; font-size: 14px; line-height: 1.55; color: var(--zb-text-2); }
@@ -407,7 +413,7 @@ button.g-label:hover { background: var(--zb-surface-2); }
   .stepper button { width: 40px; }
   .banner { gap: 6px; padding: 6px 10px; }
   .demo-banner .btn.sm { padding: 4px 9px; }
-  body.touring .page, body.touring .dialog-body { padding-bottom: 320px; }
+  body.touring .page, body.touring .dialog-body { padding-bottom: 240px; }
   .wide-only { display: none; }
   .phone-only { display: inline; }
   .tiles { grid-template-columns: 1fr 1fr; gap: 8px; }

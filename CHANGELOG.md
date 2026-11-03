@@ -5,6 +5,8 @@
 **Learn it step by step**
 - Six hands-on lessons in the Guide: add a training course, add an aircraft, add a pilot, a customer calls with dates, a pilot calls in sick, and a job needs another aircraft. Each step says what to tap and moves on once it's done; **Do it for me** does it instead.
 - Finished lessons and tours are ticked off, and each lesson ends with **Take a break** or the next one.
+- Every lesson and tour starts on a fresh demo and puts it back when it's over.
+- On a phone the lesson card is small: just what to tap and the buttons, with **Why?** for the explanation.
 - The page can be scrolled and used while a tour runs, and its card can be made small to see what's under it.
 
 **Easier to use**
