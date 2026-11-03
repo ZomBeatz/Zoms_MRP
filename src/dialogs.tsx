@@ -8,7 +8,7 @@ import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
 import { SWATCHES, missionLook, slotStyle } from "./look";
-import { Avatar, Dialog, Field, LookPicker, NumberInput, StatusPill, Stepper, initials } from "./components/ui";
+import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials } from "./components/ui";
 import { seasonsOf } from "./bookings";
 import { IssueList } from "./pages/Overview";
 import type { Aircraft, AppData, MaintenanceJob, Mission, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
@@ -218,7 +218,7 @@ function MissionDialog({ id, defaults }: Props) {
       {tab === "details" && (
         <div className="form-grid">
           <Field label="Mission (customer)" full>
-            <input autoFocus value={m.name} placeholder="Interior Fire Service" onChange={(e) => set({ name: e.target.value })} />
+            <input autoFocus={autoFocusBox} value={m.name} placeholder="Interior Fire Service" onChange={(e) => set({ name: e.target.value })} />
           </Field>
           <Field label="Contact"><input value={m.contact} placeholder="Who to call" onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="Location"><input value={m.location} onChange={(e) => set({ location: e.target.value })} /></Field>
@@ -625,7 +625,7 @@ function AircraftDialog({ id }: Props) {
         onDelete={() => { remove("aircraft", a.id, `Deleted ${a.tail}`); close(); }} />}>
       <div className="form-grid">
         <Field label="Tail number" error={error}>
-          <input autoFocus value={a.tail} placeholder="N412ZM" style={{ fontFamily: "var(--zb-font-mono)", textTransform: "uppercase" }} onChange={(e) => set({ tail: e.target.value })} />
+          <input autoFocus={autoFocusBox} value={a.tail} placeholder="N412ZM" style={{ fontFamily: "var(--zb-font-mono)", textTransform: "uppercase" }} onChange={(e) => set({ tail: e.target.value })} />
         </Field>
         <Field label="Type" hint="Crew ratings match this.">
           <input list="mrp-types" value={a.type} placeholder="Bell 412" onChange={(e) => set({ type: e.target.value })} />
@@ -684,7 +684,7 @@ function PersonDialog({ id, defaults }: Props) {
         onDelete={() => { remove("people", p.id, `Deleted ${p.name} and their shifts`); close(); }} />}>
       {tab === "details" && (
         <div className="form-grid">
-          <Field label="Name"><input autoFocus value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
+          <Field label="Name"><input autoFocus={autoFocusBox} value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
           <Field label="Role">
             <select value={p.role} onChange={(e) => set({ role: e.target.value as Person["role"] })}>
               <option>Pilot</option><option>Maintainer</option>
@@ -758,7 +758,7 @@ function JobDialog({ id, defaults }: Props) {
         onSave={() => { upsert("jobs", j); if (!existing) showToast(`Added “${j.title}”`); close(); }}
         onDelete={() => { remove("jobs", j.id, `Deleted “${j.title}”`); close(); }} />}>
       <div className="form-grid">
-        <Field label="Job" full><input autoFocus value={j.title} placeholder="100 hour inspection" onChange={(e) => set({ title: e.target.value })} /></Field>
+        <Field label="Job" full><input autoFocus={autoFocusBox} value={j.title} placeholder="100 hour inspection" onChange={(e) => set({ title: e.target.value })} /></Field>
         <div className="full pair">
           <Field label="Aircraft">
             <select value={j.aircraftId} onChange={(e) => set({ aircraftId: e.target.value })}>
@@ -958,7 +958,7 @@ function TrainingDialog({ id }: Props) {
         onSave={() => { upsert("trainings", t); if (!existing) showToast(`Added “${t.name}”`); close(); }}
         onDelete={() => { remove("trainings", t.id, `Deleted “${t.name}”${holders ? ` and ${plural(holders, "record")}` : ""}`); close(); }} />}>
       <div className="form-grid">
-        <Field label="Name" full><input autoFocus value={t.name} placeholder="Night vision goggles (NVG)" onChange={(e) => set({ name: e.target.value })} /></Field>
+        <Field label="Name" full><input autoFocus={autoFocusBox} value={t.name} placeholder="Night vision goggles (NVG)" onChange={(e) => set({ name: e.target.value })} /></Field>
         <div className="field"><span>Renew every (months)</span><Stepper label="months" max={120} value={t.validMonths} onChange={(validMonths) => set({ validMonths })} /><span className="hint">0 if it never runs out.</span></div>
         <Field label="For">
           <select value={t.appliesTo} onChange={(e) => set({ appliesTo: e.target.value as Training["appliesTo"] })}>

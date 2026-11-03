@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download, KeyRound, LogOut, Plus, ScrollText, UserCog, Users } from "lucide-react";
 import { useStore } from "../store";
-import { Dialog, Field } from "../components/ui";
+import { Dialog, Field, autoFocusBox } from "../components/ui";
 import { api, serverUser, type ServerUser } from "../backends/server";
 
 /**
@@ -63,7 +63,7 @@ function PasswordDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="Change password" onClose={onClose} foot={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" onClick={save} disabled={!current || next.length < 10}>Change password</button></>}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field label="Current password"><input type="password" autoComplete="current-password" autoFocus value={current} onChange={(e) => setCurrent(e.target.value)} /></Field>
+        <Field label="Current password"><input type="password" autoComplete="current-password" autoFocus={autoFocusBox} value={current} onChange={(e) => setCurrent(e.target.value)} /></Field>
         <Field label="New password" hint="At least 10 characters." error={error}><input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
       </div>
     </Dialog>
@@ -171,7 +171,7 @@ function AccountDialog({ account, onClose }: { account: Account | null; onClose:
         </>
       }>
       <div className="form-grid">
-        <Field label="Name"><input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Name"><input autoFocus={autoFocusBox} value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="Username" hint={account ? "Usernames can't change." : "What they sign in with."}>
           <input value={username} disabled={!!account} autoComplete="off" onChange={(e) => setUsername(e.target.value)} />
         </Field>

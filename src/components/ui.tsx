@@ -10,6 +10,9 @@ export interface Tab { key: string; label: ReactNode; /** A red dot: something o
  * A form over the page. The title, a summary line and the tabs stay at the top and the buttons stay
  * at the bottom; only the middle scrolls. On a phone it fills the screen.
  */
+/** Focus a form's first box only with a mouse: on a touch screen it would pop up the keyboard over the form. */
+export const autoFocusBox = typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
+
 export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs, tab, onTab }: {
   title: ReactNode; onClose: () => void; children: ReactNode; foot: ReactNode; wide?: boolean;
   /** A swatch or avatar before the title. */ icon?: ReactNode;
