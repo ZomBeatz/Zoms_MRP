@@ -98,7 +98,8 @@ interface State {
   redo: () => void;
   start: (withDemo: boolean) => Promise<void>;
   setDemo: (on: boolean) => Promise<void>;
-  resetDemo: () => void;
+  /** Put the demo back the way it started. `quiet` skips the message (when a lesson starts). */
+  resetDemo: (quiet?: boolean) => void;
   /** Replace everything with an empty start (own data only). */
   clearAll: () => void;
   showToast: (text: string, action?: Toast["action"]) => void;
@@ -278,12 +279,12 @@ export const useStore = create<State>((set, get) => ({
     get().showToast(on ? "Showing demo data. Your own data is kept apart." : "Back to your own data.");
   },
 
-  resetDemo: () => {
+  resetDemo: (quiet) => {
     if (!demo) return;
     const data = sampleData(get().data.settings);
     save(data);
     set({ data, past: [], future: [] });
-    get().showToast("Demo reset");
+    if (!quiet) get().showToast("Demo reset");
   },
 
   clearAll: () => get().change((d) => ({ ...emptyData(), settings: d.settings }), "Cleared all data"),
