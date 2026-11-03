@@ -10,7 +10,7 @@ import { isDesktopApp, isOnlineDemo, isServerBuild } from "../platform";
 import { serverUser } from "../backends/server";
 import { ServerSettings } from "./ServerSettings";
 import { ExcelCopySettings } from "./ExcelCopySettings";
-import { SHORTCUTS } from "./Help";
+import { SHORTCUTS } from "./Guide";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   const { data, demo, updateSettings, setDemo, resetDemo, change, clearAll, showToast } = useStore();
@@ -113,7 +113,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           <table className="table" style={{ boxShadow: "none" }}>
             <tbody>{SHORTCUTS.map(([k, d]) => <tr key={k} style={{ cursor: "default" }}><td style={{ width: 160 }}><kbd>{k}</kbd></td><td>{d}</td></tr>)}</tbody>
           </table>
-          <button className="btn sm" style={{ marginTop: 8 }} onClick={onHelp}>Open help</button>
+          <button className="btn sm" style={{ marginTop: 8 }} onClick={onHelp}>Open the guide</button>
         </section>
 
         <section className="panel">

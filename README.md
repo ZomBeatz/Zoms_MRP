@@ -18,6 +18,8 @@
 2. Install it with a double-click and open it.
 3. Choose **Try it with demo data** to look around, or **Start empty** to plan your own operation.
 
+The **Guide** in the sidebar (or **?**) explains every part, and its walkthroughs take you through the demo one step at a time.
+
 Everything stays on that computer. For a team, see [Server](#server) below.
 
 ## What it does
@@ -125,6 +127,7 @@ npm run build:server && cargo test --manifest-path server/Cargo.toml   # the ser
 - `src/fleet.ts`: what each tail is doing day by day, free windows, and whether the fleet can take a job (tests next to it).
 - `src/components/timeline.tsx`: the drag, scroll and zoom shared by the Schedule and the Fleet page.
 - `src/pages/`: Overview, Fleet, Schedule (the Gantt chart), Missions, Crew, Maintenance, Training, Reports, Settings.
+- `src/tour.tsx`: the walkthroughs over the demo. `src/pages/Guide.tsx`: the guide.
 - `src/sample.ts`: the demo, an operator in Alaska over the past and next 12 months.
 - `src/dialogs.tsx`: the forms for each kind of item.
 - `src/tokens.css`: the ZomBeatz design tokens.
