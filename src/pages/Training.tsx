@@ -159,6 +159,20 @@ export function TrainingPage() {
           </div>
         )
       )}
+      {tab === "courses" && data.trainings.length > 0 && (
+        <div className="cards-list">
+          {data.trainings.map((t) => {
+            const needing = data.people.filter((p) => neededTraining(data, p).has(t.id));
+            const current = needing.filter((p) => standing(p, t, warn).tone !== "danger").length;
+            return (
+              <button key={t.id} className="list-card" onClick={() => open("training", t.id)}>
+                <span className="row gap-sm"><b className="grow">{t.name}</b>{needing.length > 0 && <span className={`pill ${current === needing.length ? "ok" : "warn"}`}>{current} of {needing.length} current</span>}</span>
+                <span className="small muted">{t.appliesTo === "Both" ? "Pilots and maintainers" : `${t.appliesTo}s`} · {t.validMonths ? `renew every ${t.validMonths} months` : "never runs out"}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

@@ -74,7 +74,21 @@ export function People({ issues }: { issues: Issue[] }) {
             </table>
           </div>
         )
-      ) : list.length === 0 ? (
+      ) : null}
+      {tab === "Time off" && offList.length > 0 && (
+        <div className="cards-list">
+          {offList.map((t) => {
+            const p = data.people.find((x) => x.id === t.personId);
+            return (
+              <button key={t.id} className="list-card" onClick={() => open("timeOff", t.id)}>
+                <span className="row gap-sm">{p && <Avatar person={p} />}<b>{p?.name ?? "Removed person"}</b></span>
+                <span className="small muted">{fmtRange(t.start, t.end)}{t.reason ? ` · ${t.reason}` : ""}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {tab === "Time off" ? null : list.length === 0 ? (
         <Empty icon={<Users size={28} />} text={`Add your ${tab === "Pilot" ? "pilots" : "maintainers"} and the aircraft types they're qualified on.`}
           action={<button className="btn primary" onClick={() => open("person", "new", { role: tab })}>Add {tab === "Pilot" ? "pilot" : "maintainer"}…</button>} />
       ) : (

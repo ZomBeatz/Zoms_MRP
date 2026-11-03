@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BookOpen,
+  BookOpen, FlaskConical,
   BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X,
 } from "lucide-react";
 import { useStore } from "./store";
@@ -20,7 +20,7 @@ import { SettingsPage } from "./pages/Settings";
 import { Dialogs } from "./dialogs";
 import { Welcome } from "./pages/Welcome";
 import { Guide } from "./pages/Guide";
-import { TourOverlay, useTour } from "./tour";
+import { TourOverlay } from "./tour";
 
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
@@ -152,13 +152,14 @@ export default function App() {
           </div>
         )}
         {demo && (
-          <div className="banner">
-            <span className="grow"><b>Live demo.</b> Try anything. Changes are only saved in this browser.</span>
-            <button className="btn sm" onClick={() => useTour.getState().start("basics")}>Take the tour</button>
-            <button className="btn sm" onClick={resetDemo}>Reset demo</button>
+          <div className="banner demo-banner">
+            <FlaskConical size={15} />
+            <span className="grow"><b>Demo</b><span className="wide-only muted"> · made-up data. Try anything; changes stay in this browser.</span></span>
+            <button className="btn sm primary" onClick={() => navTo("guide")}><span className="wide-only">Guide and scenarios</span><span className="phone-only">Guide</span></button>
+            <button className="btn sm ghost" onClick={resetDemo} title="Put the demo back the way it started">Reset</button>
             {isOnlineDemo
-              ? <a className="btn sm primary" href={RELEASES_URL} target="_blank" rel="noreferrer">Get Zom's MRP</a>
-              : <button className="btn sm primary" onClick={() => setDemo(false)}>Use my own data</button>}
+              ? <a className="btn sm" href={RELEASES_URL} target="_blank" rel="noreferrer"><span className="wide-only">Get Zom's MRP</span><span className="phone-only">Get it</span></a>
+              : <button className="btn sm" onClick={() => setDemo(false)}><span className="wide-only">Use my own data</span><span className="phone-only">My data</span></button>}
           </div>
         )}
         <div className="page">

@@ -148,8 +148,8 @@ function FleetNow() {
           const now = t.days[0];
           const run = t.freeRuns[0];
           return (
-            <button key={t.aircraft.id} className="issue" onClick={() => open("aircraft", t.aircraft.id)}>
-              <span style={{ minWidth: 150 }}>
+            <button key={t.aircraft.id} className="issue fleet-row" onClick={() => open("aircraft", t.aircraft.id)}>
+              <span className="tail">
                 <b style={{ fontFamily: "var(--zb-font-mono)" }}>{t.aircraft.tail}</b> <span className="small muted">{t.aircraft.type}</span>
               </span>
               <span className="grow small">

@@ -159,7 +159,7 @@ export function canSupport(data: AppData, job: Job): SupportAnswer[] {
       // Only bookings and maintenance are worth waiting out; the wrong type or too few seats never clear.
       const wrongKind = (job.type && a.type !== job.type) || a.status === "Grounded" || job.pilotsNeeded > a.seats;
       if (reasons.length)
-        return { aircraft: a, verdict: "no", reasons, shortDays: crew.short, fewestPilots: crew.fewest, earliest: wrongKind ? undefined : earliestFree(data, a, job.start, days.length) };
+        return { aircraft: a, verdict: "no", reasons: [...new Set(reasons)], shortDays: crew.short, fewestPilots: crew.fewest, earliest: wrongKind ? undefined : earliestFree(data, a, job.start, days.length) };
       if (crew.short) reasons.push(`Not enough free, qualified, current pilots on ${crew.short} day${crew.short === 1 ? "" : "s"}.`);
       return { aircraft: a, verdict: crew.short ? "crew" : "yes", reasons, shortDays: crew.short, fewestPilots: crew.fewest };
     })
