@@ -122,7 +122,7 @@ export const TOURS: Tour[] = [
     id: "basics", title: "The big picture", minutes: 3,
     summary: "Where everything is: the overview, the fleet board, the schedule, missions, crew and reports.",
     steps: [
-      { title: "Welcome to the Mission Ready Planner", body: "This is a made-up operator in Alaska: 12 helicopters, about 45 crew and 19 missions over two years. Try anything; the demo is kept apart from your own data, and Reset demo puts it back." },
+      { title: "Welcome to the Mission Ready Planner", body: "This is a made-up operator in Alaska: 12 helicopters, about 45 crew and 19 missions over two years. Tap around as you go: the demo is kept apart from your own data, and it's put back the way it was when the tour ends." },
       { page: "overview", target: ".page .tiles", title: "The overview", body: "Start each day here. The tiles show what's flying now, what's coming up and how many problems need a look. Tap a tile to go to that page." },
       { page: "overview", target: ".page .issue", title: "Needs attention", body: "Every open seat, double booking, missing rating, lapsed course and too-long hitch, worst first. Tap one and Zom's MRP opens the thing to fix." },
       { page: "aircraft", target: ".gantt", title: "The fleet board", body: "Every tail over time, grouped by type. Colored bars are missions; the green dashed blocks are free windows, counted from today. Ctrl + scroll (or pinch) zooms, and dragging moves through time." },
@@ -132,7 +132,7 @@ export const TOURS: Tour[] = [
       { page: "missions", target: ".page tbody tr, .page .list-card", title: "Missions are customers", body: "Each mission is one customer's kind of work, with its color, the training it needs and its regular crew. Its seasons are the stretches of dates it flies." },
       { page: "people", target: ".page tbody tr, .page .list-card", title: "Crew", body: "Pilots and maintainers, what they're rated on, the missions they work, their own rotation if they have one, their training and time off." },
       { page: "reports", target: ".page .tiles", title: "Reports", body: "Fleet use, days per mission, how busy each person is and how much of the flying was fully crewed. Export to Excel makes one workbook to post in Teams." },
-      { title: "That's the tour", body: "Next, try “Crew a job on a rotation” or “Can we take a new job?”. They're in the Guide, with how every part works." },
+      { title: "That's the tour", body: "Next, try the lessons in the Guide. They start with adding a training course and build up to a customer calling and a pilot calling in sick, with you doing each step. The Guide's How do I… section answers everyday questions." },
     ],
   },
   {

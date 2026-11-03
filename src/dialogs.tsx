@@ -8,7 +8,7 @@ import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
 import { SWATCHES, missionLook, slotStyle } from "./look";
-import { Avatar, Dialog, Field, LookPicker, StatusPill, Stepper, initials } from "./components/ui";
+import { Avatar, Dialog, Field, LookPicker, NumberInput, StatusPill, Stepper, initials } from "./components/ui";
 import { seasonsOf } from "./bookings";
 import { IssueList } from "./pages/Overview";
 import type { Aircraft, AppData, MaintenanceJob, Mission, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
@@ -826,9 +826,9 @@ function PersonRotationField({ value, onChange }: { value: PersonRotation | null
       </label>
       {value && (
         <span className="rotation" style={{ marginTop: 4 }}>
-          <input type="number" inputMode="numeric" min={1} max={365} aria-label="Days on" value={value.on} onChange={(e) => set({ on: Math.max(1, Number(e.target.value) || 1) })} />
+          <NumberInput min={1} max={365} aria-label="Days on" value={value.on} onChange={(on) => set({ on })} />
           on
-          <input type="number" inputMode="numeric" min={0} max={365} aria-label="Days off" value={value.off} onChange={(e) => set({ off: Math.max(0, Number(e.target.value) || 0) })} />
+          <NumberInput min={0} max={365} aria-label="Days off" value={value.off} onChange={(off) => set({ off })} />
           off, from
           <input type="date" aria-label="First day of an on stretch" value={value.start} style={{ width: "auto" }} onChange={(e) => e.target.value && set({ start: e.target.value })} />
         </span>

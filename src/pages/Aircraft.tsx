@@ -101,7 +101,7 @@ export function AircraftPage() {
                               const what = open_ ? `from ${format(fa, "MMM d")} on` : since ? `until ${format(dayAt(fb, -1), "MMM d")}` : fmtDates(toWhen(fa), toWhen(fb));
                               return (
                                 <button key={`f${fa}`} className="slot free-run" style={{ left: `${pct(fa)}%`, width: `calc(${pct(fb) - pct(fa)}% - 2px)` }}
-                                  title={`${a.tail} is free ${what}. Click to book a mission then.`}
+                                  title={`${a.tail} is free ${what}. Tap to book a mission then.`}
                                   onClick={() => !tl.justDragged.current && open("season", "new", { aircraftIds: [a.id], start: toWhen(Math.max(fa, t0)), end: toWhen(fb > Math.max(fa, t0) && !open_ ? fb : dayAt(Math.max(fa, t0), 14)) })}>
                                   <span className="t">Free</span>
                                   <span className="s">{open_ ? `from ${fa === t0 ? "today" : format(fa, "MMM d")} on` : since ? `until ${format(dayAt(fb, -1), "MMM d")}` : `${plural(Math.round((fb - fa) / 86_400_000), "day")}${fa === t0 ? " from today" : `, ${format(fa, "MMM d")} to ${format(dayAt(fb, -1), "MMM d")}`}`}</span>
@@ -148,7 +148,7 @@ export function AircraftPage() {
             <span><span className="swatch" style={{ background: "var(--zb-surface-3)", border: "1px dashed var(--zb-text-2)" }} />Check (still flies)</span>
             <span><span className="swatch" style={{ background: "var(--zb-orange)", width: 3 }} />Today</span>
             <span><span className="swatch" style={{ background: "color-mix(in srgb, var(--zb-danger) 22%, var(--zb-surface))", outline: "2px solid var(--zb-danger)" }} />Maintenance during a mission</span>
-            <span className="muted">Missions show in their own colors. Free windows count from today. Click a free block to book it.</span>
+            <span className="muted">Missions show in their own colors. Free windows count from today. Tap a free block to book it.</span>
           </div>
           {retired.length > 0 && <p className="small muted">Retired: {retired.map((a) => a.tail).join(", ")}.</p>}
         </>

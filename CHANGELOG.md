@@ -15,6 +15,14 @@
 - On a phone: the demo banner is one slim line, summary numbers sit two to a row, and time off, training courses and maintenance show as lists.
 - The Guide adds a setup checklist for your own data, a list of the words Zom's MRP uses, and how to undo mistakes.
 - "Can we take a job?" no longer repeats a reason.
+- The Guide has a **How do I…** section with step-by-step answers to everyday jobs (more days for a customer, swapping a pilot, someone off sick, a broken aircraft, a renewed course, next year's booking, sharing the plan, getting around on a phone) and a key to what the colors mean.
+
+**Fixes**
+- On a phone, buttons, tabs, chips and tick boxes are big enough to tap, and text boxes no longer make the phone zoom in.
+- Number boxes can be cleared and typed again; they settle when you leave them instead of jumping to 1 while you type.
+- The − and + buttons beside numbers in forms were squeezed thin; they're full size again.
+- A month the chart only shows a few days of gets a short name instead of a cut-off one.
+- "Click" is now "Tap" where it's about pressing something on screen.
 
 ## 0.2.0
 

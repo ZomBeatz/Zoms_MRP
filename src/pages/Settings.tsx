@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { Download, FileSpreadsheet, FlaskConical, Keyboard, Palette, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
-import { Field } from "../components/ui";
+import { Field, NumberInput } from "../components/ui";
 import { migrate } from "../migrate";
 import { downloadWorkbook } from "../excel";
 import { saveFile, showInFolder } from "../files";
@@ -68,13 +68,13 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           <p className="small muted" style={{ marginTop: 0 }}>Zom's MRP warns you when someone goes over these. Assignments with fewer days off between them count as one hitch.</p>
           <div className="form-grid">
             <Field label="Most days on in a row" hint="Missions, on call and maintenance all count.">
-              <input type="number" min={1} max={365} value={rules.maxDaysOn} onChange={(e) => updateSettings({ rules: { ...rules, maxDaysOn: Math.max(1, Number(e.target.value) || 1) } })} />
+              <NumberInput min={1} max={365} value={rules.maxDaysOn} onChange={(maxDaysOn) => updateSettings({ rules: { ...rules, maxDaysOn } })} />
             </Field>
             <Field label="Fewest days off between hitches">
-              <input type="number" min={0} max={90} value={rules.minDaysOff} onChange={(e) => updateSettings({ rules: { ...rules, minDaysOff: Math.max(0, Number(e.target.value)) } })} />
+              <NumberInput min={0} max={90} value={rules.minDaysOff} onChange={(minDaysOff) => updateSettings({ rules: { ...rules, minDaysOff } })} />
             </Field>
             <Field label="Warn before training runs out" hint="Days ahead.">
-              <input type="number" min={0} max={365} value={data.settings.expiryWarningDays} onChange={(e) => updateSettings({ expiryWarningDays: Math.max(0, Number(e.target.value)) })} />
+              <NumberInput min={0} max={365} value={data.settings.expiryWarningDays} onChange={(expiryWarningDays) => updateSettings({ expiryWarningDays })} />
             </Field>
           </div>
         </section>
@@ -99,7 +99,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             {(!isServerBuild || demo || serverUser()?.role === "admin") && (
               <>
                 <button className="btn" onClick={() => fileRef.current?.click()}><Upload size={14} /> Restore a backup…</button>
-                <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
+                <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) restore(f); }} />
                 <button className="btn danger" onClick={() => clearAll()}>Clear all {demo ? "demo " : ""}data</button>
               </>
             )}
