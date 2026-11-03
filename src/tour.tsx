@@ -789,7 +789,7 @@ export function TourOverlay() {
 
   if (!tour || !s) return null;
   const pad = 6;
-  const phone = window.innerWidth < 700;
+  const phone = window.innerWidth < 700 || window.innerHeight <= 500; // the same as the phone layout in styles.css
   // Below the target if it fits, else above, else (or on a phone) along the bottom.
   const cardW = Math.min(380, window.innerWidth - 24);
   let style: React.CSSProperties = {};

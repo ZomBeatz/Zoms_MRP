@@ -18,11 +18,18 @@
 - The Guide has a **How do I…** section with step-by-step answers to everyday jobs (more days for a customer, swapping a pilot, someone off sick, a broken aircraft, a renewed course, next year's booking, sharing the plan, getting around on a phone) and a key to what the colors mean.
 
 **Fixes**
+- Going from a mission's form into one of its seasons (or from a person into their time off) and back no longer loses what you'd typed, and it comes back on the tab you were on.
+- When nobody qualified is free for an open seat, the message says how to pick someone anyway.
 - On a phone, buttons, tabs, chips and tick boxes are big enough to tap, and text boxes no longer make the phone zoom in.
 - Number boxes can be cleared and typed again; they settle when you leave them instead of jumping to 1 while you type.
 - The − and + buttons beside numbers in forms were squeezed thin; they're full size again.
 - A month the chart only shows a few days of gets a short name instead of a cut-off one.
 - "Click" is now "Tap" where it's about pressing something on screen.
+- On a tablet, missions, crew, maintenance and training show as cards two across instead of cramped tables, and the demo banner fits on one line.
+- With nothing set up yet, the Overview has a **Getting started** card that leads to the setup steps.
+- The demo banner says **Guide and lessons**.
+- A phone turned sideways gets the phone layout too: the menu button, full-screen forms and the small lesson card.
+- The Fleet page draws about three times faster.
 
 ## 0.2.0
 

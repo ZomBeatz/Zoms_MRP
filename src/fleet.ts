@@ -23,15 +23,27 @@ const live = (m: Booking) => m.status !== "Cancelled";
  * Finished seasons and jobs still count, so the past shows what really happened.
  */
 export function dayUse(data: AppData, a: Aircraft, day: number): DayUse {
-  if (a.status === "Grounded" || a.status === "Retired") return { kind: "down" };
-  const end = dayAt(day, 1);
-  const jobs = data.jobs.filter((j) => j.aircraftId === a.id && overlaps(day, end, ms(j.start), ms(j.end)));
-  const grounding = jobs.find((j) => j.grounds);
-  if (grounding) return { kind: "maintenance", job: grounding };
-  const mission = bookings(data).find((m) => m.aircraftIds.includes(a.id) && live(m) && overlaps(day, end, ms(m.start), ms(m.end)));
-  if (mission) return { kind: "mission", mission };
-  if (jobs.length) return { kind: "maintenance", job: jobs[0] };
-  return { kind: "free" };
+  return dayUser(data, a)(day);
+}
+
+/**
+ * `dayUse` for one aircraft over many days. Its jobs and seasons are found and their dates read once,
+ * which keeps the fleet board quick over years of days.
+ */
+export function dayUser(data: AppData, a: Aircraft): (day: number) => DayUse {
+  if (a.status === "Grounded" || a.status === "Retired") return () => ({ kind: "down" });
+  const jobs = data.jobs.filter((j) => j.aircraftId === a.id).map((j) => ({ j, a: ms(j.start), b: ms(j.end) }));
+  const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m)).map((m) => ({ m, a: ms(m.start), b: ms(m.end) }));
+  return (day) => {
+    const end = dayAt(day, 1);
+    const on = jobs.filter((x) => overlaps(day, end, x.a, x.b));
+    const grounding = on.find((x) => x.j.grounds);
+    if (grounding) return { kind: "maintenance", job: grounding.j };
+    const mission = missions.find((x) => overlaps(day, end, x.a, x.b));
+    if (mission) return { kind: "mission", mission: mission.m };
+    if (on.length) return { kind: "maintenance", job: on[0].j };
+    return { kind: "free" };
+  };
 }
 
 /** Midnights from `from` up to (not including) `to`. */
@@ -59,7 +71,8 @@ export function fleetUse(data: AppData, from: number, to: number): TailUse[] {
   return data.aircraft
     .filter((a) => a.status !== "Retired")
     .map((a) => {
-      const uses = days.map((d) => dayUse(data, a, d));
+      const use = dayUser(data, a);
+      const uses = days.map(use);
       const count = (k: DayUse["kind"]) => uses.filter((u) => u.kind === k).length;
       const freeRuns: [number, number][] = [];
       uses.forEach((u, i) => {
@@ -119,7 +132,8 @@ export interface SupportAnswer {
 /** First midnight from `from` (looking up to a year ahead) when the tail is free for `length` days in a row. */
 export function earliestFree(data: AppData, a: Aircraft, from: number, length: number): number | undefined {
   const horizon = dayAt(from, 365 + length);
-  const uses = daysIn(from, horizon).map((d) => dayUse(data, a, d).kind === "free");
+  const use = dayUser(data, a);
+  const uses = daysIn(from, horizon).map((d) => use(d).kind === "free");
   let run = 0;
   for (let i = 0; i < uses.length; i++) {
     run = uses[i] ? run + 1 : 0;

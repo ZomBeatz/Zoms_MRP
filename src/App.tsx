@@ -154,8 +154,8 @@ export default function App() {
         {demo && (
           <div className="banner demo-banner">
             <FlaskConical size={15} />
-            <span className="grow"><b>Demo</b><span className="wide-only muted"> · made-up data. Try anything; changes stay in this browser.</span></span>
-            <button className="btn sm primary" onClick={() => navTo("guide")}><span className="wide-only">Guide and scenarios</span><span className="phone-only">Guide</span></button>
+            <span className="grow"><b>Demo</b><span className="wide-only banner-note muted"> · made-up data. Try anything; changes stay in this browser.</span></span>
+            <button className="btn sm primary" onClick={() => navTo("guide")}><span className="wide-only">Guide and lessons</span><span className="phone-only">Guide</span></button>
             <button className="btn sm ghost" onClick={() => resetDemo()} title="Put the demo back the way it started">Reset</button>
             {isOnlineDemo
               ? <a className="btn sm" href={RELEASES_URL} target="_blank" rel="noreferrer"><span className="wide-only">Get Zom's MRP</span><span className="phone-only">Get it</span></a>

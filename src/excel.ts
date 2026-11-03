@@ -2,7 +2,7 @@ import { addMonths, format } from "date-fns";
 import type { AppData } from "./types";
 import { bookings } from "./bookings";
 import { findIssues, missionCoverage, neededTraining, trainingStatus } from "./coverage";
-import { dayUse, fleetUse } from "./fleet";
+import { dayUser, fleetUse } from "./fleet";
 import { DAY, dayAt, ms, today } from "./time";
 import { textOn } from "./look";
 import { saveFile } from "./files";
@@ -54,9 +54,10 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
     for (const a of [...data.aircraft].filter((x) => x.status !== "Retired").sort((x, y) => x.type.localeCompare(y.type) || x.tail.localeCompare(y.tail))) {
       const row = ws.addRow({ tail: a.tail, type: a.type });
       row.getCell(1).font = { bold: true, name: "Consolas" };
+      const use = dayUser(data, a);
       weeks.forEach((w, i) => {
         // What the tail does most that week.
-        const uses = Array.from({ length: 7 }, (_, k) => dayUse(data, a, dayAt(w, k)));
+        const uses = Array.from({ length: 7 }, (_, k) => use(dayAt(w, k)));
         const tally = new Map<string, { n: number; label: string; color: string }>();
         for (const u of uses) {
           const key = u.kind === "mission" ? u.mission.missionId : u.kind;
