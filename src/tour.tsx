@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { create } from "zustand";
 import { CheckCircle2, Hand, Minus, X } from "lucide-react";
 import { useStore } from "./store";
-import { missionCoverage } from "./coverage";
+import { missionCoverage, neededTraining, trainingStatus } from "./coverage";
 import { canSupport } from "./fleet";
 import { dayAt, ms } from "./time";
 import type { AppData, Page } from "./types";
@@ -122,13 +122,13 @@ export const TOURS: Tour[] = [
     steps: [
       { title: "Welcome to the Mission Ready Planner", body: "This is a made-up operator in Alaska: 12 helicopters, about 45 crew and 19 missions over two years. Try anything; the demo is kept apart from your own data, and Reset demo puts it back." },
       { page: "overview", target: ".page .tiles", title: "The overview", body: "Start each day here. The tiles show what's flying now, what's coming up and how many problems need a look. Tap a tile to go to that page." },
-      { page: "overview", target: ".page .issues", title: "Needs attention", body: "Every open seat, double booking, missing rating, lapsed course and too-long hitch, worst first. Tap one and Zom's MRP opens the thing to fix." },
+      { page: "overview", target: ".page .issue", title: "Needs attention", body: "Every open seat, double booking, missing rating, lapsed course and too-long hitch, worst first. Tap one and Zom's MRP opens the thing to fix." },
       { page: "aircraft", target: ".gantt", title: "The fleet board", body: "Every tail over time, grouped by type. Colored bars are missions; the green dashed blocks are free windows, counted from today. Ctrl + scroll (or pinch) zooms, and dragging moves through time." },
       { page: "aircraft", target: ".g-lane.sub", title: "How many are free each day", body: "The short bars count the aircraft that are free each day. A red mark means nothing is free that day." },
       { page: "aircraft", target: ".maint-lane", title: "Maintenance under each tail", body: "Inspections and repairs sit in a thin row under their aircraft. A job that grounds it is outlined red if a mission is booked on top." },
       { page: "schedule", target: ".page-head .seg", title: "The schedule", body: "The same plan as a Gantt chart, with rows by aircraft, by mission (with its crew under it) or by person. Pick one mission from the list to see only its work." },
-      { page: "missions", target: ".page .table-wrap, .page .cards-list", title: "Missions are customers", body: "Each mission is one customer's kind of work, with its color, the training it needs and its regular crew. Its seasons are the stretches of dates it flies." },
-      { page: "people", target: ".page .table-wrap, .page .cards-list", title: "Crew", body: "Pilots and maintainers, what they're rated on, the missions they work, their own rotation if they have one, their training and time off." },
+      { page: "missions", target: ".page tbody tr, .page .list-card", title: "Missions are customers", body: "Each mission is one customer's kind of work, with its color, the training it needs and its regular crew. Its seasons are the stretches of dates it flies." },
+      { page: "people", target: ".page tbody tr, .page .list-card", title: "Crew", body: "Pilots and maintainers, what they're rated on, the missions they work, their own rotation if they have one, their training and time off." },
       { page: "reports", target: ".page .tiles", title: "Reports", body: "Fleet use, days per mission, how busy each person is and how much of the flying was fully crewed. Export to Excel makes one workbook to post in Teams." },
       { title: "That's the tour", body: "Next, try “Crew a job on a rotation” or “Can we take a new job?”. They're in the Guide, with how every part works." },
     ],
@@ -150,7 +150,7 @@ export const TOURS: Tour[] = [
     steps: [
       { page: "aircraft", target: { sel: ".page-head .btn", text: "Can we take a job" }, title: "A customer calls", body: "Say a survey company wants a helicopter for a month. Start from the Fleet page with Can we take a job?" },
       { before: async () => { if (store().editing?.kind !== "support") store().open("support", "new"); await waitFor(".dialog .form-grid"); }, target: ".dialog .form-grid", title: "What the job needs", body: "Pick the dates, the aircraft type if it matters, how many pilots fly on board, and any training the customer asks for (like mountain flying)." },
-      { before: () => { if (store().editing?.kind !== "support") store().open("support", "new"); }, target: ".dialog .issues", title: "The answer, tail by tail", body: "Each tail says Can do, Short crew or Can't, and why: booked, in maintenance, grounded, or not enough rated and current pilots free every day. A busy tail shows the first day it's free for the whole job." },
+      { before: () => { if (store().editing?.kind !== "support") store().open("support", "new"); }, target: ".dialog .issue", title: "The answer, tail by tail", body: "Each tail says Can do, Short crew or Can't, and why: booked, in maintenance, grounded, or not enough rated and current pilots free every day. A busy tail shows the first day it's free for the whole job." },
       { before: () => { if (store().editing?.kind !== "support") store().open("support", "new"); }, target: { sel: ".dialog .btn", text: "Book on" }, title: "Book it", body: "Book on N… starts a new mission with those dates, that tail and crew size filled in. Name the customer, save, and it's on the board." },
       { title: "Done", body: "The new mission's season then needs crew. That's the next walkthrough: “Crew a job on a rotation”." },
     ],
@@ -177,7 +177,7 @@ export const TOURS: Tour[] = [
     steps: [
       { page: "schedule", before: () => click({ sel: ".page-head .seg button", text: "Crew" }), target: ".gantt", title: "The crew view", body: "Rows by person. Open seats are at the top, as red dashed slots for each job that's short. Grey hatching is someone's time off or off-rotation days." },
       { page: "schedule", before: async () => { await click({ sel: ".page-head .seg button", text: "Crew" }); await choose('select[aria-label="Show one mission"]', mission("Interior Fire Service")?.id ?? ""); }, target: 'select[aria-label="Show one mission"]', title: "One job at a time", body: "Pick a mission. The crew view then shows its open seats, the people on it, and the people who are rated and current but not on it yet: the ones to call." },
-      { page: "overview", target: ".page .issues", title: "Or work from the list", body: "The overview lists the same gaps with every other problem. Tap one to open the season with the gap, and use Fill the schedule or tap the open seat." },
+      { page: "overview", target: ".page .issue", title: "Or work from the list", body: "The overview lists the same gaps with every other problem. Tap one to open the season with the gap, and use Fill the schedule or tap the open seat." },
       { page: "schedule", before: () => choose('select[aria-label="Show one mission"]', ""), title: "Done", body: "Tip: with every seat filled, the season's pill turns green: Crewed." },
     ],
   },
@@ -196,7 +196,7 @@ export const TOURS: Tour[] = [
     id: "maintenance", title: "Plan maintenance", minutes: 1,
     summary: "Book inspections and repairs, with maintainers, and keep grounded aircraft off missions.",
     steps: [
-      { page: "maintenance", target: ".page .table-wrap, .page .cards-list", title: "Maintenance jobs", body: "Inspections and repairs on each tail, with the maintainers working on them." },
+      { page: "maintenance", target: ".page tbody tr, .page .list-card", title: "Maintenance jobs", body: "Inspections and repairs on each tail, with the maintainers working on them." },
       { page: "maintenance", before: async () => { const j = store().data.jobs.find((x) => x.grounds) ?? store().data.jobs[0]; if (j) store().open("job", j.id); await waitFor(".dialog"); }, target: { sel: ".dialog .check", text: "can't fly" }, title: "Grounding jobs", body: "Tick this when the aircraft can't fly during the job. Zom's MRP then flags any mission booked on it, and it doesn't count as free on the Fleet page." },
       { page: "aircraft", target: ".maint-lane", title: "On the fleet board", body: "Jobs show in the thin row under each tail, so a gap in the missions is easy to plan into." },
     ],
@@ -210,7 +210,7 @@ const today0 = () => dayAt(Date.now());
 const data = () => store().data;
 const editing = () => store().editing;
 const toastId = () => store().toast?.id ?? 0;
-let mark = { missions: new Set<string>(), trainings: new Set<string>(), aircraft: new Set<string>(), people: new Set<string>(), toast: 0, tags: 0, pilots: 0 };
+let mark = { auto: false, missions: new Set<string>(), trainings: new Set<string>(), aircraft: new Set<string>(), people: new Set<string>(), toast: 0, tags: 0, pilots: 0 };
 
 // A customer calling: the first month, from three weeks out, that some tail can really take with one
 // mountain-rated pilot on board. Worked out when the scenario starts, so it works on any day.
@@ -283,7 +283,7 @@ export const SCENARIOS: Tour[] = [
         },
       },
       {
-        target: ".dialog .issues", title: "The answer, tail by tail",
+        target: ".dialog .issue", title: "The answer, tail by tail",
         body: "Can do means the tail is free and enough rated, current pilots are free every day. Short crew means the aircraft is free but pilots aren't. Can't says why, and when it's free next. Scroll to see them all.",
       },
       {
@@ -503,6 +503,8 @@ export const SETUP: Tour[] = [
         task: { say: "Tap Add training.", done: () => !!course() && editing()?.kind !== "training", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
+        // Points at whatever comes next as the person gets there: the mission's tabs, then the course.
+        target: () => (editing()?.kind !== "mission" ? "" : activeTab().startsWith("Training") ? { sel: ".dialog .chip.pick", text: course()?.name ?? COURSE } : ".dialog-tabs"),
         title: "Missions say what they need",
         body: () => `Open ${ICEFIELD} and tick ${course()?.name ?? COURSE} on its Training tab. Then only the people who work it need the course.`,
         task: {
@@ -534,7 +536,7 @@ export const SETUP: Tour[] = [
         task: { say: "Tap Add aircraft.", done: () => editing()?.kind === "aircraft" && editing()?.id === "new", doIt: () => store().open("aircraft", "new") },
       },
       {
-        target: ".dialog .form-grid", title: "Tail, type and base",
+        target: { sel: ".dialog .field", text: "Tail number" }, title: "Tail, type and base",
         body: "The tail number is how it's shown everywhere. The type has to match what pilots are rated on, so pick it from the suggestions.",
         task: {
           say: `Type ${TAIL} as the tail number, AS350 B3 as the type, and Juneau as the base.`,
@@ -573,35 +575,45 @@ export const SETUP: Tour[] = [
         task: { say: "Tap Add pilot.", done: () => editing()?.kind === "person" && editing()?.id === "new", doIt: () => store().open("person", "new", { role: "Pilot" }) },
       },
       {
-        target: ".dialog .form-grid", title: "Name and base",
-        body: "A fixed rotation is here too, for people who always work, say, 2 weeks on and 2 off. Leave it off for now.",
+        target: { sel: ".dialog .field", text: "Name" }, title: "Name and base",
+        body: "Base is where they usually work from. A fixed rotation (like 2 weeks on, 2 off) is lower down; leave it off for now.",
         task: { say: `Type ${PILOT} as the name and Juneau as the base.`, done: () => !!field("Name")?.value.trim(), doIt: async () => { await type(field("Name"), PILOT); await type(field("Base"), "Juneau"); } },
       },
       {
-        before: async () => { if (editing()?.kind === "person") await tab("Ratings"); },
-        target: ".dialog-body", title: "Rated on, and works on",
-        body: "Rated on is what they can fly; they're only offered for jobs on those types. Works on is the missions they rotate through, which decides the training they need.",
-        task: {
-          say: `Tap AS350 B3 under Rated on, and ${ICEFIELD} under Works on.`,
-          done: () => pickOn("AS350 B3") && pickOn(ICEFIELD),
-          doIt: async () => { await tab("Ratings"); await tapPick("AS350 B3"); await tapPick(ICEFIELD); },
-        },
+        before: async () => { if (editing()?.kind === "person" && !activeTab().startsWith("Ratings")) await tab("Ratings"); },
+        target: ".dialog .picker-row", title: "What they can fly",
+        body: "Rated on is the aircraft types they can fly. They're only offered for jobs on those types.",
+        task: { say: "Tap AS350 B3.", done: () => pickOn("AS350 B3"), doIt: async () => { await tab("Ratings"); await tapPick("AS350 B3"); } },
       },
       {
-        before: async () => { if (editing()?.kind === "person") await tab("Training"); },
-        target: ".dialog-body", title: "Their training",
-        body: "The courses their mission needs are listed with a + button. Each one is added as done today; tap a line to change the dates.",
+        before: async () => { if (editing()?.kind === "person" && !activeTab().startsWith("Ratings")) await tab("Ratings"); },
+        target: { sel: ".dialog .picker-row", text: ICEFIELD }, title: "The mission they work",
+        body: "Works on is the missions they rotate through. It decides which training they need, and they're picked first when those missions are filled.",
+        task: { say: `Tap ${ICEFIELD}.`, done: () => pickOn(ICEFIELD), doIt: async () => { await tab("Ratings"); await tapPick(ICEFIELD); } },
+      },
+      {
+        before: async () => {
+          if (editing()?.kind !== "person") return;
+          // The courses come from the mission they work, so make sure it's ticked.
+          if (!activeTab().startsWith("Ratings")) await tab("Ratings");
+          mark.auto = !pickOn(ICEFIELD);
+          if (mark.auto) await tapPick(ICEFIELD);
+          await tab("Training");
+        },
+        target: () => (findTarget(".dialog .picker-row") ? ".dialog .picker-row" : ".dialog .toolbar"), title: "Their training",
+        body: () => `${mark.auto ? `${ICEFIELD} wasn't ticked under Works on, so it's ticked now: the courses below come from it. ` : ""}Each course ${ICEFIELD} needs has a + button. It's added as done today; tap its line afterwards to change the dates.`,
         task: {
-          say: "Tap each course under “Needed for their missions”.",
-          done: () => activeTab().startsWith("Training") && !findTarget({ sel: ".dialog .form-section", text: "Needed for their missions" }) && document.querySelectorAll(".dialog .line").length > 0,
+          say: "Tap each course under “Needed for their missions” until none are left.",
+          done: () => activeTab().startsWith("Training") && !findTarget({ sel: ".dialog .form-section", text: "Needed for their missions" }) && !document.querySelector(".dialog .line-edit") && document.querySelectorAll(".dialog .line").length > 0,
           doIt: async () => {
-            await tab("Training");
+            if (!activeTab().startsWith("Training")) await tab("Training");
             for (let i = 0; i < 8; i++) {
+              await click({ sel: ".dialog .line-edit .btn", text: "Done" });
               const b = [...document.querySelectorAll<HTMLElement>(".dialog .picker-row .btn")].find(visible);
               if (!b) break;
-              b.click(); await sleep(120);
-              await click({ sel: ".dialog .line-edit .btn", text: "Done" });
+              b.click(); await sleep(150);
             }
+            await click({ sel: ".dialog .line-edit .btn", text: "Done" });
           },
         },
       },
@@ -611,8 +623,18 @@ export const SETUP: Tour[] = [
         task: { say: "Tap Add pilot.", done: () => !!newPilot() && editing()?.kind !== "person", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
-        page: "training", before: () => choose('select[aria-label="Show crew for"]', icefield()?.id ?? ""), target: 'select[aria-label="Show crew for"]', title: "Lesson done",
-        body: () => `${newPilot()?.name ?? PILOT} is on ${ICEFIELD}'s crew and current on what it needs. Next, a customer calls.`,
+        page: "training", before: () => choose('select[aria-label="Show crew for"]', icefield()?.id ?? ""),
+        target: () => ({ sel: ".page .table-wrap tr, .page .list-card", text: newPilot()?.name ?? PILOT }), title: "Lesson done",
+        body: () => {
+          const p = newPilot(), m = icefield();
+          if (!p) return "The pilot wasn't added. Run the lesson again to try once more.";
+          const name = p.name;
+          if (!m || !p.missionIds.includes(m.id)) return `${name} was added, but isn't on ${ICEFIELD}'s crew, so they don't show here. Open them on the Crew page and tick it under Works on.`;
+          const now = Date.now();
+          const missing = [...neededTraining(data(), p).keys()].filter((id) => trainingStatus(p, id, now, now + 1).state !== "ok").length;
+          const red = data().trainings.some((t) => same(t.name, COURSE) && m.requiredTrainingIds.includes(t.id));
+          return `${name} is on ${ICEFIELD}'s crew${missing ? `, but still needs ${missing} course${missing === 1 ? "" : "s"}: tap their row to add them` : " and current on everything it needs"}.${red ? ` The red “${COURSE}: Not done” on the others is right: lesson 1 made the mission need it, and they haven't done it yet.` : ""}`;
+        },
       },
     ],
   },
@@ -681,6 +703,8 @@ export function TourOverlay() {
   const [done, setDone] = useState(false);
   const [small, setSmall] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Was the task already done when the step opened (say, after Back)? Then it waits for Next.
+  const [doneAtStart, setDoneAtStart] = useState(false);
   const s = tour?.steps[step];
 
   // Set up the step: page, form, clicks, then find what to point at.
@@ -689,6 +713,7 @@ export function TourOverlay() {
     let cancelled = false;
     setReady(false);
     setDone(false);
+    setDoneAtStart(!!s.task?.done());
     (async () => {
       const st = store();
       if (s.page) {
@@ -699,7 +724,8 @@ export function TourOverlay() {
       await s.before?.();
       const el = s.target ? await waitFor(s.target, 1500) : null;
       if (cancelled) return;
-      el?.scrollIntoView({ block: "center", inline: "nearest" });
+      // A tall target scrolls to its top, so the card at the bottom leaves its start in view.
+      el?.scrollIntoView({ block: el.getBoundingClientRect().height > window.innerHeight * 0.4 ? "start" : "center", inline: "nearest" });
       await sleep(120);
       if (cancelled) return;
       setRect(el?.getBoundingClientRect() ?? null);
@@ -724,8 +750,7 @@ export function TourOverlay() {
   // A task moves on by itself once it's done.
   useEffect(() => {
     if (!s?.task || !ready || done) return;
-    // Already done (say, after Back): show it, but let the person move on.
-    if (s.task.done()) { setDone(true); return; }
+    if (doneAtStart && s.task.done()) { setDone(true); return; }
     const t = setInterval(() => {
       if (s.task!.done()) {
         setDone(true);
@@ -734,7 +759,13 @@ export function TourOverlay() {
       }
     }, 300);
     return () => clearInterval(t);
-  }, [s, ready, done, step, go]);
+  }, [s, ready, done, step, go, doneAtStart]);
+
+  // Room under the page and forms, so anything the card covers can be scrolled up above it.
+  useEffect(() => {
+    document.body.classList.toggle("touring", !!tour);
+    return () => document.body.classList.remove("touring");
+  }, [tour]);
 
   useEffect(() => {
     if (!tour) return;
@@ -777,7 +808,7 @@ export function TourOverlay() {
       {rect && ready
         ? <div className="tour-spot" style={{ top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} />
         : !s.task && <div className="tour-dim" />}
-      <div className={`tour-card ${rect && !phone ? "" : "docked"} ${phone && rect && rect.top + rect.height / 2 > window.innerHeight / 2 ? "top" : ""}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.7 }}>
+      <div className={`tour-card ${rect && !phone ? "" : "docked"} ${phone && rect && rect.height < window.innerHeight * 0.4 && rect.top + rect.height / 2 > window.innerHeight / 2 ? "top" : ""}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.7 }}>
         <div className="row gap-sm">
           <span className="small muted grow">{lessonNo(tour.id) ? `Lesson ${lessonNo(tour.id)}` : "Tour"}: {tour.title} · step {step + 1} of {tour.steps.length}</span>
           <button className="icon-btn" aria-label="Make this card small" title="Make small, to see the page" onClick={() => setSmall(true)}><Minus size={16} /></button>
@@ -785,6 +816,7 @@ export function TourOverlay() {
         </div>
         <h3 style={{ margin: "6px 0 6px" }}>{say(s.title)}</h3>
         <p>{say(s.body)}</p>
+        {last && next && <p className="small"><b>Up next:</b> {next.title} ({next.minutes} min)</p>}
         {s.task && (
           <div className={`tour-task ${done ? "done" : ""}`}>
             {done ? <><CheckCircle2 size={16} /> <b>Done.</b></> : <><Hand size={16} /> <span><b>Your turn:</b> {say(s.task.say)}</span></>}
@@ -803,7 +835,7 @@ export function TourOverlay() {
             last && next ? (
               <>
                 <button className="btn sm" onClick={() => go(step + 1)}>Take a break</button>
-                <button className="btn sm primary" autoFocus onClick={() => { go(step + 1); setTimeout(() => useTour.getState().start(next.id), 50); }}>Next: {next.title}</button>
+                <button className="btn sm primary" autoFocus onClick={() => { go(step + 1); setTimeout(() => useTour.getState().start(next.id), 50); }}>Next lesson</button>
               </>
             ) : <button className="btn sm primary" autoFocus onClick={() => go(step + 1)}>{last ? "Finish" : "Next"}</button>
           )}

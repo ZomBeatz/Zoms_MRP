@@ -407,6 +407,7 @@ button.g-label:hover { background: var(--zb-surface-2); }
   .stepper button { width: 40px; }
   .banner { gap: 6px; padding: 6px 10px; }
   .demo-banner .btn.sm { padding: 4px 9px; }
+  body.touring .page, body.touring .dialog-body { padding-bottom: 320px; }
   .wide-only { display: none; }
   .phone-only { display: inline; }
   .tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
