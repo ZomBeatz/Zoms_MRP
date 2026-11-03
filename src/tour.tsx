@@ -344,7 +344,7 @@ export const SCENARIOS: Tour[] = [
       },
       {
         page: "aircraft", title: "Booked and crewed",
-        body: "It's on the Fleet board now, on the tail you picked, and its pilots show on the schedule. That's the whole loop: check, book, crew. Reset demo on the banner puts the demo back the way it was.",
+        body: "It's on the Fleet board now, on the tail you picked, and its pilots show on the schedule. That's the whole loop: check, book, crew.",
       },
     ],
   },
@@ -443,7 +443,7 @@ export const SCENARIOS: Tour[] = [
         body: "Any red left means nobody rated and current was free those days. That's when to hire, train, or move someone from another job.",
         task: { say: "Tap Save.", done: () => editing()?.kind !== "season", doIt: () => click(".dialog-foot .btn.primary") },
       },
-      { page: "aircraft", title: "Done", body: "The new tail shows the fire season on the Fleet board. Reset demo on the banner puts everything back." },
+      { page: "aircraft", title: "Done", body: "The new tail shows the fire season on the Fleet board." },
     ],
   },
 ];
@@ -517,7 +517,7 @@ export const SETUP: Tour[] = [
       },
       {
         target: ".dialog-foot .btn.primary", title: "Save",
-        body: "Its crew now show as not current for this course until it's recorded on them. That's the next lessons.",
+        body: "Its crew now show as not current for this course until it's recorded on them, the way lesson 3 does for a new pilot.",
         task: { say: "Tap Save.", done: () => !!course() && !!icefield()?.requiredTrainingIds.includes(course()!.id), doIt: () => click(".dialog-foot .btn.primary") },
       },
       { page: "training", target: ".page .seg", title: "Lesson done", body: "Who's current on this page now counts the new course for that mission's crew." },
@@ -634,8 +634,7 @@ export const SETUP: Tour[] = [
           if (!m || !p.missionIds.includes(m.id)) return `${name} was added, but isn't on ${ICEFIELD}'s crew, so they don't show here. Open them on the Crew page and tick it under Works on.`;
           const now = Date.now();
           const missing = [...neededTraining(data(), p).keys()].filter((id) => trainingStatus(p, id, now, now + 1).state !== "ok").length;
-          const red = data().trainings.some((t) => same(t.name, COURSE) && m.requiredTrainingIds.includes(t.id));
-          return `${name} is on ${ICEFIELD}'s crew${missing ? `, but still needs ${missing} course${missing === 1 ? "" : "s"}: tap their row to add them` : " and current on everything it needs"}.${red ? ` The red “${COURSE}: Not done” on the others is right: lesson 1 made the mission need it, and they haven't done it yet.` : ""}`;
+          return `${name} is on ${ICEFIELD}'s crew${missing ? `, but still needs ${missing} course${missing === 1 ? "" : "s"}: tap their row to add them` : " and current on everything it needs"}.`;
         },
       },
     ],
@@ -656,7 +655,7 @@ const ALL = () => [...LESSONS, ...TOURS];
 
 interface TourState {
   tour: Tour | null; step: number; done: Record<string, true>;
-  start: (id: string, fresh?: boolean) => void; stop: () => void; go: (n: number) => void;
+  start: (id: string) => void; stop: () => void; go: (n: number) => void;
   /** The lesson after this one on the learning path, if any. */
   next: (id: string) => Tour | undefined;
 }
@@ -665,22 +664,27 @@ export const useTour = create<TourState>((set, get) => ({
   tour: null,
   step: 0,
   done: readDone(),
-  start: (id, fresh = true) => {
+  start: (id) => {
     const tour = ALL().find((t) => t.id === id);
     if (!tour) return;
     void (async () => {
       // The walkthroughs need the demo's data.
       if (!store().demo) await store().setDemo(true);
       if (store().editing) store().close();
-      // Started from the guide, a walkthrough begins on a fresh demo, so it goes the same way every time.
-      // Going on to the next lesson keeps what the last one did.
-      if (fresh) store().resetDemo(true);
+      // Each walkthrough begins on a fresh demo, so it goes the same way every time.
+      store().resetDemo(true);
       tour.reset?.();
       set({ tour, step: 0 });
     })();
   },
   stop: () => {
-    if (get().tour && store().editing) store().close();
+    if (!get().tour) return;
+    if (store().editing) store().close();
+    // Every walkthrough leaves the demo the way it found it.
+    if (store().demo) {
+      store().resetDemo(true);
+      store().showToast("The demo is back the way it was.");
+    }
     set({ tour: null, step: 0 });
   },
   go: (n) => {
@@ -709,6 +713,8 @@ export function TourOverlay() {
   const [busy, setBusy] = useState(false);
   // Was the task already done when the step opened (say, after Back)? Then it waits for Next.
   const [doneAtStart, setDoneAtStart] = useState(false);
+  // On a phone the card leads with what to do; the explanation waits behind "Why?".
+  const [why, setWhy] = useState(false);
   const s = tour?.steps[step];
 
   // Set up the step: page, form, clicks, then find what to point at.
@@ -718,6 +724,7 @@ export function TourOverlay() {
     setReady(false);
     setDone(false);
     setDoneAtStart(!!s.task?.done());
+    setWhy(false);
     (async () => {
       const st = store();
       if (s.page) {
@@ -812,21 +819,30 @@ export function TourOverlay() {
       {rect && ready
         ? <div className="tour-spot" style={{ top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} />
         : !s.task && <div className="tour-dim" />}
-      <div className={`tour-card ${rect && !phone ? "" : "docked"} ${phone && rect && rect.height < window.innerHeight * 0.4 && rect.top + rect.height / 2 > window.innerHeight / 2 ? "top" : ""}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.7 }}>
+      <div className={`tour-card ${phone ? "compact" : ""} ${rect && !phone ? "" : "docked"} ${phone && rect && rect.height < window.innerHeight * 0.4 && rect.top + rect.height / 2 > window.innerHeight / 2 ? "top" : ""}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.7 }}>
         <div className="row gap-sm">
-          <span className="small muted grow">{lessonNo(tour.id) ? `Lesson ${lessonNo(tour.id)}` : "Tour"}: {tour.title} · step {step + 1} of {tour.steps.length}</span>
+          <span className="small muted grow">
+            {phone ? `${lessonNo(tour.id) ? `Lesson ${lessonNo(tour.id)}` : "Tour"} · ${step + 1} of ${tour.steps.length}`
+              : `${lessonNo(tour.id) ? `Lesson ${lessonNo(tour.id)}` : "Tour"}: ${tour.title} · step ${step + 1} of ${tour.steps.length}`}
+          </span>
+          {phone && s.task && <button className="btn sm ghost" onClick={() => setWhy(!why)}>{why ? "Hide" : "Why?"}</button>}
           <button className="icon-btn" aria-label="Make this card small" title="Make small, to see the page" onClick={() => setSmall(true)}><Minus size={16} /></button>
           <button className="icon-btn" aria-label="End the walkthrough" onClick={stop}><X size={16} /></button>
         </div>
-        <h3 style={{ margin: "6px 0 6px" }}>{say(s.title)}</h3>
-        <p>{say(s.body)}</p>
+        {(!phone || !s.task || why) && (
+          <>
+            <h3 style={{ margin: "6px 0 6px" }}>{say(s.title)}</h3>
+            <p>{say(s.body)}</p>
+          </>
+        )}
         {last && next && <p className="small"><b>Up next:</b> {next.title} ({next.minutes} min)</p>}
+        {last && lessonNo(tour.id) > 0 && <p className="small muted">Finishing puts the demo back the way it was.</p>}
         {s.task && (
           <div className={`tour-task ${done ? "done" : ""}`}>
-            {done ? <><CheckCircle2 size={16} /> <b>Done.</b></> : <><Hand size={16} /> <span><b>Your turn:</b> {say(s.task.say)}</span></>}
+            {done ? <><CheckCircle2 size={16} /> <b>Done.</b></> : <><Hand size={16} /> <span>{phone ? <b>{say(s.task.say)}</b> : <><b>Your turn:</b> {say(s.task.say)}</>}</span></>}
           </div>
         )}
-        <div className="tour-dots" aria-hidden="true">{tour.steps.map((_, i) => <span key={i} className={i === step ? "on" : i < step ? "past" : ""} />)}</div>
+        {!phone && <div className="tour-dots" aria-hidden="true">{tour.steps.map((_, i) => <span key={i} className={i === step ? "on" : i < step ? "past" : ""} />)}</div>}
         <div className="row gap-sm">
           {step > 0 && <button className="btn sm" onClick={() => go(step - 1)}>Back</button>}
           <span className="grow" />
@@ -839,7 +855,7 @@ export function TourOverlay() {
             last && next ? (
               <>
                 <button className="btn sm" onClick={() => go(step + 1)}>Take a break</button>
-                <button className="btn sm primary" autoFocus onClick={() => { go(step + 1); setTimeout(() => useTour.getState().start(next.id, false), 50); }}>Next lesson</button>
+                <button className="btn sm primary" autoFocus onClick={() => { go(step + 1); setTimeout(() => useTour.getState().start(next.id), 50); }}>Next lesson</button>
               </>
             ) : <button className="btn sm primary" autoFocus onClick={() => go(step + 1)}>{last ? "Finish" : "Next"}</button>
           )}
