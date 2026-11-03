@@ -28,7 +28,7 @@ export function dayUse(data: AppData, a: Aircraft, day: number): DayUse {
   const jobs = data.jobs.filter((j) => j.aircraftId === a.id && overlaps(day, end, ms(j.start), ms(j.end)));
   const grounding = jobs.find((j) => j.grounds);
   if (grounding) return { kind: "maintenance", job: grounding };
-  const mission = bookings(data).find((m) => m.aircraftId === a.id && live(m) && overlaps(day, end, ms(m.start), ms(m.end)));
+  const mission = bookings(data).find((m) => m.aircraftIds.includes(a.id) && live(m) && overlaps(day, end, ms(m.start), ms(m.end)));
   if (mission) return { kind: "mission", mission };
   if (jobs.length) return { kind: "maintenance", job: jobs[0] };
   return { kind: "free" };
@@ -152,7 +152,7 @@ export function canSupport(data: AppData, job: Job): SupportAnswer[] {
       if (a.status === "Grounded") reasons.push("It's grounded.");
       if (job.pilotsNeeded > a.seats) reasons.push(`It has ${a.seats} pilot seat${a.seats === 1 ? "" : "s"}.`);
       for (const m of bookings(data))
-        if (m.aircraftId === a.id && live(m) && overlaps(job.start, job.end, ms(m.start), ms(m.end))) reasons.push(`Booked on “${m.name}”.`);
+        if (m.aircraftIds.includes(a.id) && live(m) && overlaps(job.start, job.end, ms(m.start), ms(m.end))) reasons.push(`Booked on “${m.name}”.`);
       for (const j of data.jobs)
         if (j.aircraftId === a.id && j.grounds && !j.done && overlaps(job.start, job.end, ms(j.start), ms(j.end))) reasons.push(`In maintenance (“${j.title}”).`);
       const crew = crewFor(a.type);

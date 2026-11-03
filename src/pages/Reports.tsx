@@ -7,6 +7,7 @@ import { useStore } from "../store";
 import { dutyOf, missionCoverage } from "../coverage";
 import { DAY, dayAt, fmtDates, fmtDays, ms, toWhen, today } from "../time";
 import { missionLook, slotStyle } from "../look";
+import { seasonTails } from "../rotation";
 import { Avatar } from "../components/ui";
 import type { AppData, Booking } from "../types";
 
@@ -31,7 +32,7 @@ export function report(data: AppData, from: number, to: number) {
   const mDays = (m: Booking) => clip(ms(m.start), ms(m.end), from, to) / DAY;
 
   const fleet = data.aircraft.filter((a) => a.status !== "Retired").map((a) => {
-    const flying = missions.filter((m) => m.aircraftId === a.id).reduce((t, m) => t + mDays(m), 0);
+    const flying = missions.filter((m) => m.aircraftIds.includes(a.id)).reduce((t, m) => t + mDays(m), 0);
     const maint = data.jobs.filter((j) => j.aircraftId === a.id).reduce((t, j) => t + clip(ms(j.start), ms(j.end), from, to) / DAY, 0);
     return { a, flying, maint, idle: Math.max(0, days - flying - maint) };
   });
@@ -177,7 +178,7 @@ export function Reports() {
                 return (
                   <tr key={m.id} onClick={() => open("season", m.id)}>
                     <td className="name"><span className="row gap-sm"><span className="swatch" style={slotStyle(missionLook(m))} />{m.name}</span></td>
-                    <td style={{ fontFamily: "var(--zb-font-mono)" }}>{data.aircraft.find((a) => a.id === m.aircraftId)?.tail ?? "None"}</td>
+                    <td style={{ fontFamily: "var(--zb-font-mono)" }}>{seasonTails(data, m, "None")}</td>
                     <td>{fmtDates(m.start, m.end)}</td>
                     <td className="r">{Math.round(clip(ms(m.start), ms(m.end), from, to) / DAY)}</td>
                     <td className="r"><span className={`pill ${pct === 100 ? "ok" : "danger"}`}>{pct}%</span></td>

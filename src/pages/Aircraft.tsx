@@ -81,7 +81,7 @@ export function AircraftPage() {
                     <div className="g-group">{type} <span className="muted" style={{ fontWeight: 400 }}>· {plural(tails.length, "aircraft", "aircraft")}{t0 >= from && t0 < to ? `, ${freeNow} free today` : ""}</span></div>
                     {tails.map((t) => {
                       const a = t.aircraft;
-                      const missions = bookings(data).filter((m) => m.aircraftId === a.id && live(m.status) && ms(m.end) > from && ms(m.start) < to);
+                      const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m.status) && ms(m.end) > from && ms(m.start) < to);
                       const jobs = data.jobs.filter((j) => j.aircraftId === a.id && ms(j.end) > from && ms(j.start) < to);
                       return (
                         <Fragment key={a.id}>
@@ -102,7 +102,7 @@ export function AircraftPage() {
                               return (
                                 <button key={`f${fa}`} className="slot free-run" style={{ left: `${pct(fa)}%`, width: `calc(${pct(fb) - pct(fa)}% - 2px)` }}
                                   title={`${a.tail} is free ${what}. Click to book a mission then.`}
-                                  onClick={() => !tl.justDragged.current && open("season", "new", { aircraftId: a.id, start: toWhen(Math.max(fa, t0)), end: toWhen(fb > Math.max(fa, t0) && !open_ ? fb : dayAt(Math.max(fa, t0), 14)) })}>
+                                  onClick={() => !tl.justDragged.current && open("season", "new", { aircraftIds: [a.id], start: toWhen(Math.max(fa, t0)), end: toWhen(fb > Math.max(fa, t0) && !open_ ? fb : dayAt(Math.max(fa, t0), 14)) })}>
                                   <span className="t">Free</span>
                                   <span className="s">{open_ ? `from ${fa === t0 ? "today" : format(fa, "MMM d")} on` : since ? `until ${format(dayAt(fb, -1), "MMM d")}` : `${plural(Math.round((fb - fa) / 86_400_000), "day")}${fa === t0 ? " from today" : `, ${format(fa, "MMM d")} to ${format(dayAt(fb, -1), "MMM d")}`}`}</span>
                                 </button>

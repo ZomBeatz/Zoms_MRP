@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0
+
+**Rotations**
+- Each season has a pilot rotation and a maintainer rotation, like 21 days on, 14 off. They can differ.
+- **Fill the schedule** rotates free, rated, current people through the open days on that pattern, the mission's own crew first. **Start over and fill** does it again from scratch.
+- People can work a fixed rotation of their own (days on, days off, from a first day). They're only offered for shifts on their on days, their days off are shaded on the schedule, and booking them on one is flagged.
+
+**Jobs**
+- A season can have several aircraft, added when they're known. Pilots and maintainers needed are for the whole job at any time.
+- The people offered for a shift are only those who can take it: rated on one of the job's aircraft, current on its training, free and on rotation. **Show everyone** lists the rest.
+
+**Schedule**
+- Pick a mission from a list to narrow the schedule to it.
+- The crew view shows open seats at the top. With a mission picked, it shows who's on the job, then who else is rated and current.
+
 ## 0.1.0
 
 The first release of Zom's MRP, the Mission Ready Planner.

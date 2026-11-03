@@ -27,9 +27,9 @@ Like a fleet board, a crew roster and a Gantt chart in one, with the checks buil
 | | |
 |---|---|
 | **Fleet** | Every tail over time, grouped by type: its missions, maintenance and free windows, how many aircraft are free each day, and **Can we take a job?** to see which tails and crew could do new work. |
-| **Schedule** | A Gantt chart by aircraft, mission or person. Drag to move through time, and Ctrl + scroll (or pinch) to zoom from a week to a year. Each mission has its own color and pattern. |
-| **Missions** | One customer's work, with the training it needs and the crew who work it. Its seasons hold the dates, aircraft (by tail number), pilots on board and maintainers on call. **Copy to next season** books next year in one click. |
-| **Rotations** | Pilots rotate in hitches. **Rotate pilots every** splits a season into hitches and picks free, qualified, current pilots. |
+| **Schedule** | A Gantt chart by aircraft, mission or person, narrowed to one mission from a list. The crew view puts open seats on top, with who's on the job and who else is rated and current. Drag to move through time, and Ctrl + scroll (or pinch) to zoom from a week to a year. Each mission has its own color and pattern. |
+| **Missions** | One customer's work, with the training it needs and the crew who work it. Its seasons hold the dates, one or more aircraft (by tail number), and how many pilots and maintainers the job needs at any time. **Copy to next season** books next year in one click. |
+| **Rotations** | Each job has a pilot and a maintainer rotation (say 21 on, 14 off); **Fill the schedule** rotates free, rated, current people through it. People can have a fixed rotation of their own and are only offered on their on days. |
 | **Crew** | Pilots and maintainers, the aircraft types they're qualified on, time off, and their training records. |
 | **Training** | Courses that need renewing, set by each mission. People only need what their missions ask for, and "Who's current" shows where everyone stands. |
 | **Maintenance** | Jobs on an aircraft with the maintainers on them. A job can ground the aircraft. |

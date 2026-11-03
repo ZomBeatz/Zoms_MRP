@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import type { AppData, Mission, Person, Season, Shift } from "./types";
 import { bookings } from "./bookings";
+import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
 import { DAY, dayAt, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
@@ -101,19 +102,21 @@ export function findIssues(data: AppData): Issue[] {
       issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the mission and fix its times.", at: from, seasonId: m.id });
       continue;
     }
-    const ac = m.aircraftId ? aircraft.get(m.aircraftId) : undefined;
-    if (!ac) {
-      issues.push({ id: `noac-${m.id}`, severity: "warn", title: `“${m.name}” has no aircraft`, detail: "Pick an aircraft for this mission.", at: from, seasonId: m.id });
-    } else {
+    const tails = m.aircraftIds.map((id) => aircraft.get(id)).filter((a): a is NonNullable<typeof a> => !!a);
+    if (!tails.length && m.status !== "Planned") {
+      // A planned job can wait for its aircraft; once it's confirmed it needs one.
+      issues.push({ id: `noac-${m.id}`, severity: "warn", title: `“${m.name}” has no aircraft`, detail: "Pick an aircraft for this job.", at: from, seasonId: m.id });
+    }
+    for (const ac of tails) {
       if (ac.status === "Grounded" || ac.status === "Retired")
-        issues.push({ id: `acstat-${m.id}`, severity: "danger", title: `${ac.tail} is ${ac.status.toLowerCase()}`, detail: `It's booked for “${m.name}”. Pick another aircraft or change its status.`, at: from, seasonId: m.id, aircraftId: ac.id });
+        issues.push({ id: `acstat-${m.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is ${ac.status.toLowerCase()}`, detail: `It's booked for “${m.name}”. Pick another aircraft or change its status.`, at: from, seasonId: m.id, aircraftId: ac.id });
       for (const j of data.jobs) {
         if (j.aircraftId === ac.id && j.grounds && !j.done && overlaps(from, to, ms(j.start), ms(j.end)))
           issues.push({ id: `acjob-${m.id}-${j.id}`, severity: "danger", title: `${ac.tail} is in maintenance during “${m.name}”`, detail: `“${j.title}”, ${fmtRange(j.start, j.end)}. Move the job or pick another aircraft.`, at: Math.max(from, ms(j.start)), seasonId: m.id, aircraftId: ac.id, jobId: j.id });
       }
       for (const o of missions) {
-        if (o.id > m.id && o.aircraftId === ac.id && overlaps(from, to, ms(o.start), ms(o.end)))
-          issues.push({ id: `acdbl-${m.id}-${o.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, ms(o.start)), seasonId: m.id, aircraftId: ac.id });
+        if (o.id > m.id && o.aircraftIds.includes(ac.id) && overlaps(from, to, ms(o.start), ms(o.end)))
+          issues.push({ id: `acdbl-${m.id}-${o.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, ms(o.start)), seasonId: m.id, aircraftId: ac.id });
       }
     }
 
@@ -127,13 +130,14 @@ export function findIssues(data: AppData): Issue[] {
     for (const g of cov.maintainerGaps)
       issues.push({ id: `mgap-${m.id}-${g.a}`, severity: "warn", title: `“${m.name}” needs ${plural(g.short, "maintainer")} on call`, detail: `${range(g.a, g.b)}.`, at: g.a, seasonId: m.id });
 
-    if (ac) {
+    if (tails.length) {
+      const seats = tails.reduce((t, a) => t + a.seats, 0);
       const pilotSpans = data.shifts
         .filter((s) => s.seasonId === m.id && people.get(s.personId)?.role === "Pilot")
         .map((s) => [ms(s.start), ms(s.end)] as [number, number]);
-      const crowded = coverageSteps(from, to, pilotSpans).filter((s) => s.n > ac.seats);
+      const crowded = coverageSteps(from, to, pilotSpans).filter((s) => s.n > seats);
       for (const s of crowded)
-        issues.push({ id: `seats-${m.id}-${s.a}`, severity: "warn", title: `${plural(s.n, "pilot")} on ${ac.tail}, which has ${plural(ac.seats, "seat")}`, detail: `“${m.name}”, ${range(s.a, s.b)}.`, at: s.a, seasonId: m.id });
+        issues.push({ id: `seats-${m.id}-${s.a}`, severity: "warn", title: `${plural(s.n, "pilot")} on “${m.name}”, with ${plural(seats, "pilot seat")}`, detail: `${tails.map((a) => a.tail).join(", ")}, ${range(s.a, s.b)}.`, at: s.a, seasonId: m.id });
     }
   }
 
@@ -142,9 +146,13 @@ export function findIssues(data: AppData): Issue[] {
     const m = missionById.get(s.seasonId);
     const p = people.get(s.personId);
     if (!m || !p || !active(m)) continue;
-    const ac = m.aircraftId ? aircraft.get(m.aircraftId) : undefined;
-    if (ac && !p.quals.includes(ac.type))
-      issues.push({ id: `qual-${s.id}`, severity: "danger", title: `${p.name} isn't qualified on the ${ac.type}`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Swap them out or add the qualification.`, at: ms(s.start), seasonId: m.id, personId: p.id });
+    // Qualified on at least one of the job's aircraft types.
+    const types = seasonTypes(data, m);
+    if (types.length && !types.some((t) => p.quals.includes(t)))
+      issues.push({ id: `qual-${s.id}`, severity: "danger", title: `${p.name} isn't qualified on the ${types.join(" or ")}`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Swap them out or add the qualification.`, at: ms(s.start), seasonId: m.id, personId: p.id });
+    // Booked on their own off days.
+    if (p.rotation && !onRotationFor(p, ms(s.start), ms(s.end)))
+      issues.push({ id: `offrot-${s.id}`, severity: "warn", title: `${p.name} is booked on their days off`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Their rotation is ${fmtRotation(p.rotation)}.`, at: ms(s.start), seasonId: m.id, personId: p.id });
     // Maintainers often start before the mission (pre-flight) and stay after; pilots fly inside it.
     if (p.role === "Pilot" && (ms(s.start) < ms(m.start) || ms(s.end) > ms(m.end)))
       issues.push({ id: `outside-${s.id}`, severity: "warn", title: `${p.name}'s shift runs outside “${m.name}”`, detail: `The shift is ${fmtRange(s.start, s.end)}; the mission is ${fmtRange(m.start, m.end)}.`, at: ms(s.start), seasonId: m.id, personId: p.id });
@@ -242,19 +250,21 @@ export function findIssues(data: AppData): Issue[] {
 }
 
 /** Pilots or maintainers free for the whole of [a, b], qualified on the type, best first. */
-export function whoCanCover(data: AppData, role: Person["role"], a: number, b: number, type: string | null, except: Shift["id"][] = [], required: string[] = [], missionId?: string) {
+export function whoCanCover(data: AppData, role: Person["role"], a: number, b: number, types: string[] | string | null, except: Shift["id"][] = [], required: string[] = [], missionId?: string) {
+  const anyOf = types === null ? [] : Array.isArray(types) ? types : [types];
   return data.people
     .filter((p) => p.role === role)
     .map((p) => {
       const busy = dutyOf(data, p.id).some((d) => !except.includes(d.shiftId ?? "") && overlaps(a, b, d.a, d.b));
       const off = data.timeOff.some((t) => t.personId === p.id && overlaps(a, b, ms(t.start), ms(t.end)));
-      const qualified = !type || p.quals.includes(type);
+      const qualified = !anyOf.length || anyOf.some((t) => p.quals.includes(t));
+      const onRot = onRotationFor(p, a, b);
       const trained = required.every((id) => {
         const t = data.trainings.find((x) => x.id === id);
         return !t || (t.appliesTo !== "Both" && t.appliesTo !== role) || trainingStatus(p, id, a, b).state === "ok";
       });
       const regular = !!missionId && p.missionIds.includes(missionId);
-      return { person: p, busy, off, qualified, trained, regular, ok: !busy && !off && qualified && trained };
+      return { person: p, busy, off, qualified, trained, regular, onRotation: onRot, ok: !busy && !off && qualified && trained && onRot };
     })
     .sort((x, y) => Number(y.ok) - Number(x.ok) || Number(y.regular) - Number(x.regular) || Number(y.qualified && y.trained) - Number(x.qualified && x.trained) || x.person.name.localeCompare(y.person.name));
 }

@@ -173,7 +173,7 @@ export const useStore = create<State>((set, get) => ({
       }
       if (c === "aircraft") {
         next.jobs = next.jobs.filter((j) => j.aircraftId !== id);
-        next.seasons = next.seasons.map((m) => (m.aircraftId === id ? { ...m, aircraftId: null } : m));
+        next.seasons = next.seasons.map((m) => (m.aircraftIds.includes(id) ? { ...m, aircraftIds: m.aircraftIds.filter((a) => a !== id) } : m));
       }
       if (c === "trainings") {
         next.missions = next.missions.map((m) => ({ ...m, requiredTrainingIds: m.requiredTrainingIds.filter((t) => t !== id) }));

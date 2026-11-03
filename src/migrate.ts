@@ -36,7 +36,7 @@ export function migrate(raw: any): AppData {
       missionOf.set(b.id, m.id);
       // The season keeps the block's id, so shifts can keep pointing at it.
       seasons.push({
-        id: b.id, missionId: m.id, start: b.start, end: b.end, aircraftId: b.aircraftId ?? null,
+        id: b.id, missionId: m.id, start: b.start, end: b.end, aircraftIds: b.aircraftId ? [b.aircraftId] : [], pilotRotation: null, maintainerRotation: null,
         pilotsNeeded: b.pilotsNeeded ?? 1, maintainersNeeded: b.maintainersNeeded ?? 0, status: b.status ?? "Planned", notes: b.notes ?? "",
       });
     }
@@ -47,7 +47,12 @@ export function migrate(raw: any): AppData {
     d.people = d.people.map((p) => ({ ...p, missionIds: [...new Set(p.missionIds.map((id) => missionOf.get(id) ?? id))] }));
   }
   d.missions = d.missions.map((m) => ({ ...m, contact: m.contact ?? "", location: m.location ?? "", notes: m.notes ?? "", color: m.color || "#2563eb", pattern: m.pattern || "solid", requiredTrainingIds: m.requiredTrainingIds ?? [] }));
-  d.seasons = d.seasons ?? [];
+  // 0.1: a season had one aircraft and no rotations.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  d.seasons = (d.seasons ?? []).map(({ aircraftId, ...x }: any) => ({
+    ...x, aircraftIds: x.aircraftIds ?? (aircraftId ? [aircraftId] : []), pilotRotation: x.pilotRotation ?? null, maintainerRotation: x.maintainerRotation ?? null,
+  }));
+  d.people = d.people.map((p) => ({ ...p, rotation: p.rotation ?? null }));
   delete d.areas;
 
   const settings = { ...defaultSettings(), ...d.settings, rules: { ...defaultSettings().rules, ...d.settings?.rules } };
