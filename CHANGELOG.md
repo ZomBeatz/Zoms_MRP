@@ -31,6 +31,7 @@
 - The demo banner says **Guide and lessons**.
 - A phone turned sideways gets the phone layout too: the menu button, full-screen forms and the small lesson card.
 - The Fleet page draws about three times faster.
+- On a phone or tablet, opening a form no longer jumps into its first text box and pops up the keyboard.
 
 ## 0.2.0
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Wordmark } from "../components/Logo";
-import { Field } from "../components/ui";
+import { Field, autoFocusBox } from "../components/ui";
 import { api } from "../backends/server";
 
 /**
@@ -41,7 +41,7 @@ export function SignIn({ needsSetup, serverName }: { needsSetup: boolean; server
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <Field label="Username">
-            <input autoFocus autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+            <input autoFocus={autoFocusBox} autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
           </Field>
           {needsSetup && (
             <Field label="Your name" hint="As others will see it.">
