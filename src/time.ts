@@ -87,6 +87,13 @@ export function fmtDates(a: When, b: When): string {
   return isSameDay(first, last) ? `${day(first)} (1 day)` : `${day(first)} to ${day(last)} (${plural(n, "day")})`;
 }
 
+/** "Jan 5 – Jan 18", short enough for one line on a phone. `noYear` when the year is shown nearby. */
+export function fmtSpan(a: When, b: When, noYear = false): string {
+  const first = new Date(ms(a)), last = new Date(ms(b) - 1);
+  const day = (d: Date) => format(d, noYear || isSameYear(d, new Date()) ? "MMM d" : "MMM d, yyyy");
+  return isSameDay(first, last) ? day(first) : `${day(first)} – ${day(last)}`;
+}
+
 /** Midnight `n` days from a day, by the calendar. */
 export const dayAt = (d: Date | number, n = 0) => {
   const x = new Date(d);

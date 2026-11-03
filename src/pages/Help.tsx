@@ -23,7 +23,7 @@ export function Help({ onClose }: { onClose: () => void }) {
         <li>A season can have a <b>pilot rotation</b> and a <b>maintainer rotation</b>, like 21 days on, 14 off. <b>Fill the schedule</b> rotates free, qualified, current people through the open days on that pattern. People can also have a <b>fixed rotation</b> of their own; they're only offered on their on days.</li>
         <li>Each mission sets the <b>training</b> it needs, and the crew who work it. People only need the training of the missions they work, so a fire pilot doesn't need NVG unless they also fly medevac.</li>
         <li>The <b>Fleet</b> page shows every tail over time with its free windows. <b>Can we take a job?</b> checks which tails and crew could do new work.</li>
-        <li><b>Shifts</b> put people on a season. Pilots rotate in hitches: several shifts that hand over. The people offered for a shift are only those who can take it (rated, current, free, on rotation); tick <b>Show everyone</b> to see the rest.</li>
+        <li><b>Shifts</b> put people on a season. Pilots rotate in hitches: several shifts that hand over. The people offered for a shift are only those who can take it (rated, current, free, on rotation); tick <b>Show everyone</b> to see the rest. In a season, each shift is one line on the <b>Pilots</b> or <b>Maintainers</b> tab: tap it to change it, or tap an open seat to put someone on those days.</li>
         <li><b>Maintenance jobs</b> book maintainers on an aircraft. Jobs that ground the aircraft block it from missions.</li>
         <li>The <b>Overview</b> lists every gap and conflict. Click one to fix it.</li>
       </ul>
