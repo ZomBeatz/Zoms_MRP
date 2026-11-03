@@ -5,7 +5,7 @@ import { useStore } from "./store";
 import { missionCoverage } from "./coverage";
 import { canSupport } from "./fleet";
 import { dayAt, ms } from "./time";
-import type { Page } from "./types";
+import type { AppData, Page } from "./types";
 
 /**
  * Walkthroughs over the demo data. Each step can go to a page, open a form or click a tab, then
@@ -36,6 +36,8 @@ export interface Tour {
   id: string; title: string; summary: string; minutes: number; steps: Step[];
   /** Scenarios are stories to work through hands-on; the rest are tours to look around. */
   scenario?: boolean;
+  /** Clear away what an earlier try left behind, so the lesson starts fresh. Demo only. */
+  reset?: () => void;
 }
 
 const say = (t: Text) => (typeof t === "function" ? t() : t);
@@ -247,10 +249,18 @@ const filled = () => toastId() !== mark.toast && /shift|Nobody/.test(store().toa
 export const SCENARIOS: Tour[] = [
   {
     id: "call", scenario: true, title: "A customer calls with dates", minutes: 4,
+    reset: () => {
+      store().change((d) => {
+        const old = new Set(d.missions.filter((m) => m.name.trim().toLowerCase().startsWith("denali heli")).map((m) => m.id));
+        const seasons = new Set(d.seasons.filter((x) => old.has(x.missionId)).map((x) => x.id));
+        return { ...d, missions: d.missions.filter((m) => !old.has(m.id)), seasons: d.seasons.filter((x) => !seasons.has(x.id)), shifts: d.shifts.filter((x) => !seasons.has(x.seasonId)), people: d.people.map((p) => ({ ...p, missionIds: p.missionIds.filter((id) => !old.has(id)) })) };
+      });
+      mark.missions = new Set(data().missions.map((m) => m.id));
+    },
     summary: "Denali Heli-Ski Tours wants a helicopter for a month. Check the fleet, book it, and crew it.",
     steps: [
       {
-        page: "aircraft", before: () => { if (!mark.missions.size || !newMission()) mark = { ...mark, missions: new Set(data().missions.map((m) => m.id)) }; pickCall(); },
+        page: "aircraft", before: pickCall,
         target: { sel: ".page-head .btn", text: "Can we take a job" },
         title: "Denali Heli-Ski Tours calls",
         body: () => `They want a helicopter with mountain-rated pilots from ${fmt(callA())} to ${fmt(dayAt(callB(), -1))}. Before saying yes, check what the fleet can support.`,
@@ -307,7 +317,7 @@ export const SCENARIOS: Tour[] = [
       {
         target: ".dialog-foot .btn.primary", title: "Add it",
         body: "That's enough to put it on the board. Training and regular crew can be set any time on its other tabs.",
-        task: { say: "Tap Add mission.", done: () => !!newMission(), doIt: () => click(".dialog-foot .btn.primary") },
+        task: { say: "Tap Add mission.", done: () => !!newMission() && editing()?.kind !== "mission", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
         before: () => { if (editing()?.kind === "support") store().close(); },
@@ -440,7 +450,14 @@ export const SCENARIOS: Tour[] = [
 // ---------------------------------------------------------------- lessons: setting up, hands-on
 
 const COURSE = "Glacier landings", TAIL = "N520AK", PILOT = "Kit Larkin", ICEFIELD = "Juneau Icefield Tours";
-const course = () => data().trainings.find((t) => t.name.trim().toLowerCase() === COURSE.toLowerCase()) ?? data().trainings.find((t) => !mark.trainings.has(t.id));
+/** The course added in this lesson (not one from before it started). */
+const course = () => data().trainings.find((t) => !mark.trainings.has(t.id));
+const same = (a: string, b: string) => a.trim().toLowerCase() === b.toLowerCase();
+/** Take out what an earlier try of a lesson added, then note what's there now. */
+function clearOld(fn: (d: AppData) => AppData) {
+  store().change(fn);
+  remember();
+}
 const icefield = () => mission(ICEFIELD);
 const newTail = () => data().aircraft.find((a) => !mark.aircraft.has(a.id));
 const newPilot = () => data().people.find((p) => !mark.people.has(p.id));
@@ -455,10 +472,18 @@ const tapPick = async (text: string) => { if (!pickOn(text)) await click({ sel: 
 export const SETUP: Tour[] = [
   {
     id: "learn-training", scenario: true, title: "Add a training course", minutes: 2,
+    reset: () => clearOld((d) => {
+      const old = new Set(d.trainings.filter((t) => same(t.name, COURSE)).map((t) => t.id));
+      return {
+        ...d, trainings: d.trainings.filter((t) => !old.has(t.id)),
+        missions: d.missions.map((m) => ({ ...m, requiredTrainingIds: m.requiredTrainingIds.filter((x) => !old.has(x)) })),
+        people: d.people.map((p) => ({ ...p, training: p.training.filter((r) => !old.has(r.trainingId)) })),
+      };
+    }),
     summary: "Add a course people need, and set which mission needs it.",
     steps: [
       {
-        page: "training", before: () => { if (!course() || data().trainings.length === mark.trainings.size) remember(); },
+        page: "training",
         target: { sel: ".page-head .btn", text: "Add training" }, title: "A new course",
         body: `Juneau Icefield Tours now wants its pilots trained in ${COURSE}, renewed every 2 years. Courses live on the Training page.`,
         task: { say: "Tap Add training.", done: () => editing()?.kind === "training" && editing()?.id === "new", doIt: () => store().open("training", "new") },
@@ -475,7 +500,7 @@ export const SETUP: Tour[] = [
       {
         target: ".dialog-foot .btn.primary", title: "Add it",
         body: "A course on its own doesn't ask anything of anyone yet. A mission has to need it.",
-        task: { say: "Tap Add training.", done: () => data().trainings.length > mark.trainings.size, doIt: () => click(".dialog-foot .btn.primary") },
+        task: { say: "Tap Add training.", done: () => !!course() && editing()?.kind !== "training", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
         title: "Missions say what they need",
@@ -496,10 +521,14 @@ export const SETUP: Tour[] = [
   },
   {
     id: "learn-aircraft", scenario: true, title: "Add an aircraft", minutes: 1,
+    reset: () => clearOld((d) => {
+      const old = new Set(d.aircraft.filter((a) => same(a.tail, TAIL)).map((a) => a.id));
+      return { ...d, aircraft: d.aircraft.filter((a) => !old.has(a.id)), seasons: d.seasons.map((x) => ({ ...x, aircraftIds: x.aircraftIds.filter((id) => !old.has(id)) })), jobs: d.jobs.filter((j) => !old.has(j.aircraftId)) };
+    }),
     summary: "Put a new helicopter on the fleet by its tail number.",
     steps: [
       {
-        page: "aircraft", before: () => { if (!newTail()) remember(); },
+        page: "aircraft",
         target: { sel: ".page-head .btn", text: "Add aircraft" }, title: "A new helicopter",
         body: `The company just bought an AS350 B3, ${TAIL}, based in Juneau. Aircraft live on the Fleet page.`,
         task: { say: "Tap Add aircraft.", done: () => editing()?.kind === "aircraft" && editing()?.id === "new", doIt: () => store().open("aircraft", "new") },
@@ -521,7 +550,7 @@ export const SETUP: Tour[] = [
       {
         target: ".dialog-foot .btn.primary", title: "Add it",
         body: "If something's missing, the button says what.",
-        task: { say: "Tap Add aircraft.", done: () => !!newTail(), doIt: () => click(".dialog-foot .btn.primary") },
+        task: { say: "Tap Add aircraft.", done: () => !!newTail() && editing()?.kind !== "aircraft", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
         page: "aircraft", target: () => ({ sel: ".g-label", text: newTail()?.tail ?? TAIL }), title: "On the board",
@@ -531,10 +560,14 @@ export const SETUP: Tour[] = [
   },
   {
     id: "learn-pilot", scenario: true, title: "Add a pilot", minutes: 3,
+    reset: () => clearOld((d) => {
+      const old = new Set(d.people.filter((p) => same(p.name, PILOT)).map((p) => p.id));
+      return { ...d, people: d.people.filter((p) => !old.has(p.id)), shifts: d.shifts.filter((x) => !old.has(x.personId)), timeOff: d.timeOff.filter((t) => !old.has(t.personId)), jobs: d.jobs.map((j) => ({ ...j, maintainerIds: j.maintainerIds.filter((id) => !old.has(id)) })) };
+    }),
     summary: "A new pilot: what they're rated on, the mission they work, and their training.",
     steps: [
       {
-        page: "people", before: () => { if (!newPilot()) remember(); },
+        page: "people",
         target: { sel: ".page-head .btn", text: "Add pilot" }, title: "A new hire",
         body: `${PILOT} joins to fly ${ICEFIELD}. People live on the Crew page.`,
         task: { say: "Tap Add pilot.", done: () => editing()?.kind === "person" && editing()?.id === "new", doIt: () => store().open("person", "new", { role: "Pilot" }) },
@@ -575,7 +608,7 @@ export const SETUP: Tour[] = [
       {
         target: ".dialog-foot .btn.primary", title: "Add them",
         body: "They'll now be offered, and picked by Fill the schedule, for jobs they're rated and current for.",
-        task: { say: "Tap Add pilot.", done: () => !!newPilot(), doIt: () => click(".dialog-foot .btn.primary") },
+        task: { say: "Tap Add pilot.", done: () => !!newPilot() && editing()?.kind !== "person", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
         page: "training", before: () => choose('select[aria-label="Show crew for"]', icefield()?.id ?? ""), target: 'select[aria-label="Show crew for"]', title: "Lesson done",
@@ -611,10 +644,14 @@ export const useTour = create<TourState>((set, get) => ({
   start: (id) => {
     const tour = ALL().find((t) => t.id === id);
     if (!tour) return;
-    // The walkthroughs need the demo's data.
-    if (!store().demo) void store().setDemo(true);
-    if (store().editing) store().close();
-    set({ tour, step: 0 });
+    void (async () => {
+      // The walkthroughs need the demo's data.
+      if (!store().demo) await store().setDemo(true);
+      if (store().editing) store().close();
+      await sleep(50);
+      tour.reset?.();
+      set({ tour, step: 0 });
+    })();
   },
   stop: () => {
     if (get().tour && store().editing) store().close();
@@ -740,7 +777,7 @@ export function TourOverlay() {
       {rect && ready
         ? <div className="tour-spot" style={{ top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} />
         : !s.task && <div className="tour-dim" />}
-      <div className={`tour-card ${rect && !phone ? "" : "docked"}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.7 }}>
+      <div className={`tour-card ${rect && !phone ? "" : "docked"} ${phone && rect && rect.top + rect.height / 2 > window.innerHeight / 2 ? "top" : ""}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.7 }}>
         <div className="row gap-sm">
           <span className="small muted grow">{lessonNo(tour.id) ? `Lesson ${lessonNo(tour.id)}` : "Tour"}: {tour.title} · step {step + 1} of {tour.steps.length}</span>
           <button className="icon-btn" aria-label="Make this card small" title="Make small, to see the page" onClick={() => setSmall(true)}><Minus size={16} /></button>
