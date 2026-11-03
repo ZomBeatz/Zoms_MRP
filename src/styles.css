@@ -152,13 +152,28 @@ button.tile:hover { background: var(--zb-surface-2); }
 
 /* ---------- dialogs ---------- */
 .backdrop { position: fixed; inset: 0; background: #0006; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 100; overflow-y: auto; animation: fade .12s; }
-.dialog { width: 100%; max-width: 640px; background: var(--zb-surface); border-radius: var(--zb-radius-lg); box-shadow: var(--zb-shadow-lg); animation: pop .14s; }
-.dialog.wide { max-width: 860px; }
-.dialog-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px 6px; }
-.dialog-head h2 { margin: 0; flex: 1; }
-.dialog-body { padding: 8px 18px 4px; }
-.dialog-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 18px 16px; align-items: center; }
+/* Head and foot stay put; only the body scrolls. */
+.dialog { width: 100%; max-width: 640px; max-height: 88vh; display: flex; flex-direction: column; background: var(--zb-surface); border-radius: var(--zb-radius-lg); box-shadow: var(--zb-shadow-lg); animation: pop .14s; overflow: hidden; }
+.dialog.wide { max-width: 760px; }
+/* Tabbed forms keep one height, so switching tabs doesn't make the window jump. */
+.dialog.tabbed { height: min(720px, 88vh); }
+.dialog-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--zb-border); flex-shrink: 0; }
+.dialog.tabbed .dialog-head { padding-bottom: 0; }
+.dialog-title { display: flex; align-items: center; gap: 10px; }
+.dialog-title h2 { margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dialog-title .swatch { width: 16px; height: 16px; }
+.dialog-meta { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; margin-top: 4px; font-size: 13px; color: var(--zb-text-2); }
+.dialog-tabs { display: flex; gap: 2px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+.dialog-tabs::-webkit-scrollbar { display: none; }
+.dialog-tabs button { padding: 8px 12px; font-size: 14px; color: var(--zb-text-2); border-bottom: 2px solid transparent; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.dialog-tabs button:hover { color: var(--zb-text); }
+.dialog-tabs button.on { color: var(--zb-accent); border-bottom-color: var(--zb-accent); font-weight: 600; }
+.dialog-tabs .chip { padding: 0 6px; font-size: 11px; }
+.tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--zb-danger); }
+.dialog-body { padding: 16px 18px; overflow-y: auto; flex: 1; min-height: 0; }
+.dialog-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px; align-items: center; border-top: 1px solid var(--zb-border); flex-shrink: 0; }
 .dialog-foot .left { margin-right: auto; }
+.form-note { font-size: 12.5px; color: var(--zb-muted); margin: 10px 0 0; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: scale(.97); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -173,6 +188,46 @@ button.tile:hover { background: var(--zb-surface-2); }
 .field input:not([type="checkbox"]):not([type="color"]), .field select, .field textarea { width: 100%; }
 .check { display: flex; align-items: center; gap: 8px; }
 .form-section { margin: 18px 0 8px; }
+.form-section:first-child { margin-top: 0; }
+/* Two fields side by side, even on a phone (first and last day, crew counts). */
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--zb-border); border-radius: var(--zb-radius-sm); overflow: hidden; width: max-content; }
+.stepper button { width: 34px; font-size: 17px; color: var(--zb-text-2); background: var(--zb-surface-2); }
+.stepper button:hover:not(:disabled) { color: var(--zb-text); background: var(--zb-surface-3); }
+.stepper button:disabled { opacity: .4; cursor: default; }
+.field .stepper input, .stepper input { width: 46px; border: none; border-radius: 0; text-align: center; font-weight: 600; -moz-appearance: textfield; }
+.stepper input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.rotation { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13.5px; color: var(--zb-text-2); }
+.field .rotation input[type="number"] { width: 58px; text-align: center; }
+/* Tags you add and remove (tails on a job). */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px; font-size: 13px; background: var(--zb-accent-soft); border: 1px solid color-mix(in srgb, var(--zb-accent) 45%, transparent); }
+.tag b { font-family: var(--zb-font-mono); }
+.tag .icon-btn { padding: 2px; }
+.field .tags select.add-tag { width: auto; border-style: dashed; border-radius: 999px; padding: 4px 12px; font-size: 13px; color: var(--zb-text-2); background: transparent; cursor: pointer; }
+/* Toggle chips (training a mission needs, its crew, a person's types). */
+.chip.pick { cursor: pointer; padding: 4px 11px; font-size: 13px; border: 1px solid transparent; user-select: none; }
+.chip.pick input { position: absolute; opacity: 0; pointer-events: none; }
+.chip.pick:focus-within { box-shadow: 0 0 0 3px var(--zb-accent-soft); }
+.chip.pick.on { background: var(--zb-accent-soft); border-color: color-mix(in srgb, var(--zb-accent) 45%, transparent); color: var(--zb-text); }
+.chip.pick:hover { border-color: var(--zb-border); }
+/* One line per shift or record; tap it to change it. */
+.lines { display: flex; flex-direction: column; border: 1px solid var(--zb-border); border-radius: var(--zb-radius); overflow: hidden; }
+.line { display: flex; align-items: center; gap: 10px; padding: 9px 12px; width: 100%; text-align: left; font-size: 14px; border-bottom: 1px solid var(--zb-border); background: var(--zb-surface); }
+.line:last-child { border-bottom: none; }
+button.line:hover { background: var(--zb-surface-2); }
+.line .name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line .when { color: var(--zb-text-2); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.line .avatar { width: 26px; height: 26px; font-size: 10.5px; }
+.line.open-seat .name, .line.open-seat .when { color: var(--zb-danger); }
+.line.open-seat .avatar { background: transparent; border: 1.5px dashed var(--zb-danger); color: var(--zb-danger); }
+.line.flag { box-shadow: inset 3px 0 0 var(--zb-danger); }
+.line-edit { padding: 12px; background: var(--zb-surface-2); border-bottom: 1px solid var(--zb-border); display: flex; flex-direction: column; gap: 10px; }
+.line-edit:last-child { border-bottom: none; }
+.cov-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.cov-head .muted { font-size: 12.5px; }
+.toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+.toolbar .check { margin-left: auto; font-size: 12.5px; color: var(--zb-text-2); }
 .picker-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .swatch-btn { width: 26px; height: 26px; border-radius: 7px; box-shadow: inset 0 0 0 1px #0000001f; }
 .swatch-btn.on { box-shadow: 0 0 0 2px var(--zb-surface), 0 0 0 4px var(--zb-accent); }
@@ -284,7 +339,17 @@ button.g-label:hover { background: var(--zb-surface-2); }
   .nav-item { min-height: 40px; }
   .form-grid { grid-template-columns: 1fr; }
   .backdrop { padding: 0; }
-  .dialog { max-width: none; min-height: 100%; border-radius: 0; }
+  .dialog, .dialog.tabbed { max-width: none; height: 100%; max-height: none; border-radius: 0; }
+  .dialog-head { padding-top: calc(env(safe-area-inset-top) + 12px); }
+  .dialog-body { padding: 14px 16px; }
+  .dialog-foot { padding: 10px 16px calc(env(safe-area-inset-bottom) + 10px); }
+  .dialog-foot .btn { min-height: 40px; }
+  .dialog-foot .left .label { display: none; }
+  .stepper button { width: 40px; }
+  .dialog-tabs button { padding: 8px 9px; }
+  .dialog-tabs .chip { display: none; }
+  /* Keep messages clear of a form's buttons. */
+  .toast { bottom: calc(env(safe-area-inset-bottom) + 74px); max-width: calc(100vw - 32px); }
   .table-wrap { display: none; }
   .cards-list { display: flex; flex-direction: column; gap: 8px; }
   .list-card { background: var(--zb-surface); border-radius: var(--zb-radius); box-shadow: var(--zb-shadow); padding: 12px 14px; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 4px; }

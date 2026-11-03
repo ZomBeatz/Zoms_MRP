@@ -4,7 +4,18 @@ import type { AircraftStatus, MissionStatus, Person } from "../types";
 import { PATTERNS, SWATCHES, slotStyle } from "../look";
 import type { Pattern } from "../types";
 
-export function Dialog({ title, onClose, children, foot, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; foot: ReactNode; wide?: boolean }) {
+export interface Tab { key: string; label: ReactNode; /** A red dot: something on this tab needs a look. */ alert?: boolean }
+
+/**
+ * A form over the page. The title, a summary line and the tabs stay at the top and the buttons stay
+ * at the bottom; only the middle scrolls. On a phone it fills the screen.
+ */
+export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs, tab, onTab }: {
+  title: ReactNode; onClose: () => void; children: ReactNode; foot: ReactNode; wide?: boolean;
+  /** A swatch or avatar before the title. */ icon?: ReactNode;
+  /** The thing at a glance, under the title. */ meta?: ReactNode;
+  tabs?: Tab[]; tab?: string; onTab?: (key: string) => void;
+}) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k);
@@ -12,17 +23,42 @@ export function Dialog({ title, onClose, children, foot, wide }: { title: ReactN
   }, [onClose]);
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`dialog ${wide ? "wide" : ""}`} role="dialog" aria-modal="true">
+      <div className={`dialog ${wide ? "wide" : ""} ${tabs ? "tabbed" : ""}`} role="dialog" aria-modal="true">
         <div className="dialog-head">
-          <h2>{title}</h2>
-          <button className="icon-btn" aria-label="Close" onClick={onClose}>
-            <X size={18} />
-          </button>
+          <div className="dialog-title">
+            {icon}
+            <h2>{title}</h2>
+            <button className="icon-btn" aria-label="Close" onClick={onClose}>
+              <X size={18} />
+            </button>
+          </div>
+          {meta && <div className="dialog-meta">{meta}</div>}
+          {tabs && (
+            <div className="dialog-tabs" role="tablist">
+              {tabs.map((t) => (
+                <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? "on" : ""} onClick={() => onTab?.(t.key)}>
+                  {t.label}{t.alert && <span className="tab-dot" aria-label="needs a look" />}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="dialog-body">{children}</div>
         <div className="dialog-foot">{foot}</div>
       </div>
     </div>
+  );
+}
+
+/** A number with − and + buttons, easy to hit on a phone. */
+export function Stepper({ value, onChange, min = 0, max = 20, label }: { value: number; onChange: (n: number) => void; min?: number; max?: number; label: string }) {
+  const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n) || 0));
+  return (
+    <span className="stepper">
+      <button type="button" aria-label={`Fewer ${label}`} disabled={value <= min} onClick={() => onChange(clamp(value - 1))}>−</button>
+      <input type="number" inputMode="numeric" aria-label={label} min={min} max={max} value={value} onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      <button type="button" aria-label={`More ${label}`} disabled={value >= max} onClick={() => onChange(clamp(value + 1))}>+</button>
+    </span>
   );
 }
 

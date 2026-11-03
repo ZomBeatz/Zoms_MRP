@@ -4,12 +4,19 @@
 
 **Rotations**
 - Each season has a pilot rotation and a maintainer rotation, like 21 days on, 14 off. They can differ.
-- **Fill the schedule** rotates free, rated, current people through the open days on that pattern, the mission's own crew first. **Start over and fill** does it again from scratch.
+- **Fill the schedule** rotates free, rated, current people through the open days on that pattern, the mission's own crew first. **Start over** does it again from scratch.
 - People can work a fixed rotation of their own (days on, days off, from a first day). They're only offered for shifts on their on days, their days off are shaded on the schedule, and booking them on one is flagged.
 
 **Jobs**
 - A season can have several aircraft, added when they're known. Pilots and maintainers needed are for the whole job at any time.
 - The people offered for a shift are only those who can take it: rated on one of the job's aircraft, current on its training, free and on rotation. **Show everyone** lists the rest.
+
+**Forms**
+- Seasons, missions and people open in tabs (a season's details, pilots, maintainers and problems), with a red dot on any tab that needs a look. The title, a summary line and the Save button stay in view; only the middle scrolls.
+- Each shift is one line: who and when. Tap it to change or remove it. Open seats sit in the list in date order; tap one to put someone on those days.
+- Aircraft on a job are tags you add and remove, crew counts have − and + buttons, and first and last day sit side by side, even on a phone.
+- A person's training is one line per course. Older records that were renewed are greyed out instead of showing as run out.
+- On a phone, forms fill the screen and messages stay clear of the buttons.
 
 **Schedule**
 - Pick a mission from a list to narrow the schedule to it.
