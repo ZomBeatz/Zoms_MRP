@@ -17,9 +17,9 @@ export function Maintenance() {
     <>
       <div className="page-head">
         <h1>Maintenance</h1>
-        <label className="check small"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show finished jobs</label>
         <button className="btn primary" onClick={() => open("job", "new")}><Plus size={16} /> New job…</button>
       </div>
+      <label className="check small" style={{ marginBottom: 14 }}><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show finished jobs</label>
       {list.length === 0 ? (
         <Empty icon={<Wrench size={28} />} text="Inspections and repairs go here, with the maintainers working on them." action={<button className="btn primary" onClick={() => open("job", "new")}>New job…</button>} />
       ) : (
@@ -51,8 +51,9 @@ export function Maintenance() {
           <div className="cards-list">
             {list.map((j) => (
               <button key={j.id} className="list-card" onClick={() => open("job", j.id)}>
-                <b>{j.title}</b>
+                <span className="row gap-sm"><b className="grow">{j.title}</b>{j.done ? <span className="pill">Done</span> : j.grounds ? <span className="pill warn">Grounds aircraft</span> : null}</span>
                 <span className="small muted">{aircraft.get(j.aircraftId)?.tail} · {j.kind} · {fmtRange(j.start, j.end)}</span>
+                {unstaffed(j.maintainerIds) && !j.done && <span className="small" style={{ color: "var(--zb-warn)" }}>Nobody assigned yet</span>}
               </button>
             ))}
           </div>

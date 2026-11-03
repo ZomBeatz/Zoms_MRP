@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { create } from "zustand";
-import { X } from "lucide-react";
+import { CheckCircle2, Hand, Minus, X } from "lucide-react";
 import { useStore } from "./store";
 import { missionCoverage } from "./coverage";
-import { ms } from "./time";
+import { canSupport } from "./fleet";
+import { dayAt, ms } from "./time";
 import type { Page } from "./types";
 
 /**
@@ -13,19 +14,31 @@ import type { Page } from "./types";
  */
 
 type Target = string | { sel: string; text: string };
+type Text = string | (() => string);
 
 export interface Step {
-  title: string;
-  body: string;
+  title: Text;
+  body: Text;
   /** What to point at: a CSS selector, or a selector plus text the element must contain. Empty: a card in the middle. */
-  target?: Target;
+  target?: Target | (() => Target);
   /** Go to this page first (closing any open form). */
   page?: Page;
   /** Set things up before pointing, after `page`. Runs again on Back. */
   before?: () => void | Promise<void>;
+  /**
+   * Something for the person to do themselves. The step moves on once `done` is true. "Do it for me"
+   * runs `doIt` instead.
+   */
+  task?: { say: Text; done: () => boolean; doIt: () => void | Promise<void> };
 }
 
-export interface Tour { id: string; title: string; summary: string; minutes: number; steps: Step[] }
+export interface Tour {
+  id: string; title: string; summary: string; minutes: number; steps: Step[];
+  /** Scenarios are stories to work through hands-on; the rest are tours to look around. */
+  scenario?: boolean;
+}
+
+const say = (t: Text) => (typeof t === "function" ? t() : t);
 
 // ---------------------------------------------------------------- helpers the steps use
 
@@ -33,7 +46,8 @@ const sleep = (t: number) => new Promise((r) => setTimeout(r, t));
 const visible = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
 
 /** The first visible element matching the target. */
-export function findTarget(t: Target | undefined): HTMLElement | null {
+export function findTarget(target: Target | (() => Target) | undefined): HTMLElement | null {
+  const t = typeof target === "function" ? target() : target;
   if (!t) return null;
   const sel = typeof t === "string" ? t : t.sel;
   const all = [...document.querySelectorAll<HTMLElement>(sel)].filter(visible);
@@ -41,7 +55,7 @@ export function findTarget(t: Target | undefined): HTMLElement | null {
 }
 
 /** Wait for something to show up (a page or form that just opened). */
-async function waitFor(t: Target, ms_ = 2000) {
+async function waitFor(t: Target | (() => Target), ms_ = 2000) {
   for (let i = 0; i < ms_ / 50; i++) {
     const el = findTarget(t);
     if (el) return el;
@@ -64,6 +78,18 @@ async function choose(sel: string, value: string) {
   await sleep(80);
 }
 
+/** Type into a field the way a person would, so the page reacts. */
+async function type(el: HTMLInputElement | null, value: string) {
+  if (!el) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  await sleep(80);
+}
+const dateInputs = () => [...document.querySelectorAll<HTMLInputElement>('.dialog input[type="date"]')].filter(visible);
+const ymd = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const fmt = (t: number) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const activeTab = () => document.querySelector(".dialog-tabs button.on")?.textContent ?? "";
 const tab = (name: string) => click({ sel: ".dialog-tabs button", text: name });
 const store = () => useStore.getState();
 const mission = (name: string) => store().data.missions.find((m) => m.name === name) ?? store().data.missions[0];
@@ -103,6 +129,17 @@ export const TOURS: Tour[] = [
       { page: "people", target: ".page .table-wrap, .page .cards-list", title: "Crew", body: "Pilots and maintainers, what they're rated on, the missions they work, their own rotation if they have one, their training and time off." },
       { page: "reports", target: ".page .tiles", title: "Reports", body: "Fleet use, days per mission, how busy each person is and how much of the flying was fully crewed. Export to Excel makes one workbook to post in Teams." },
       { title: "That's the tour", body: "Next, try “Crew a job on a rotation” or “Can we take a new job?”. They're in the Guide, with how every part works." },
+    ],
+  },
+  {
+    id: "add-mission", title: "Add a mission", minutes: 2,
+    summary: "The form for a new customer: its name and look, first season, training and crew. Nothing is saved.",
+    steps: [
+      { before: async () => { if (store().editing?.id !== "new" || store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Details"); }, target: ".dialog .form-grid", title: "Name and look", body: "Type the customer's name, who to call there, and pick a color and pattern so its bars are easy to spot on the schedule." },
+      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("First season"); }, target: ".dialog .form-grid", title: "Its first season", body: "The first stretch of dates it flies. Add the aircraft if you know them, how many pilots and maintainers it needs at a time, and its rotation. You can leave the aircraft for later." },
+      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Training"); }, target: ".dialog .picker-row", title: "Training it needs", body: "Tap the courses this customer's crew must have. Only people on this mission need them." },
+      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Crew"); }, target: ".dialog-body", title: "Its regular crew", body: "Tap the people who usually work it. People rated on its aircraft are listed first; the rest are folded away." },
+      { before: () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); }, target: ".dialog-foot", title: "Add it", body: "Add mission saves it. If something's missing, like the name, the button says what. This walkthrough closes without saving." },
     ],
   },
   {
@@ -164,37 +201,449 @@ export const TOURS: Tour[] = [
   },
 ];
 
+
+// ---------------------------------------------------------------- scenarios: stories to do hands-on
+
+const today0 = () => dayAt(Date.now());
+const data = () => store().data;
+const editing = () => store().editing;
+const toastId = () => store().toast?.id ?? 0;
+let mark = { missions: new Set<string>(), trainings: new Set<string>(), aircraft: new Set<string>(), people: new Set<string>(), toast: 0, tags: 0, pilots: 0 };
+
+// A customer calling: the first month, from three weeks out, that some tail can really take with one
+// mountain-rated pilot on board. Worked out when the scenario starts, so it works on any day.
+let call = { a: 0, b: 0 };
+const mountain = () => data().trainings.find((t) => t.name === "Mountain flying")?.id;
+function pickCall() {
+  for (let off = 21; off < 300; off += 7) {
+    const a = dayAt(today0(), off), b = dayAt(a, 30);
+    if (canSupport(data(), { start: a, end: b, type: null, pilotsNeeded: 1, training: mountain() ? [mountain()!] : [] }).some((x) => x.verdict === "yes")) {
+      call = { a, b };
+      return;
+    }
+  }
+  call = { a: dayAt(today0(), 45), b: dayAt(today0(), 75) };
+}
+const callA = () => call.a;
+const callB = () => call.b; // the day after the last day
+const newMission = () => data().missions.find((m) => !mark.missions.has(m.id));
+const newSeason = () => data().seasons.find((x) => x.missionId === newMission()?.id);
+
+// Someone booked from tomorrow, who calls in sick for a week.
+let sick = { id: "", name: "", mission: "", a: 0, b: 0 };
+function pickSick() {
+  const d = data(), a = dayAt(today0(), 1);
+  const sh = d.shifts.find((x) => ms(x.start) <= a && ms(x.end) > dayAt(a, 3) && d.people.find((p) => p.id === x.personId)?.role === "Pilot");
+  const p = d.people.find((x) => x.id === sh?.personId) ?? d.people[0];
+  const season = d.seasons.find((x) => x.id === sh?.seasonId);
+  sick = { id: p.id, name: p.name, mission: d.missions.find((m) => m.id === season?.missionId)?.name ?? "a mission", a, b: dayAt(a, 7) };
+}
+
+const pilotsOnBoard = () => Number((document.querySelector('.dialog input[aria-label="pilots"]') as HTMLInputElement | null)?.value ?? 0);
+const tagCount = () => document.querySelectorAll(".dialog .tag").length;
+const pilotsAtATime = () => Number((document.querySelector('.dialog input[aria-label="pilots"]') as HTMLInputElement | null)?.value ?? 0);
+const filled = () => toastId() !== mark.toast && /shift|Nobody/.test(store().toast?.text ?? "");
+
+export const SCENARIOS: Tour[] = [
+  {
+    id: "call", scenario: true, title: "A customer calls with dates", minutes: 4,
+    summary: "Denali Heli-Ski Tours wants a helicopter for a month. Check the fleet, book it, and crew it.",
+    steps: [
+      {
+        page: "aircraft", before: () => { if (!mark.missions.size || !newMission()) mark = { ...mark, missions: new Set(data().missions.map((m) => m.id)) }; pickCall(); },
+        target: { sel: ".page-head .btn", text: "Can we take a job" },
+        title: "Denali Heli-Ski Tours calls",
+        body: () => `They want a helicopter with mountain-rated pilots from ${fmt(callA())} to ${fmt(dayAt(callB(), -1))}. Before saying yes, check what the fleet can support.`,
+        task: { say: "Tap Can we take a job?", done: () => editing()?.kind === "support", doIt: () => store().open("support", "new") },
+      },
+      {
+        before: () => { if (editing()?.kind !== "support") store().open("support", "new"); },
+        target: ".dialog .form-grid", title: "What they need",
+        body: "Put in their dates, how many pilots fly on board, and the training their pilots must have. The answer below updates as you go.",
+        task: {
+          say: () => `Set the first day to ${fmt(callA())}, the last day to ${fmt(dayAt(callB(), -1))}, Pilots on board to 1, and tap Mountain flying.`,
+          done: () => dateInputs()[0]?.value === ymd(callA()) && dateInputs()[1]?.value === ymd(dayAt(callB(), -1)) && pilotsOnBoard() === 1 && !!findTarget({ sel: ".dialog .chip.pick.on", text: "Mountain flying" }),
+          doIt: async () => {
+            while (pilotsOnBoard() > 1) await click('.dialog button[aria-label="Fewer pilots"]');
+            await type(dateInputs()[1] ?? null, ymd(dayAt(callB(), -1)));
+            await type(dateInputs()[0] ?? null, ymd(callA()));
+            await type(dateInputs()[1] ?? null, ymd(dayAt(callB(), -1)));
+            if (!findTarget({ sel: ".dialog .chip.pick.on", text: "Mountain flying" })) await click({ sel: ".dialog .chip.pick", text: "Mountain flying" });
+          },
+        },
+      },
+      {
+        target: ".dialog .issues", title: "The answer, tail by tail",
+        body: "Can do means the tail is free and enough rated, current pilots are free every day. Short crew means the aircraft is free but pilots aren't. Can't says why, and when it's free next. Scroll to see them all.",
+      },
+      {
+        target: { sel: ".dialog .btn", text: "Book on" }, title: "Book it",
+        body: "Booking starts a new mission with the dates, the tail and the pilots already filled in.",
+        task: { say: "Tap Book on… next to a tail that says Can do.", done: () => editing()?.kind === "mission" && editing()?.id === "new", doIt: () => click({ sel: ".dialog .btn", text: "Book on" }) },
+      },
+      {
+        target: '.dialog input[placeholder="Interior Fire Service"]', title: "Name the customer",
+        body: "A mission is the customer. Its color and pattern are picked for you; change them if you like.",
+        task: {
+          say: "Type Denali Heli-Ski Tours as the name.",
+          done: () => !!(findTarget('.dialog input[placeholder="Interior Fire Service"]') as HTMLInputElement | null)?.value.trim(),
+          doIt: () => type(findTarget('.dialog input[placeholder="Interior Fire Service"]') as HTMLInputElement | null, "Denali Heli-Ski Tours"),
+        },
+      },
+      {
+        target: ".dialog-tabs", title: "Check its first season",
+        body: "The dates, the tail and the pilots on board came from the check. One thing is left: how the pilots rotate.",
+        task: { say: "Tap the First season tab.", done: () => activeTab().startsWith("First season"), doIt: () => tab("First season") },
+      },
+      {
+        target: ".dialog .rotation", title: "Set the rotation",
+        body: "Pilots on this job work 14 days, then have 7 off. Fill the schedule will rotate them on that pattern.",
+        task: {
+          say: "Set the pilot rotation to 14 on, 7 off.",
+          done: () => { const [on, off] = document.querySelectorAll<HTMLInputElement>(".dialog .rotation input"); return on?.value === "14" && off?.value === "7"; },
+          doIt: async () => { if (!activeTab().startsWith("First season")) await tab("First season"); const [on, off] = document.querySelectorAll<HTMLInputElement>(".dialog .rotation input"); await type(on, "14"); await type(off, "7"); },
+        },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Add it",
+        body: "That's enough to put it on the board. Training and regular crew can be set any time on its other tabs.",
+        task: { say: "Tap Add mission.", done: () => !!newMission(), doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      {
+        before: () => { if (editing()?.kind === "support") store().close(); },
+        title: "Now crew it",
+        body: () => `“${newMission()?.name ?? "The new mission"}” is booked but has nobody on it yet. Its season is where the crew goes.`,
+        task: {
+          say: () => `Open its season: Missions › ${newMission()?.name ?? "the new mission"} › Seasons › tap the dates.`,
+          done: () => editing()?.kind === "season" && editing()?.id === newSeason()?.id,
+          doIt: () => { const x = newSeason(); if (x) store().open("season", x.id); },
+        },
+      },
+      {
+        before: async () => { if (editing()?.kind === "season") await tab("Pilots"); mark.toast = toastId(); },
+        target: { sel: ".dialog .btn", text: "Fill the schedule" }, title: "Fill the schedule",
+        body: "The red stripes are days with nobody on. Fill the schedule rotates free, rated and current pilots through them on the 14 on, 7 off pattern.",
+        task: { say: "Tap Fill the schedule.", done: filled, doIt: () => click({ sel: ".dialog .btn", text: "Fill the schedule" }) },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Save",
+        body: "Each line is one pilot's stretch. Tap any line to swap the person or change the dates. Anything still red is a day nobody was free.",
+        task: { say: "Tap Save.", done: () => !!newSeason() && data().shifts.some((x) => x.seasonId === newSeason()!.id), doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      {
+        page: "aircraft", title: "Booked and crewed",
+        body: "It's on the Fleet board now, on the tail you picked, and its pilots show on the schedule. That's the whole loop: check, book, crew. Reset demo on the banner puts the demo back the way it was.",
+      },
+    ],
+  },
+  {
+    id: "sick", scenario: true, title: "A pilot calls in sick", minutes: 3,
+    summary: "Record their time off, see the problem it makes, and get someone else on.",
+    steps: [
+      {
+        page: "people", before: pickSick, target: { sel: ".page-head .btn", text: "Add time off" },
+        title: () => `${sick.name} calls in sick`,
+        body: () => `They're on ${sick.mission} and will be out ${fmt(sick.a)} to ${fmt(dayAt(sick.b, -1))}. First, write it down.`,
+        task: { say: "Tap Add time off.", done: () => editing()?.kind === "timeOff", doIt: () => store().open("timeOff", "new") },
+      },
+      {
+        target: ".dialog .form-grid", title: "Who and when",
+        body: "Time off keeps them from being offered for shifts on those days.",
+        task: {
+          say: () => `Pick ${sick.name}, set ${fmt(sick.a)} to ${fmt(dayAt(sick.b, -1))}, and type Sick as the reason.`,
+          done: () => (document.querySelector(".dialog select") as HTMLSelectElement | null)?.value === sick.id && dateInputs()[0]?.value === ymd(sick.a) && dateInputs()[1]?.value === ymd(dayAt(sick.b, -1)),
+          doIt: async () => {
+            await choose(".dialog select", sick.id);
+            await type(dateInputs()[1] ?? null, ymd(dayAt(sick.b, -1)));
+            await type(dateInputs()[0] ?? null, ymd(sick.a));
+            await type(document.querySelector<HTMLInputElement>('.dialog input[placeholder^="Vacation"]'), "Sick");
+          },
+        },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Add it",
+        body: "Nothing changes until you add it.",
+        task: { say: "Tap Add time off.", done: () => data().timeOff.some((t) => t.personId === sick.id && ms(t.start) === sick.a), doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      {
+        page: "overview", target: () => ({ sel: ".page .issue", text: sick.name }), title: "A new problem",
+        body: () => `The overview now says ${sick.name} is off but still booked on ${sick.mission}. Problems always open the place to fix them.`,
+        task: { say: () => `Tap the problem about ${sick.name}.`, done: () => editing()?.kind === "season", doIt: () => click({ sel: ".page .issue", text: sick.name }) },
+      },
+      {
+        before: async () => { if (editing()?.kind === "season" && !activeTab().startsWith("Pilots")) await tab("Pilots"); },
+        target: () => ({ sel: ".dialog .line.flag", text: sick.name }), title: "Their shift is marked",
+        body: "Lines with a red edge have a problem. Take them off this stretch.",
+        task: {
+          say: () => `Tap ${sick.name}'s red-edged line, then tap Remove.`,
+          done: () => !findTarget({ sel: ".dialog .line.flag", text: sick.name }) && !document.querySelector(".dialog .line-edit"),
+          doIt: async () => { await click({ sel: ".dialog .line.flag", text: sick.name }); await click({ sel: ".dialog .line-edit .btn", text: "Remove" }); },
+        },
+      },
+      {
+        before: () => { mark.toast = toastId(); },
+        target: { sel: ".dialog .btn", text: "Fill the schedule" }, title: "Fill the hole",
+        body: "Removing them left an open seat, the red line. Fill the schedule finds someone free, rated and current for just those days. You could also tap the open seat to pick someone yourself.",
+        task: { say: "Tap Fill the schedule.", done: filled, doIt: () => click({ sel: ".dialog .btn", text: "Fill the schedule" }) },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Save",
+        body: "Check who it picked, then save.",
+        task: { say: "Tap Save.", done: () => editing()?.kind !== "season", doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      {
+        page: "schedule", before: () => click({ sel: ".page-head .seg button", text: "Crew" }), target: ".gantt", title: "Covered",
+        body: () => `${sick.name}'s days off are shaded on the crew schedule, and someone else has their stretch. Back on the overview, the problem is gone.`,
+      },
+    ],
+  },
+  {
+    id: "grow", scenario: true, title: "A job needs another aircraft", minutes: 2,
+    summary: "The fire service wants one more tail and one more pilot on. Add them and crew the extra seat.",
+    steps: [
+      {
+        before: async () => { await openSeason("Details"); mark.tags = tagCount(); mark.pilots = pilotsAtATime(); },
+        target: ".dialog .tags", title: "One more aircraft",
+        body: "Interior Fire Service wants a third helicopter for next summer's season, with one more pilot on at a time.",
+        task: {
+          say: "Tap + Add aircraft and pick any tail.",
+          done: () => tagCount() > mark.tags,
+          doIt: async () => {
+            const sel = document.querySelector<HTMLSelectElement>(".dialog select.add-tag");
+            const opt = sel && [...sel.options].find((o) => o.value);
+            if (opt) await choose(".dialog select.add-tag", opt.value);
+          },
+        },
+      },
+      {
+        target: ".dialog .stepper", title: "One more pilot",
+        body: "Pilots at a time counts across all the job's aircraft.",
+        task: { say: "Tap + next to Pilots at a time.", done: () => pilotsAtATime() > mark.pilots, doIt: () => click('.dialog button[aria-label="More pilots"]') },
+      },
+      {
+        before: async () => { await tab("Pilots"); mark.toast = toastId(); },
+        target: { sel: ".dialog .btn", text: "Fill the schedule" }, title: "Crew the extra seat",
+        body: "The extra seat shows as more red. Fill the schedule only adds people; the shifts already there stay.",
+        task: { say: "Tap Fill the schedule.", done: filled, doIt: () => click({ sel: ".dialog .btn", text: "Fill the schedule" }) },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Save",
+        body: "Any red left means nobody rated and current was free those days. That's when to hire, train, or move someone from another job.",
+        task: { say: "Tap Save.", done: () => editing()?.kind !== "season", doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      { page: "aircraft", title: "Done", body: "The new tail shows the fire season on the Fleet board. Reset demo on the banner puts everything back." },
+    ],
+  },
+];
+
+
+// ---------------------------------------------------------------- lessons: setting up, hands-on
+
+const COURSE = "Glacier landings", TAIL = "N520AK", PILOT = "Kit Larkin", ICEFIELD = "Juneau Icefield Tours";
+const course = () => data().trainings.find((t) => t.name.trim().toLowerCase() === COURSE.toLowerCase()) ?? data().trainings.find((t) => !mark.trainings.has(t.id));
+const icefield = () => mission(ICEFIELD);
+const newTail = () => data().aircraft.find((a) => !mark.aircraft.has(a.id));
+const newPilot = () => data().people.find((p) => !mark.people.has(p.id));
+const field = (label: string) => {
+  const f = [...document.querySelectorAll<HTMLElement>(".dialog .field")].find((x) => x.querySelector(":scope > span")?.textContent === label);
+  return (f?.querySelector("input, select") ?? null) as HTMLInputElement | null;
+};
+const remember = () => { mark.trainings = new Set(data().trainings.map((t) => t.id)); mark.aircraft = new Set(data().aircraft.map((a) => a.id)); mark.people = new Set(data().people.map((p) => p.id)); };
+const pickOn = (text: string) => !!findTarget({ sel: ".dialog .chip.pick.on", text });
+const tapPick = async (text: string) => { if (!pickOn(text)) await click({ sel: ".dialog .chip.pick", text }); };
+
+export const SETUP: Tour[] = [
+  {
+    id: "learn-training", scenario: true, title: "Add a training course", minutes: 2,
+    summary: "Add a course people need, and set which mission needs it.",
+    steps: [
+      {
+        page: "training", before: () => { if (!course() || data().trainings.length === mark.trainings.size) remember(); },
+        target: { sel: ".page-head .btn", text: "Add training" }, title: "A new course",
+        body: `Juneau Icefield Tours now wants its pilots trained in ${COURSE}, renewed every 2 years. Courses live on the Training page.`,
+        task: { say: "Tap Add training.", done: () => editing()?.kind === "training" && editing()?.id === "new", doIt: () => store().open("training", "new") },
+      },
+      {
+        target: ".dialog .form-grid", title: "Name it and how long it lasts",
+        body: "Renew every is in months. Zom's MRP warns before it runs out, and 0 means it never does.",
+        task: {
+          say: `Type ${COURSE} as the name, and set Renew every to 24.`,
+          done: () => !!field("Name")?.value.trim() && (document.querySelector<HTMLInputElement>('.dialog input[aria-label="months"]')?.value === "24"),
+          doIt: async () => { await type(field("Name"), COURSE); await type(document.querySelector<HTMLInputElement>('.dialog input[aria-label="months"]'), "24"); },
+        },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Add it",
+        body: "A course on its own doesn't ask anything of anyone yet. A mission has to need it.",
+        task: { say: "Tap Add training.", done: () => data().trainings.length > mark.trainings.size, doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      {
+        title: "Missions say what they need",
+        body: () => `Open ${ICEFIELD} and tick ${course()?.name ?? COURSE} on its Training tab. Then only the people who work it need the course.`,
+        task: {
+          say: () => `Open ${ICEFIELD} (Missions page), go to its Training tab, and tap ${course()?.name ?? COURSE}.`,
+          done: () => editing()?.kind === "mission" && pickOn(course()?.name ?? COURSE),
+          doIt: async () => { const m = icefield(); if (m && editing()?.id !== m.id) store().open("mission", m.id); await tab("Training"); await tapPick(course()?.name ?? COURSE); },
+        },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Save",
+        body: "Its crew now show as not current for this course until it's recorded on them. That's the next lessons.",
+        task: { say: "Tap Save.", done: () => !!course() && !!icefield()?.requiredTrainingIds.includes(course()!.id), doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      { page: "training", target: ".page .seg", title: "Lesson done", body: "Who's current on this page now counts the new course for that mission's crew." },
+    ],
+  },
+  {
+    id: "learn-aircraft", scenario: true, title: "Add an aircraft", minutes: 1,
+    summary: "Put a new helicopter on the fleet by its tail number.",
+    steps: [
+      {
+        page: "aircraft", before: () => { if (!newTail()) remember(); },
+        target: { sel: ".page-head .btn", text: "Add aircraft" }, title: "A new helicopter",
+        body: `The company just bought an AS350 B3, ${TAIL}, based in Juneau. Aircraft live on the Fleet page.`,
+        task: { say: "Tap Add aircraft.", done: () => editing()?.kind === "aircraft" && editing()?.id === "new", doIt: () => store().open("aircraft", "new") },
+      },
+      {
+        target: ".dialog .form-grid", title: "Tail, type and base",
+        body: "The tail number is how it's shown everywhere. The type has to match what pilots are rated on, so pick it from the suggestions.",
+        task: {
+          say: `Type ${TAIL} as the tail number, AS350 B3 as the type, and Juneau as the base.`,
+          done: () => !!field("Tail number")?.value.trim() && !!field("Type")?.value.trim(),
+          doIt: async () => { await type(field("Tail number"), TAIL); await type(field("Type"), "AS350 B3"); await type(field("Base"), "Juneau"); },
+        },
+      },
+      {
+        target: ".dialog .stepper", title: "Pilot seats",
+        body: "How many pilots fly it at once. An AS350 has one; leave it at 1.",
+        task: { say: "Make sure Pilot seats is 1.", done: () => document.querySelector<HTMLInputElement>('.dialog input[aria-label="pilot seats"]')?.value === "1", doIt: async () => { while (Number(document.querySelector<HTMLInputElement>('.dialog input[aria-label="pilot seats"]')?.value) > 1) await click('.dialog button[aria-label="Fewer pilot seats"]'); } },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Add it",
+        body: "If something's missing, the button says what.",
+        task: { say: "Tap Add aircraft.", done: () => !!newTail(), doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      {
+        page: "aircraft", target: () => ({ sel: ".g-label", text: newTail()?.tail ?? TAIL }), title: "On the board",
+        body: "It shows under its type, free from today. A customer can be booked onto it with Can we take a job? or by tapping a free block.",
+      },
+    ],
+  },
+  {
+    id: "learn-pilot", scenario: true, title: "Add a pilot", minutes: 3,
+    summary: "A new pilot: what they're rated on, the mission they work, and their training.",
+    steps: [
+      {
+        page: "people", before: () => { if (!newPilot()) remember(); },
+        target: { sel: ".page-head .btn", text: "Add pilot" }, title: "A new hire",
+        body: `${PILOT} joins to fly ${ICEFIELD}. People live on the Crew page.`,
+        task: { say: "Tap Add pilot.", done: () => editing()?.kind === "person" && editing()?.id === "new", doIt: () => store().open("person", "new", { role: "Pilot" }) },
+      },
+      {
+        target: ".dialog .form-grid", title: "Name and base",
+        body: "A fixed rotation is here too, for people who always work, say, 2 weeks on and 2 off. Leave it off for now.",
+        task: { say: `Type ${PILOT} as the name and Juneau as the base.`, done: () => !!field("Name")?.value.trim(), doIt: async () => { await type(field("Name"), PILOT); await type(field("Base"), "Juneau"); } },
+      },
+      {
+        before: async () => { if (editing()?.kind === "person") await tab("Ratings"); },
+        target: ".dialog-body", title: "Rated on, and works on",
+        body: "Rated on is what they can fly; they're only offered for jobs on those types. Works on is the missions they rotate through, which decides the training they need.",
+        task: {
+          say: `Tap AS350 B3 under Rated on, and ${ICEFIELD} under Works on.`,
+          done: () => pickOn("AS350 B3") && pickOn(ICEFIELD),
+          doIt: async () => { await tab("Ratings"); await tapPick("AS350 B3"); await tapPick(ICEFIELD); },
+        },
+      },
+      {
+        before: async () => { if (editing()?.kind === "person") await tab("Training"); },
+        target: ".dialog-body", title: "Their training",
+        body: "The courses their mission needs are listed with a + button. Each one is added as done today; tap a line to change the dates.",
+        task: {
+          say: "Tap each course under “Needed for their missions”.",
+          done: () => activeTab().startsWith("Training") && !findTarget({ sel: ".dialog .form-section", text: "Needed for their missions" }) && document.querySelectorAll(".dialog .line").length > 0,
+          doIt: async () => {
+            await tab("Training");
+            for (let i = 0; i < 8; i++) {
+              const b = [...document.querySelectorAll<HTMLElement>(".dialog .picker-row .btn")].find(visible);
+              if (!b) break;
+              b.click(); await sleep(120);
+              await click({ sel: ".dialog .line-edit .btn", text: "Done" });
+            }
+          },
+        },
+      },
+      {
+        target: ".dialog-foot .btn.primary", title: "Add them",
+        body: "They'll now be offered, and picked by Fill the schedule, for jobs they're rated and current for.",
+        task: { say: "Tap Add pilot.", done: () => !!newPilot(), doIt: () => click(".dialog-foot .btn.primary") },
+      },
+      {
+        page: "training", before: () => choose('select[aria-label="Show crew for"]', icefield()?.id ?? ""), target: 'select[aria-label="Show crew for"]', title: "Lesson done",
+        body: () => `${newPilot()?.name ?? PILOT} is on ${ICEFIELD}'s crew and current on what it needs. Next, a customer calls.`,
+      },
+    ],
+  },
+];
+
+/** The learning path, in order: set up, then the everyday jobs. */
+export const LESSONS: Tour[] = [...SETUP, ...SCENARIOS];
+/** A lesson's number on the path, from 1; 0 for the tours. */
+export const lessonNo = (id: string) => LESSONS.findIndex((t) => t.id === id) + 1;
+
 // ---------------------------------------------------------------- state and the overlay
 
-interface TourState { tour: Tour | null; step: number; start: (id: string) => void; stop: () => void; go: (n: number) => void }
+/** Which walkthroughs someone has finished, kept in this browser so the guide can tick them off. */
+const PROGRESS = "zoms-mrp:tours-done";
+const readDone = (): Record<string, true> => { try { return JSON.parse(localStorage.getItem(PROGRESS) ?? "{}"); } catch { return {}; } };
+const ALL = () => [...LESSONS, ...TOURS];
+
+interface TourState {
+  tour: Tour | null; step: number; done: Record<string, true>;
+  start: (id: string) => void; stop: () => void; go: (n: number) => void;
+  /** The lesson after this one on the learning path, if any. */
+  next: (id: string) => Tour | undefined;
+}
 
 export const useTour = create<TourState>((set, get) => ({
   tour: null,
   step: 0,
+  done: readDone(),
   start: (id) => {
-    const tour = TOURS.find((t) => t.id === id);
+    const tour = ALL().find((t) => t.id === id);
     if (!tour) return;
     // The walkthroughs need the demo's data.
     if (!store().demo) void store().setDemo(true);
+    if (store().editing) store().close();
     set({ tour, step: 0 });
   },
   stop: () => {
-    if (get().tour) store().close();
+    if (get().tour && store().editing) store().close();
     set({ tour: null, step: 0 });
   },
   go: (n) => {
     const { tour } = get();
     if (!tour) return;
-    if (n >= tour.steps.length) get().stop();
-    else set({ step: Math.max(0, n) });
+    if (n >= tour.steps.length) {
+      const done = { ...get().done, [tour.id]: true as const };
+      try { localStorage.setItem(PROGRESS, JSON.stringify(done)); } catch { /* only a convenience */ }
+      set({ done });
+      get().stop();
+    } else set({ step: Math.max(0, n) });
   },
+  next: (id) => { const i = LESSONS.findIndex((t) => t.id === id); return i >= 0 ? LESSONS[i + 1] : undefined; },
 }));
 
-/** The highlight and the card. Mounted once in the app. */
+/**
+ * The highlight and the card. Mounted once in the app. The page stays usable underneath: it can be
+ * scrolled and tapped, which is how the scenarios' "Your turn" tasks get done.
+ */
 export function TourOverlay() {
   const { tour, step, go, stop } = useTour();
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [ready, setReady] = useState(false);
+  const [done, setDone] = useState(false);
+  const [small, setSmall] = useState(false);
+  const [busy, setBusy] = useState(false);
   const s = tour?.steps[step];
 
   // Set up the step: page, form, clicks, then find what to point at.
@@ -202,13 +651,14 @@ export function TourOverlay() {
     if (!s) return;
     let cancelled = false;
     setReady(false);
+    setDone(false);
     (async () => {
       const st = store();
       if (s.page) {
         if (st.editing) st.close();
         if (st.page !== s.page) st.go(s.page);
         await sleep(60);
-      } else if (!s.before && st.editing) st.close();
+      }
       await s.before?.();
       const el = s.target ? await waitFor(s.target, 1500) : null;
       if (cancelled) return;
@@ -221,7 +671,7 @@ export function TourOverlay() {
     return () => { cancelled = true; };
   }, [s]);
 
-  // Follow the target as the page scrolls or resizes.
+  // Follow the target as the page scrolls, resizes or changes.
   const measure = useCallback(() => {
     if (!s?.target) return setRect(null);
     setRect(findTarget(s.target)?.getBoundingClientRect() ?? null);
@@ -230,55 +680,96 @@ export function TourOverlay() {
     if (!tour) return;
     window.addEventListener("resize", measure);
     document.addEventListener("scroll", measure, true);
-    return () => { window.removeEventListener("resize", measure); document.removeEventListener("scroll", measure, true); };
+    const t = setInterval(measure, 400);
+    return () => { window.removeEventListener("resize", measure); document.removeEventListener("scroll", measure, true); clearInterval(t); };
   }, [tour, measure]);
+
+  // A task moves on by itself once it's done.
+  useEffect(() => {
+    if (!s?.task || !ready || done) return;
+    // Already done (say, after Back): show it, but let the person move on.
+    if (s.task.done()) { setDone(true); return; }
+    const t = setInterval(() => {
+      if (s.task!.done()) {
+        setDone(true);
+        clearInterval(t);
+        setTimeout(() => { if (useTour.getState().step === step) go(step + 1); }, 1100);
+      }
+    }, 300);
+    return () => clearInterval(t);
+  }, [s, ready, done, step, go]);
 
   useEffect(() => {
     if (!tour) return;
     const k = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.stopPropagation(); stop(); }
-      else if (e.key === "ArrowRight") go(step + 1);
-      else if (e.key === "ArrowLeft") go(step - 1);
     };
     window.addEventListener("keydown", k, true);
     return () => window.removeEventListener("keydown", k, true);
-  }, [tour, step, go, stop]);
+  }, [tour, stop]);
 
   if (!tour || !s) return null;
   const pad = 6;
   const phone = window.innerWidth < 700;
   // Below the target if it fits, else above, else (or on a phone) along the bottom.
-  const cardW = Math.min(360, window.innerWidth - 32);
+  const cardW = Math.min(380, window.innerWidth - 24);
   let style: React.CSSProperties = {};
   if (rect && !phone) {
     const below = rect.bottom + pad + 12;
     const left = Math.min(Math.max(16, rect.left), window.innerWidth - cardW - 16);
-    if (below + 220 < window.innerHeight) style = { top: below, left };
-    else if (rect.top - pad - 12 - 220 > 0) style = { bottom: window.innerHeight - rect.top + pad + 12, left };
+    if (below + 260 < window.innerHeight) style = { top: below, left };
+    else if (rect.top - pad - 12 - 260 > 0) style = { bottom: window.innerHeight - rect.top + pad + 12, left };
     else style = { bottom: 16, right: 16 };
   }
   const last = step === tour.steps.length - 1;
+  const next = useTour.getState().next(tour.id);
+  const doIt = async () => {
+    setBusy(true);
+    try { await s.task!.doIt(); } finally { setBusy(false); }
+  };
+
+  if (small)
+    return (
+      <button className="tour-pill" onClick={() => setSmall(false)}>
+        {tour.title} · {step + 1} of {tour.steps.length} <b>Show</b>
+      </button>
+    );
 
   return (
-    <div className="tour" role="dialog" aria-modal="true" aria-label={`Walkthrough: ${tour.title}`}>
-      {/* Catches clicks, so the walkthrough leads; the highlight is drawn on top. */}
-      <div className={`tour-block ${rect && ready ? "" : "dim"}`} />
-      {rect && ready && (
-        <div className="tour-spot" style={{ top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} />
-      )}
-      <div className={`tour-card ${rect && !phone ? "" : "docked"}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.6 }}>
+    <div className="tour" role="dialog" aria-label={`Walkthrough: ${tour.title}`}>
+      {rect && ready
+        ? <div className="tour-spot" style={{ top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} />
+        : !s.task && <div className="tour-dim" />}
+      <div className={`tour-card ${rect && !phone ? "" : "docked"}`} style={{ ...style, width: cardW, opacity: ready ? 1 : 0.7 }}>
         <div className="row gap-sm">
-          <span className="small muted grow">{tour.title} · {step + 1} of {tour.steps.length}</span>
+          <span className="small muted grow">{lessonNo(tour.id) ? `Lesson ${lessonNo(tour.id)}` : "Tour"}: {tour.title} · step {step + 1} of {tour.steps.length}</span>
+          <button className="icon-btn" aria-label="Make this card small" title="Make small, to see the page" onClick={() => setSmall(true)}><Minus size={16} /></button>
           <button className="icon-btn" aria-label="End the walkthrough" onClick={stop}><X size={16} /></button>
         </div>
-        <h3 style={{ margin: "6px 0 6px" }}>{s.title}</h3>
-        <p>{s.body}</p>
-        <div className="tour-dots" aria-hidden="true">{tour.steps.map((_, i) => <span key={i} className={i === step ? "on" : ""} />)}</div>
+        <h3 style={{ margin: "6px 0 6px" }}>{say(s.title)}</h3>
+        <p>{say(s.body)}</p>
+        {s.task && (
+          <div className={`tour-task ${done ? "done" : ""}`}>
+            {done ? <><CheckCircle2 size={16} /> <b>Done.</b></> : <><Hand size={16} /> <span><b>Your turn:</b> {say(s.task.say)}</span></>}
+          </div>
+        )}
+        <div className="tour-dots" aria-hidden="true">{tour.steps.map((_, i) => <span key={i} className={i === step ? "on" : i < step ? "past" : ""} />)}</div>
         <div className="row gap-sm">
           {step > 0 && <button className="btn sm" onClick={() => go(step - 1)}>Back</button>}
           <span className="grow" />
-          <button className="btn sm ghost" onClick={stop}>{last ? "Close" : "Skip"}</button>
-          <button className="btn sm primary" autoFocus onClick={() => go(step + 1)}>{last ? "Finish" : "Next"}</button>
+          {s.task && !done ? (
+            <>
+              <button className="btn sm ghost" onClick={() => go(step + 1)}>Skip step</button>
+              <button className="btn sm primary" disabled={busy} onClick={doIt}>Do it for me</button>
+            </>
+          ) : (
+            last && next ? (
+              <>
+                <button className="btn sm" onClick={() => go(step + 1)}>Take a break</button>
+                <button className="btn sm primary" autoFocus onClick={() => { go(step + 1); setTimeout(() => useTour.getState().start(next.id), 50); }}>Next: {next.title}</button>
+              </>
+            ) : <button className="btn sm primary" autoFocus onClick={() => go(step + 1)}>{last ? "Finish" : "Next"}</button>
+          )}
         </div>
       </div>
     </div>

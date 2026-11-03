@@ -1,5 +1,19 @@
 # Changelog
 
+## Not released yet
+
+**Learn it step by step**
+- Six hands-on lessons in the Guide: add a training course, add an aircraft, add a pilot, a customer calls with dates, a pilot calls in sick, and a job needs another aircraft. Each step says what to tap and moves on once it's done; **Do it for me** does it instead.
+- Finished lessons and tours are ticked off, and each lesson ends with **Take a break** or the next one.
+- The page can be scrolled and used while a tour runs, and its card can be made small to see what's under it.
+
+**Easier to use**
+- Save is never greyed out: if something's missing, it says what. Delete asks once more.
+- A mission's Crew tab shows who's on it, who could join, and folds away people not rated on its aircraft.
+- On a phone: the demo banner is one slim line, summary numbers sit two to a row, and time off, training courses and maintenance show as lists.
+- The Guide adds a setup checklist for your own data, a list of the words Zom's MRP uses, and how to undo mistakes.
+- "Can we take a job?" no longer repeats a reason.
+
 ## 0.2.0
 
 **Rotations**
@@ -13,7 +27,7 @@
 
 **Guide and walkthroughs**
 - A **Guide** page explains how every part works and how Zom's MRP is meant to be used, from setting up the fleet to a customer calling with dates. Press **?** to open it.
-- Six walkthroughs run over the demo data and show one thing at a time: the big picture, taking a new job, crewing a job on a rotation, closing coverage gaps, keeping training current and planning maintenance. **Take the tour** is on the demo's banner.
+- Seven tours run over the demo data and show one thing at a time: the big picture, adding a mission, taking a new job, crewing a job on a rotation, closing coverage gaps, keeping training current and planning maintenance.
 
 **Forms**
 - Seasons, missions and people open in tabs (a season's details, pilots, maintainers and problems), with a red dot on any tab that needs a look. The title, a summary line and the Save button stay in view; only the middle scrolls.

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Clock, PlayCircle } from "lucide-react";
-import { TOURS, useTour } from "../tour";
+import { CheckCircle2, Clock, PlayCircle } from "lucide-react";
+import { LESSONS, TOURS, useTour, type Tour } from "../tour";
 import { useStore } from "../store";
 import { isOnlineDemo, isServerBuild } from "../platform";
 
@@ -36,11 +36,45 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
     ),
   },
   {
+    id: "setup", title: "Set up your own operation", tour: "add-mission",
+    body: <Setup />,
+  },
+  {
+    id: "words", title: "Words used here",
+    body: (
+      <dl className="glossary">
+        <dt>Tail</dt><dd>An aircraft, named by its tail number, like N412ZM.</dd>
+        <dt>Type</dt><dd>The kind of aircraft, like Bell 412. People are <b>rated</b> on types.</dd>
+        <dt>Rated</dt><dd>Allowed to fly or work on a type of aircraft.</dd>
+        <dt>Mission</dt><dd>One customer's kind of work, like “Interior Fire Service”.</dd>
+        <dt>Season</dt><dd>One stretch of dates a mission flies, like May 15 to Sep 15.</dd>
+        <dt>Shift</dt><dd>One person on a season for some days in a row.</dd>
+        <dt>Hitch</dt><dd>The days someone works in a row before time off. Several shifts back to back count as one hitch.</dd>
+        <dt>Rotation</dt><dd>A repeating pattern of days on and days off, like 14 on, 7 off.</dd>
+        <dt>Open seat</dt><dd>A day a job needs one more pilot or maintainer than it has.</dd>
+        <dt>Current</dt><dd>Training that hasn't run out yet.</dd>
+        <dt>Grounded</dt><dd>An aircraft that can't fly, usually because of maintenance.</dd>
+      </dl>
+    ),
+  },
+  {
+    id: "mistakes", title: "Mistakes are easy to undo",
+    body: (
+      <ul>
+        <li>Nothing in a form is kept until you press <b>Save</b>. <b>Cancel</b> or the back button leaves everything as it was.</li>
+        <li>If Save can't save yet, it tells you what's missing, like a name or a date.</li>
+        <li><b>Delete</b> asks once more before it deletes. After you add or delete something, the message at the bottom has an <b>Undo</b> button. {mod} Z undoes any change.</li>
+        <li>On a phone, the back button closes the form you're in, then goes back to the page before.</li>
+        <li>In the demo, try anything. <b>Reset demo</b> puts it all back.</li>
+      </ul>
+    ),
+  },
+  {
     id: "overview", title: "Overview", tour: "basics",
     body: <p>What's flying now and in the next 30 days, the fleet at a glance, and <b>Needs attention</b>: every problem Zom's MRP finds, worst first. Tap a problem to open what needs fixing. The number beside Overview in the sidebar is how many there are.</p>,
   },
   {
-    id: "fleet", title: "Fleet", tour: "new-job",
+    id: "fleet", title: "Fleet", tour: "call",
     body: (
       <>
         <p>Every tail over time, grouped by type. Colored bars are missions, green dashed blocks are free windows (counted from today), and a thin row under each tail holds its maintenance. The row at the top counts how many aircraft are free each day.</p>
@@ -128,6 +162,60 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
   },
 ];
 
+function TourCards({ tours, onStart, numbered }: { tours: Tour[]; onStart: (id: string) => void; numbered?: boolean }) {
+  const done = useTour((s) => s.done);
+  // The first one not done yet is next up.
+  const nextUp = numbered ? tours.find((t) => !done[t.id])?.id : undefined;
+  return (
+    <div className="tour-cards">
+      {tours.map((t, i) => (
+        <button key={t.id} className={`tour-pick ${done[t.id] ? "done" : ""} ${nextUp === t.id ? "next" : ""}`} onClick={() => onStart(t.id)}>
+          <span className="row gap-sm">
+            {done[t.id] ? <CheckCircle2 size={18} className="ok" /> : numbered ? <span className="lesson-no">{i + 1}</span> : <PlayCircle size={18} className="accent" />}
+            <b className="grow">{t.title}</b>
+            <span className="small muted row" style={{ gap: 4 }}><Clock size={12} /> {t.minutes} min</span>
+          </span>
+          <span className="small muted">{t.summary}</span>
+          {done[t.id] ? <span className="small ok-text">Done. Tap to do it again.</span> : nextUp === t.id ? <span className="small accent-text">Next up</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The order to add things in, with a button for each. */
+function Setup() {
+  const { data, demo, open, setDemo } = useStore();
+  const steps: { done: boolean; text: ReactNode; action: string; run: () => void }[] = [
+    { done: data.aircraft.length > 0, text: <><b>Add your aircraft</b> by tail number, with their type and pilot seats.</>, action: "Add aircraft…", run: () => open("aircraft", "new") },
+    { done: data.trainings.length > 0, text: <><b>Add the training courses</b> you track, and how often each is renewed.</>, action: "Add training…", run: () => open("training", "new") },
+    { done: data.people.some((p) => p.role === "Pilot"), text: <><b>Add your pilots</b> with the types they're rated on, their training dates, and their own rotation if they have one.</>, action: "Add pilot…", run: () => open("person", "new", { role: "Pilot" }) },
+    { done: data.people.some((p) => p.role === "Maintainer"), text: <><b>Add your maintainers</b> the same way.</>, action: "Add maintainer…", run: () => open("person", "new", { role: "Maintainer" }) },
+    { done: data.missions.length > 0, text: <><b>Add each customer as a mission</b>, with its first season, the training it needs and its regular crew.</>, action: "New mission…", run: () => open("mission", "new") },
+    { done: data.shifts.length > 0, text: <><b>Crew each season:</b> open it, go to Pilots, and press Fill the schedule.</>, action: "Go to Missions", run: () => useStore.getState().go("missions") },
+  ];
+  if (demo)
+    return (
+      <p>
+        You're looking at the demo now. To set up your own, switch to your own data first; the demo stays as it is.{" "}
+        {!isOnlineDemo && <button className="btn sm" onClick={() => setDemo(false)}>Use my own data</button>}
+      </p>
+    );
+  return (
+    <>
+      <p>Add things in this order, so each step has what it needs. Ticked steps are done.</p>
+      <ol className="setup">
+        {steps.map((s, i) => (
+          <li key={i} className={s.done ? "done" : ""}>
+            <span className="grow">{s.text}</span>
+            <button className={`btn sm ${!s.done && steps.slice(0, i).every((x) => x.done) ? "primary" : ""}`} onClick={s.run}>{s.action}</button>
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
+
 /** How every part works and how it's meant to be used, with walkthroughs of the demo. */
 export function Guide() {
   const start = useTour((s) => s.start);
@@ -136,18 +224,17 @@ export function Guide() {
     <div className="guide">
       <div className="page-head"><h1>Guide</h1></div>
 
-      <h2 style={{ marginTop: 0 }}>Walkthroughs</h2>
+      <h2 style={{ marginTop: 0 }}>Learn it step by step</h2>
       <p className="muted" style={{ marginTop: -4 }}>
-        Each one runs over the demo data and shows one thing at a time. {demo || isOnlineDemo ? "Nothing is saved unless you save it." : "Starting one switches to the demo; your own data is kept apart."}
+        Short lessons you do yourself on the demo, a few minutes each. Every step says what to tap and moves on when you've done it; <b>Do it for me</b> does it for you.
+        Take a break between lessons any time: finished ones are ticked off here.
+        {demo || isOnlineDemo ? " Reset demo puts everything back afterwards." : " Starting one switches to the demo; your own data is kept apart."}
       </p>
-      <div className="tour-cards">
-        {TOURS.map((t) => (
-          <button key={t.id} className="tour-pick" onClick={() => start(t.id)}>
-            <span className="row gap-sm"><PlayCircle size={18} className="accent" /><b className="grow">{t.title}</b><span className="small muted row" style={{ gap: 4 }}><Clock size={12} /> {t.minutes} min</span></span>
-            <span className="small muted">{t.summary}</span>
-          </button>
-        ))}
-      </div>
+      <TourCards tours={LESSONS} onStart={start} numbered />
+
+      <h2>Look around</h2>
+      <p className="muted" style={{ marginTop: -4 }}>Tours that point at one thing at a time and explain it. You can scroll and tap the page while they run.</p>
+      <TourCards tours={TOURS} onStart={start} />
 
       <nav className="guide-toc" aria-label="Contents">
         {SECTIONS.map((s) => <a key={s.id} href={`#guide-${s.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(`guide-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{s.title}</a>)}

@@ -51,13 +51,21 @@ function DateFields({ start, end, onChange, labels = ["First day", "Last day"] }
   );
 }
 
-function Foot({ isNew, onDelete, onSave, label, disabled }: { isNew: boolean; onDelete: () => void; onSave: () => void; label: string; disabled?: boolean }) {
+/**
+ * Delete, Cancel and Save. Save stays clickable: if something's missing, it says what instead of
+ * going grey, so nobody is left wondering why nothing happens.
+ */
+function Foot({ isNew, onDelete, onSave, label, problem }: { isNew: boolean; onDelete: () => void; onSave: () => void; label: string; problem?: string | false | null }) {
   const close = useStore((s) => s.close);
+  const showToast = useStore((s) => s.showToast);
+  const [sure, setSure] = useState(false);
   return (
     <>
-      {!isNew && <button className="btn danger left" onClick={onDelete} aria-label="Delete"><Trash2 size={14} /> <span className="label">Delete</span></button>}
+      {!isNew && (sure
+        ? <button className="btn danger left" onClick={onDelete} onBlur={() => setSure(false)} autoFocus><Trash2 size={14} /> Delete for good?</button>
+        : <button className="btn danger left" onClick={() => setSure(true)} aria-label={`Delete this ${label}`}><Trash2 size={14} /> <span className="label">Delete</span></button>)}
       <button className="btn" onClick={close}>Cancel</button>
-      <button className="btn primary" onClick={onSave} disabled={disabled}>{isNew ? `Add ${label}` : "Save"}</button>
+      <button className="btn primary" onClick={() => (problem ? showToast(problem) : onSave())}>{isNew ? `Add ${label}` : "Save"}</button>
     </>
   );
 }
@@ -140,17 +148,44 @@ function MissionDialog({ id, defaults }: Props) {
     .filter((p) => p.role === role)
     // The mission's own crew (as saved) first, then by name.
     .sort((x, y) => Number(y.missionIds.includes(m.id)) - Number(x.missionIds.includes(m.id)) || x.name.localeCompare(y.name));
-  const crewChips = (role: Person["role"]) => crewOf(role).map((p) => {
+  const chip = (p: Person) => {
     const missing = requiredTraining(data, m, p.role).filter((tid) => trainingStatus(p, tid, now, now + 1).state !== "ok");
-    const unqualified = types.size > 0 && ![...types].some((t) => p.quals.includes(t));
     return (
       <Pick key={p.id} on={pool.has(p.id)} onToggle={() => setPool((x) => { const n = new Set(x); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
-        title={[unqualified ? `Not rated on ${[...types].join(" or ")}` : "", missing.length ? `Needs ${missing.map((tid) => data.trainings.find((t) => t.id === tid)?.name).join(", ")}` : ""].filter(Boolean).join(". ") || undefined}>
+        title={missing.length ? `Needs ${missing.map((tid) => data.trainings.find((t) => t.id === tid)?.name).join(", ")}` : undefined}>
         {p.name}
-        {(unqualified || missing.length > 0) && <span className="pill warn">{unqualified ? "Not on type" : `Needs ${missing.length}`}</span>}
+        {missing.length > 0 && <span className="pill warn">Needs {plural(missing.length, "course")}</span>}
       </Pick>
     );
-  });
+  };
+  /** One role: who's on the crew, who could join, and (folded away) who isn't rated on these aircraft. */
+  const crewGroup = (role: Person["role"]) => {
+    const all = crewOf(role);
+    const rated = (p: Person) => types.size === 0 || [...types].some((t) => p.quals.includes(t));
+    const on = all.filter((p) => pool.has(p.id));
+    const could = all.filter((p) => !pool.has(p.id) && rated(p));
+    const other = all.filter((p) => !pool.has(p.id) && !rated(p));
+    const word = role === "Pilot" ? "pilots" : "maintainers";
+    return (
+      <>
+        <h4 className="form-section">{role === "Pilot" ? "Pilots" : "Maintainers"} on the crew <span className="chip">{on.length}</span></h4>
+        <div className="picker-row">{on.length ? on.map(chip) : <span className="muted small">None yet. Tap people below to add them.</span>}</div>
+        {could.length > 0 && (
+          <>
+            <p className="form-note" style={{ margin: "10px 0 6px" }}>Could join (rated on {types.size ? [...types].join(" or ") : "any type"}):</p>
+            <div className="picker-row">{could.map(chip)}</div>
+          </>
+        )}
+        {other.length > 0 && (
+          <details className="fold-more">
+            <summary>{plural(other.length, role === "Pilot" ? "other pilot" : "other maintainer")}, not rated on these aircraft</summary>
+            <div className="picker-row">{other.map(chip)}</div>
+          </details>
+        )}
+        {all.length === 0 && <span className="muted small">No {word} yet. Add them under Crew.</span>}
+      </>
+    );
+  };
 
   return (
     <Dialog wide title={isNew ? m.name || "New mission" : m.name || "Mission"} onClose={close}
@@ -168,7 +203,7 @@ function MissionDialog({ id, defaults }: Props) {
         { key: "crew", label: <>Crew <span className="chip">{pool.size}</span></> },
       ]}
       tab={tab} onTab={setTab}
-      foot={<Foot isNew={isNew} label="mission" disabled={!m.name.trim() || firstBad} onSave={save}
+      foot={<Foot isNew={isNew} label="mission" problem={!m.name.trim() ? "Give the mission a name first (Details tab)." : firstBad && "The first season's last day is before its first day."} onSave={save}
         onDelete={() => { remove("missions", m.id, `Deleted “${m.name}”${seasons.length ? ` and its ${plural(seasons.length, "season")}` : ""}`); close(); }} />}>
       {tab === "details" && (
         <div className="form-grid">
@@ -238,10 +273,8 @@ function MissionDialog({ id, defaults }: Props) {
       {tab === "crew" && (
         <>
           <p className="form-note" style={{ marginTop: 0 }}>The people who rotate through this mission. They're picked first when a season is filled, and only they need its training.</p>
-          <h4 className="form-section" style={{ marginTop: 14 }}>Pilots</h4>
-          <div className="picker-row">{crewChips("Pilot")}</div>
-          <h4 className="form-section">Maintainers</h4>
-          <div className="picker-row">{crewChips("Maintainer")}</div>
+          {crewGroup("Pilot")}
+          {crewGroup("Maintainer")}
         </>
       )}
     </Dialog>
@@ -522,7 +555,7 @@ function SeasonDialog({ id, defaults }: Props) {
         ...(issues.length ? [{ key: "problems", label: <>Problems <span className="chip">{issues.length}</span></>, alert: issues.some((i) => i.severity === "danger") }] : []),
       ]}
       tab={tab === "problems" && !issues.length ? "details" : tab} onTab={(t) => { setTab(t); setEditingShift(null); }}
-      foot={<Foot isNew={isNew} label="season" disabled={!mission || timeError} onSave={save}
+      foot={<Foot isNew={isNew} label="season" problem={!mission ? "Pick a mission first." : timeError && "The last day is before the first day (Details tab)."} onSave={save}
         onDelete={() => { remove("seasons", season.id, `Deleted the season ${fmtDates(season.start, season.end)}`); close(); }} />}>
       {(tab === "details" || (tab === "problems" && !issues.length)) && (
         <div className="form-grid">
@@ -574,7 +607,7 @@ function AircraftDialog({ id }: Props) {
   return (
     <Dialog title={existing ? <span style={{ fontFamily: "var(--zb-font-mono)" }}>{a.tail}</span> : "Add aircraft"} onClose={close}
       meta={existing && <><StatusPill status={a.status} /><span>{a.type}</span>{a.base && <>·<span>{a.base}</span></>}</>}
-      foot={<Foot isNew={!existing} label="aircraft" disabled={!tail || !a.type.trim() || taken}
+      foot={<Foot isNew={!existing} label="aircraft" problem={!tail ? "Type the tail number first." : !a.type.trim() ? "Type the aircraft type, like Bell 412." : taken && `${tail} is already in your fleet.`}
         onSave={() => { upsert("aircraft", { ...a, tail }); if (!existing) showToast(`Added ${tail}`); close(); }}
         onDelete={() => { remove("aircraft", a.id, `Deleted ${a.tail}`); close(); }} />}>
       <div className="form-grid">
@@ -631,7 +664,7 @@ function PersonDialog({ id, defaults }: Props) {
         { key: "training", label: <>Training <span className="chip">{p.training.length}</span></>, alert: notCurrent > 0 },
       ]}
       tab={tab} onTab={setTab}
-      foot={<Foot isNew={!existing} label={word} disabled={!p.name.trim()}
+      foot={<Foot isNew={!existing} label={word} problem={!p.name.trim() && "Type their name first (Details tab)."}
         onSave={() => { if (!p.name.trim()) { setTab("details"); return; } upsert("people", p); if (!existing) showToast(`Added ${p.name}`); close(); }}
         onDelete={() => { remove("people", p.id, `Deleted ${p.name} and their shifts`); close(); }} />}>
       {tab === "details" && (
@@ -706,7 +739,7 @@ function JobDialog({ id, defaults }: Props) {
   return (
     <Dialog title={existing ? j.title : "New maintenance job"} onClose={close}
       meta={existing && <>{ac && <b style={{ fontFamily: "var(--zb-font-mono)" }}>{ac.tail}</b>}<span>{j.kind}</span>·<span>{timeError ? "Check the dates" : fmtDates(j.start, j.end)}</span>{j.done && <span className="pill ok">Finished</span>}</>}
-      foot={<Foot isNew={!existing} label="job" disabled={!j.title.trim() || !j.aircraftId || timeError}
+      foot={<Foot isNew={!existing} label="job" problem={!j.title.trim() ? "Name the job first, like 100 hour inspection." : !j.aircraftId ? "Pick the aircraft." : timeError && "The last day is before the first day."}
         onSave={() => { upsert("jobs", j); if (!existing) showToast(`Added “${j.title}”`); close(); }}
         onDelete={() => { remove("jobs", j.id, `Deleted “${j.title}”`); close(); }} />}>
       <div className="form-grid">
@@ -761,7 +794,7 @@ function TimeOffDialog({ id, defaults }: Props) {
   return (
     <Dialog title={existing ? "Time off" : "Add time off"} onClose={close}
       meta={person && <><span>{person.name}</span>{!timeError && <>·<span>{fmtDates(t.start, t.end)}</span></>}</>}
-      foot={<Foot isNew={!existing} label="time off" disabled={!t.personId || timeError}
+      foot={<Foot isNew={!existing} label="time off" problem={!t.personId ? "Pick who's off." : timeError && "The last day is before the first day."}
         onSave={() => { upsert("timeOff", t); if (!existing) showToast("Added time off"); close(); }}
         onDelete={() => { remove("timeOff", t.id, "Deleted time off"); close(); }} />}>
       <div className="form-grid">
@@ -906,7 +939,7 @@ function TrainingDialog({ id }: Props) {
   return (
     <Dialog title={existing ? t.name || "Training" : "Add training"} onClose={close}
       meta={existing && <><span>{plural(holders, "person", "people")} on record</span>·<span>Needed by {plural(missions, "mission")}</span></>}
-      foot={<Foot isNew={!existing} label="training" disabled={!t.name.trim()}
+      foot={<Foot isNew={!existing} label="training" problem={!t.name.trim() && "Name the course first."}
         onSave={() => { upsert("trainings", t); if (!existing) showToast(`Added “${t.name}”`); close(); }}
         onDelete={() => { remove("trainings", t.id, `Deleted “${t.name}”${holders ? ` and ${plural(holders, "record")}` : ""}`); close(); }} />}>
       <div className="form-grid">
