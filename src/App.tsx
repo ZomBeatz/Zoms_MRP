@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  BookOpen,
   BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X,
 } from "lucide-react";
 import { useStore } from "./store";
@@ -18,7 +19,8 @@ import { TrainingPage } from "./pages/Training";
 import { SettingsPage } from "./pages/Settings";
 import { Dialogs } from "./dialogs";
 import { Welcome } from "./pages/Welcome";
-import { Help } from "./pages/Help";
+import { Guide } from "./pages/Guide";
+import { TourOverlay, useTour } from "./tour";
 
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
@@ -39,7 +41,6 @@ const typing = (e: KeyboardEvent) => {
 export default function App() {
   const { data, started, demo, canEdit, page, go, open, editing, toast, saveError, updateSettings, undo, redo, resetDemo, setDemo } = useStore();
   const [drawer, setDrawer] = useState(false);
-  const [help, setHelp] = useState(false);
   const collapsed = data.settings.sidebarCollapsed;
   const issues = useMemo(() => findIssues(data), [data]);
   const problems = issues.filter((i) => i.severity === "danger").length;
@@ -72,8 +73,7 @@ export default function App() {
         const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training" } as const)[page as "aircraft"] ?? "mission";
         open(kind, "new");
       } else if (e.key === "[") updateSettings({ sidebarCollapsed: !useStore.getState().data.settings.sidebarCollapsed });
-      else if (e.key === "?") setHelp(true);
-      else if (e.key === "Escape") setHelp(false);
+      else if (e.key === "?") useStore.getState().go("guide");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -125,6 +125,10 @@ export default function App() {
           </button>
         ))}
         <div className="nav-gap" />
+        <button className={`nav-item ${page === "guide" ? "active" : ""}`} onClick={() => navTo("guide")} title={collapsed ? "Guide" : undefined}>
+          <BookOpen size={16} />
+          {(!collapsed || drawer) && "Guide"}
+        </button>
         <button className={`nav-item ${page === "settings" ? "active" : ""}`} onClick={() => navTo("settings")} title={collapsed ? "Settings" : undefined}>
           <Cog size={16} />
           {(!collapsed || drawer) && "Settings"}
@@ -150,6 +154,7 @@ export default function App() {
         {demo && (
           <div className="banner">
             <span className="grow"><b>Live demo.</b> Try anything. Changes are only saved in this browser.</span>
+            <button className="btn sm" onClick={() => useTour.getState().start("basics")}>Take the tour</button>
             <button className="btn sm" onClick={resetDemo}>Reset demo</button>
             {isOnlineDemo
               ? <a className="btn sm primary" href={RELEASES_URL} target="_blank" rel="noreferrer">Get Zom's MRP</a>
@@ -165,12 +170,13 @@ export default function App() {
           {page === "maintenance" && <Maintenance />}
           {page === "training" && <TrainingPage />}
           {page === "reports" && <Reports />}
-          {page === "settings" && <SettingsPage onHelp={() => setHelp(true)} />}
+          {page === "settings" && <SettingsPage onHelp={() => navTo("guide")} />}
+          {page === "guide" && <Guide />}
         </div>
       </main>
 
       {editing && <Dialogs />}
-      {help && <Help onClose={() => setHelp(false)} />}
+      <TourOverlay />
       {toast && (
         <div className="toast" key={toast.id} role="status">
           {toast.text}

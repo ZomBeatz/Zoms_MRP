@@ -179,4 +179,4 @@ export interface AppData {
   settings: Settings;
 }
 
-export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "reports" | "settings";
+export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "reports" | "settings" | "guide";

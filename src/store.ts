@@ -115,6 +115,38 @@ const lastPage = (() => {
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
+/**
+ * The browser's (and a phone's) back button steps back through pages and forms: it closes the open
+ * form, or goes back to the form it came from, then to the page before. Each page change and each
+ * form adds a history entry holding what was showing.
+ */
+type Shown = { page: Page; editing: State["editing"] };
+// Closing a form steps back in history, which happens a moment later. Page changes and new forms
+// asked for in the meantime wait for it, so they land in order.
+let stepping = false;
+let queued: (() => void)[] = [];
+const afterStep = (fn: () => void) => (stepping ? (queued.push(fn), true) : false);
+function pushHistory(shown: Shown) {
+  try {
+    history.pushState({ mrp: true, ...shown }, "");
+  } catch { /* history can be unavailable in some embeds; back then just leaves */ }
+}
+if (typeof window !== "undefined") {
+  try {
+    history.replaceState({ mrp: true, page: lastPage, editing: null }, "");
+  } catch { /* as above */ }
+  window.addEventListener("popstate", (e) => {
+    const shown = e.state as (Shown & { mrp?: boolean }) | null;
+    if (shown?.mrp) useStore.setState({ page: shown.page, editing: shown.editing ?? null });
+    if (stepping) {
+      stepping = false;
+      const run = queued;
+      queued = [];
+      run.forEach((fn) => fn());
+    }
+  });
+}
+
 export const useStore = create<State>((set, get) => ({
   data: emptyData(), // filled in by `boot`, before the first screen draws
   started: false,
@@ -128,13 +160,29 @@ export const useStore = create<State>((set, get) => ({
   saveError: null,
 
   go: (page) => {
+    if (afterStep(() => get().go(page))) return;
     try {
       localStorage.setItem(LAST_PAGE, page);
     } catch { /* only a convenience */ }
+    if (page !== get().page) pushHistory({ page, editing: null });
     set({ page });
   },
-  open: (kind, id, defaults) => set({ editing: { kind, id, defaults } }),
-  close: () => set({ editing: null }),
+  open: (kind, id, defaults) => {
+    if (afterStep(() => get().open(kind, id, defaults))) return;
+    const editing = { kind, id, defaults };
+    pushHistory({ page: get().page, editing });
+    set({ editing });
+  },
+  close: () => {
+    // Step back over the form's history entry, so the phone's back button doesn't land on it again.
+    // That shows the form this one was opened from, if any (a mission's season, say).
+    if (stepping) return;
+    if (history.state?.editing) {
+      stepping = true;
+      set({ editing: null });
+      history.back();
+    } else set({ editing: null });
+  },
 
   change: (fn, message) => {
     if (!get().canEdit) {

@@ -241,6 +241,34 @@ button.line:hover { background: var(--zb-surface-2); }
 .cov-bar { position: relative; height: 18px; border-radius: 5px; background: color-mix(in srgb, var(--zb-ok) 30%, var(--zb-surface-2)); overflow: hidden; margin: 6px 0 2px; }
 .cov-bar .gap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, var(--zb-danger) 0 4px, color-mix(in srgb, var(--zb-danger) 55%, transparent) 4px 8px); }
 
+/* ---------- guide ---------- */
+.guide { max-width: 860px; }
+.guide p, .guide li { color: var(--zb-text-2); line-height: 1.6; }
+.guide b { color: var(--zb-text); }
+.guide ol, .guide ul { padding-left: 20px; }
+.guide .accent { color: var(--zb-accent); flex-shrink: 0; }
+.tour-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.tour-pick { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 14px 16px; border-radius: var(--zb-radius); background: var(--zb-surface); box-shadow: var(--zb-shadow); border: 1px solid transparent; }
+.tour-pick:hover { border-color: var(--zb-accent); }
+.guide-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 26px 0 0; padding: 12px 0; border-top: 1px solid var(--zb-border); border-bottom: 1px solid var(--zb-border); }
+.guide-toc a { font-size: 13px; color: var(--zb-text-2); text-decoration: none; padding: 3px 10px; border-radius: 999px; background: var(--zb-surface-2); }
+.guide-toc a:hover { color: var(--zb-accent); }
+.guide-section { scroll-margin-top: 16px; }
+.guide-section h2 { margin-bottom: 8px; }
+
+/* ---------- walkthrough ---------- */
+.tour { position: fixed; inset: 0; z-index: 250; pointer-events: none; }
+.tour-block { position: absolute; inset: 0; pointer-events: auto; }
+.tour-block.dim { background: #0007; }
+.tour-spot { position: absolute; border-radius: 10px; box-shadow: 0 0 0 3px var(--zb-accent), 0 0 0 9999px #0008; transition: top .2s, left .2s, width .2s, height .2s; pointer-events: none; }
+.tour-card { position: absolute; pointer-events: auto; background: var(--zb-surface); color: var(--zb-text); border-radius: var(--zb-radius-lg); box-shadow: var(--zb-shadow-lg); padding: 14px 16px 12px; border: 1px solid var(--zb-border); }
+.tour-card.docked { left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 16px); }
+.tour-card p { margin: 0 0 10px; font-size: 14px; line-height: 1.55; color: var(--zb-text-2); }
+.tour-dots { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.tour-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--zb-border); }
+.tour-dots span.on { background: var(--zb-accent); width: 16px; border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 300;
@@ -346,6 +374,7 @@ button.g-label:hover { background: var(--zb-surface-2); }
   .dialog-foot .btn { min-height: 40px; }
   .dialog-foot .left .label { display: none; }
   .stepper button { width: 40px; }
+  .banner { flex-wrap: wrap; }
   .dialog-tabs button { padding: 8px 9px; }
   .dialog-tabs .chip { display: none; }
   /* Keep messages clear of a form's buttons. */
