@@ -58,6 +58,8 @@ export function findTarget(target: Target | (() => Target) | undefined): HTMLEle
 
 /** Wait for something to show up (a page or form that just opened). */
 async function waitFor(t: Target | (() => Target), ms_ = 2000) {
+  // A target that says "nothing to point at right now" isn't worth waiting for.
+  if (typeof t === "function" && !t()) return null;
   for (let i = 0; i < ms_ / 50; i++) {
     const el = findTarget(t);
     if (el) return el;
@@ -301,7 +303,7 @@ export const SCENARIOS: Tour[] = [
         },
       },
       {
-        target: ".dialog-tabs", title: "Check its first season",
+        target: { sel: ".dialog-tabs button", text: "First season" }, title: "Check its first season",
         body: "The dates, the tail and the pilots on board came from the check. One thing is left: how the pilots rotate.",
         task: { say: "Tap the First season tab.", done: () => activeTab().startsWith("First season"), doIt: () => tab("First season") },
       },
@@ -426,7 +428,7 @@ export const SCENARIOS: Tour[] = [
         },
       },
       {
-        target: ".dialog .stepper", title: "One more pilot",
+        target: '.dialog button[aria-label="More pilots"]', title: "One more pilot",
         body: "Pilots at a time counts across all the job's aircraft.",
         task: { say: "Tap + next to Pilots at a time.", done: () => pilotsAtATime() > mark.pilots, doIt: () => click('.dialog button[aria-label="More pilots"]') },
       },
@@ -581,13 +583,13 @@ export const SETUP: Tour[] = [
       },
       {
         before: async () => { if (editing()?.kind === "person" && !activeTab().startsWith("Ratings")) await tab("Ratings"); },
-        target: ".dialog .picker-row", title: "What they can fly",
+        target: { sel: ".dialog .chip.pick", text: "AS350 B3" }, title: "What they can fly",
         body: "Rated on is the aircraft types they can fly. They're only offered for jobs on those types.",
         task: { say: "Tap AS350 B3.", done: () => pickOn("AS350 B3"), doIt: async () => { await tab("Ratings"); await tapPick("AS350 B3"); } },
       },
       {
         before: async () => { if (editing()?.kind === "person" && !activeTab().startsWith("Ratings")) await tab("Ratings"); },
-        target: { sel: ".dialog .picker-row", text: ICEFIELD }, title: "The mission they work",
+        target: { sel: ".dialog .chip.pick", text: ICEFIELD }, title: "The mission they work",
         body: "Works on is the missions they rotate through. It decides which training they need, and they're picked first when those missions are filled.",
         task: { say: `Tap ${ICEFIELD}.`, done: () => pickOn(ICEFIELD), doIt: async () => { await tab("Ratings"); await tapPick(ICEFIELD); } },
       },
@@ -654,7 +656,7 @@ const ALL = () => [...LESSONS, ...TOURS];
 
 interface TourState {
   tour: Tour | null; step: number; done: Record<string, true>;
-  start: (id: string) => void; stop: () => void; go: (n: number) => void;
+  start: (id: string, fresh?: boolean) => void; stop: () => void; go: (n: number) => void;
   /** The lesson after this one on the learning path, if any. */
   next: (id: string) => Tour | undefined;
 }
@@ -663,14 +665,16 @@ export const useTour = create<TourState>((set, get) => ({
   tour: null,
   step: 0,
   done: readDone(),
-  start: (id) => {
+  start: (id, fresh = true) => {
     const tour = ALL().find((t) => t.id === id);
     if (!tour) return;
     void (async () => {
       // The walkthroughs need the demo's data.
       if (!store().demo) await store().setDemo(true);
       if (store().editing) store().close();
-      await sleep(50);
+      // Started from the guide, a walkthrough begins on a fresh demo, so it goes the same way every time.
+      // Going on to the next lesson keeps what the last one did.
+      if (fresh) store().resetDemo(true);
       tour.reset?.();
       set({ tour, step: 0 });
     })();
@@ -719,14 +723,14 @@ export function TourOverlay() {
       if (s.page) {
         if (st.editing) st.close();
         if (st.page !== s.page) st.go(s.page);
-        await sleep(60);
+        await sleep(30);
       }
       await s.before?.();
-      const el = s.target ? await waitFor(s.target, 1500) : null;
+      const el = s.target ? await waitFor(s.target, 1200) : null;
       if (cancelled) return;
       // A tall target scrolls to its top, so the card at the bottom leaves its start in view.
       el?.scrollIntoView({ block: el.getBoundingClientRect().height > window.innerHeight * 0.4 ? "start" : "center", inline: "nearest" });
-      await sleep(120);
+      await sleep(40);
       if (cancelled) return;
       setRect(el?.getBoundingClientRect() ?? null);
       setReady(true);
@@ -736,8 +740,8 @@ export function TourOverlay() {
 
   // Follow the target as the page scrolls, resizes or changes.
   const measure = useCallback(() => {
-    if (!s?.target) return setRect(null);
-    setRect(findTarget(s.target)?.getBoundingClientRect() ?? null);
+    const r = s?.target ? findTarget(s.target)?.getBoundingClientRect() ?? null : null;
+    setRect((old) => (old && r && old.top === r.top && old.left === r.left && old.width === r.width && old.height === r.height) || (!old && !r) ? old : r);
   }, [s]);
   useLayoutEffect(() => {
     if (!tour) return;
@@ -755,9 +759,9 @@ export function TourOverlay() {
       if (s.task!.done()) {
         setDone(true);
         clearInterval(t);
-        setTimeout(() => { if (useTour.getState().step === step) go(step + 1); }, 1100);
+        setTimeout(() => { if (useTour.getState().step === step) go(step + 1); }, 600);
       }
-    }, 300);
+    }, 150);
     return () => clearInterval(t);
   }, [s, ready, done, step, go, doneAtStart]);
 
@@ -835,7 +839,7 @@ export function TourOverlay() {
             last && next ? (
               <>
                 <button className="btn sm" onClick={() => go(step + 1)}>Take a break</button>
-                <button className="btn sm primary" autoFocus onClick={() => { go(step + 1); setTimeout(() => useTour.getState().start(next.id), 50); }}>Next lesson</button>
+                <button className="btn sm primary" autoFocus onClick={() => { go(step + 1); setTimeout(() => useTour.getState().start(next.id, false), 50); }}>Next lesson</button>
               </>
             ) : <button className="btn sm primary" autoFocus onClick={() => go(step + 1)}>{last ? "Finish" : "Next"}</button>
           )}

@@ -59,7 +59,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <p className="small muted" style={{ margin: "6px 0 0" }}>
               Fills Zom's MRP with made-up aircraft, crew, training and missions so you can see how it works. Your own data is kept apart and comes back when you turn this off.
             </p>
-            {demo && <button className="btn sm" style={{ marginTop: 10 }} onClick={resetDemo}>Reset demo</button>}
+            {demo && <button className="btn sm" style={{ marginTop: 10 }} onClick={() => resetDemo()}>Reset demo</button>}
           </section>
         )}
 
