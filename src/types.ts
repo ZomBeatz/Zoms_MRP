@@ -100,13 +100,24 @@ export interface Season {
   aircraftIds: ID[];
   /** Pilots working the job at every moment (across all its aircraft). */
   pilotsNeeded: number;
-  /** Maintainers on the job at every moment. 0 = none. */
+  /** Maintainers on the job at once, when they're needed. 0 = none. */
   maintainersNeeded: number;
+  /** When maintainers are needed (missing = all the time). */
+  maintainerNeed?: MaintainerNeed;
   /** How pilots and maintainers rotate through the job (they can differ). null = no set pattern. */
   pilotRotation: Rotation | null;
   maintainerRotation: Rotation | null;
   status: MissionStatus;
   notes: string;
+}
+
+/**
+ * When a season needs its maintainers: all the time, some days each week (`days` a week), for set-up and
+ * tear-down (`days` at each end), or on call (booked when needed, never a gap).
+ */
+export interface MaintainerNeed {
+  mode: "always" | "weekly" | "ends" | "oncall";
+  days: number;
 }
 
 /**

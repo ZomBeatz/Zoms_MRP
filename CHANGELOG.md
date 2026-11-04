@@ -1,6 +1,6 @@
 # Changelog
 
-## Not released yet
+## 0.2.2
 
 **Fixing problems**
 - Every problem has a button for its fix that opens the right form, on the right tab, scrolled to what needs changing and outlined in red: an open seat, a shift to swap someone out of, the course to record, the rating to add, the aircraft or dates to change. When there's another way out, it has its own button too ("Pick another aircraft" or "Move the maintenance").
@@ -14,7 +14,27 @@
 **Safer**
 - **Clear all data** says exactly what it deletes, offers a backup first, and needs DELETE typed before it goes.
 
+**Picking dates**
+- Every date has a calendar beside it: a month at a time with big days to tap, the chosen days shaded, and the number of days shown. Tap the first day, then the last.
+- Days that can't be picked are greyed out: the last day can't be before the first, and a pilot's shift stays inside its season.
+
+**Aircraft**
+- A season's aircraft are tail numbers to tap, grouped by type, each saying whether it's free for the season's dates or what it's busy with, instead of a drop-down.
+- An aircraft's form lists every pilot and maintainer to rate on its type with a tap, so "not rated" is fixed where the aircraft is.
+
+**Maintainers when they're needed**
+- Each season picks when it needs maintainers: **All the time**, **Days a week** (like 2 days each week), **Start and end** (set-up and tear-down days), or **On call** (never a gap). Problems and **Fill the schedule** follow the choice.
+
+**Inspections and maintenance**
+- A new job offers **Start from** buttons: the jobs you've planned before, with their usual length, kind and grounding, and common starters (100 hour, annual and phase inspections, engine change, pre-flight).
+- **Who's doing it** says to tap the maintainers, lists free ones rated on the aircraft first, and offers **Add a maintainer** when there are none. A job with nobody on it opens right there.
+- The Guide explains how to plan an inspection and put maintainers on it.
+
+**Safer, easier**
+- Clicking outside a form no longer closes it and loses what was typed; Cancel, ✕ or Esc do.
+
 **Desktop app**
+- Saving to Downloads works: **Save a backup**, **Export to Excel** and the PDF and Excel reports all failed in the installed app, because it wasn't allowed to save there.
 - **Settings › Your data** shows the folder the plan is kept in, and **Open folder** shows the file in Finder or Explorer.
 
 ## 0.2.1
@@ -28,9 +48,6 @@
 - The PDF has a summary page (the numbers, days by mission, aircraft free each day and each tail's use), the fleet and crew boards colored like the app, the missions with how well each is crewed, crew workload, a training grid (people down the side, courses across), maintenance and problems. It looks the same from every version, the Mac app included.
 - The Excel report has the same parts as sheets: tiles and in-cell bars on the summary, the boards colored day by day (week by week for long periods), and every sheet printing landscape, one page wide.
 - The old **Print** buttons on Reports and the Schedule are gone; the reports replace them.
-
-**Desktop app**
-- Saving to Downloads works: **Save a backup**, **Export to Excel** and the PDF and Excel reports all failed in the installed app, because it wasn't allowed to save there.
 
 **Moving a plan**
 - **Restore a backup** brings the plan's hitch limits and training warning days with it, so a plan moved from the desktop app to a server (or back) keeps its rules. Theme and layout stay each device's own.

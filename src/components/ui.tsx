@@ -25,7 +25,8 @@ export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs,
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
   return (
-    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    // Clicking outside doesn't close it: a stray click shouldn't throw away what's been typed.
+    <div className="backdrop">
       <div className={`dialog ${wide ? "wide" : ""} ${tabs ? "tabbed" : ""}`} role="dialog" aria-modal="true">
         <div className="dialog-head">
           <div className="dialog-title">
