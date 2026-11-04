@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } from "../components/timeline";
 import { Wrench } from "lucide-react";
 import { bookings } from "../bookings";
@@ -9,6 +9,8 @@ import { dayAt, fmtDates, fmtRange, ms, overlaps, toWhen } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, StatusPill } from "../components/ui";
 import type { AppData, Booking, Person, Settings } from "../types";
+import { format } from "date-fns";
+import { partnerOf, trim, type Edge } from "../trim";
 
 /**
  * The Gantt chart: time runs left to right, one row per mission, aircraft or person.
@@ -26,6 +28,8 @@ interface Bar {
   style?: CSSProperties;
   onClick: () => void;
   icon?: ReactNode;
+  /** A crew shift: its ends can be dragged to change its dates. */
+  shiftId?: string;
 }
 
 interface Row {
@@ -74,6 +78,46 @@ export function Schedule({ issues }: { issues: Issue[] }) {
   const sections = useMemo(() => buildRows(data, view, from, to, issues, open, missionId), [data, view, from, to, issues, open, missionId]);
   const shown = sections.filter((s) => s.rows.length);
 
+  // Dragging a shift's end, like trimming a clip; a handover (the next shift starting that day) moves with it.
+  const change = useStore((s) => s.change);
+  const [trimming, setTrimming] = useState<{ shiftId: string; edge: Edge; x0: number; dayPx: number; by: number; solo: boolean } | null>(null);
+  const trimmed = useRef(false);
+  const preview = trimming ? trim(data, trimming.shiftId, trimming.edge, trimming.by, trimming.solo) : null;
+  const previewOf = (id?: string) => (preview && id ? preview.data.shifts.find((s) => s.id === id && (s.id === trimming!.shiftId || s.id === preview.partner?.id)) : undefined);
+  // Shifts handing over to someone at their end (or from someone at their start): a seam to show.
+  const seams = useMemo(() => {
+    // Only where the handover partner is known (linked, or the only one that meets it).
+    const role = new Map(data.people.map((p) => [p.id, p.role]));
+    const starts = new Set(data.shifts.map((s) => `${s.seasonId}|${role.get(s.personId)}|${s.start}`));
+    return new Set(data.shifts.filter((s) => starts.has(`${s.seasonId}|${role.get(s.personId)}|${s.end}`) && partnerOf(data, s, "end")).map((s) => s.id));
+  }, [data]);
+  const startTrim = (e: React.PointerEvent, shiftId: string, edge: Edge) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const lane = (e.currentTarget as HTMLElement).closest(".g-lane")!.getBoundingClientRect();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setTrimming({ shiftId, edge, x0: e.clientX, dayPx: lane.width / span, by: 0, solo: e.altKey });
+  };
+  const moveTrim = (e: React.PointerEvent) => {
+    if (!trimming) return;
+    const by = Math.round((e.clientX - trimming.x0) / trimming.dayPx);
+    if (by !== trimming.by || e.altKey !== trimming.solo) setTrimming({ ...trimming, by, solo: e.altKey });
+  };
+  const endTrim = () => {
+    if (!trimming) return;
+    const t = trimming;
+    setTrimming(null);
+    const r = trim(data, t.shiftId, t.edge, t.by, t.solo);
+    if (!r.moved) return;
+    trimmed.current = true;
+    setTimeout(() => (trimmed.current = false), 0);
+    const s = r.data.shifts.find((x) => x.id === t.shiftId)!;
+    const who = (id: string) => data.people.find((p) => p.id === id)?.name ?? "Someone";
+    const day = format(t.edge === "end" ? ms(s.end) - 1 : ms(s.start), "MMM d");
+    change(() => r.data, `${who(s.personId)}'s ${t.edge === "end" ? "last" : "first"} day is now ${day}${r.partner ? `; ${who(r.partner.personId)} ${t.edge === "end" ? "starts" : "finishes"} ${t.edge === "end" ? format(ms(s.end), "MMM d") : format(ms(s.start) - 1, "MMM d")}` : ""}`);
+  };
+
   const lane = (r: Row) => {
     const packed = pack(r.bars.filter((b) => b.b > from && b.a < to));
     const tracks = packed.tracks ?? 1;
@@ -94,23 +138,40 @@ export function Schedule({ issues }: { issues: Issue[] }) {
         <LaneBackdrop tl={tl} />
         {r.rotationOff?.map(([a, b], i) => b > from && a < to && <div key={`r${i}`} className="g-offrot" title="Off rotation" style={{ left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%` }} />)}
         {r.shade?.map(([a, b], i) => b > from && a < to && <div key={i} className="g-off" style={{ left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%` }} />)}
-        {packed.map(({ bar, track }) => (
+        {packed.map(({ bar, track }) => {
+          const pv = previewOf(bar.shiftId);
+          const a = pv ? ms(pv.start) : bar.a, b = pv ? ms(pv.end) : bar.b;
+          const live = !!pv;
+          return (
           <button
             key={bar.key}
-            className={`slot ${bar.className ?? ""}`}
-            title={bar.tip}
-            onClick={bar.onClick}
+            className={`slot ${bar.className ?? ""} ${bar.shiftId ? "trimmable" : ""} ${live ? "trimming" : ""}`}
+            title={bar.shiftId ? `${bar.tip}\nDrag either end to change the dates.` : bar.tip}
+            onClick={() => !trimmed.current && bar.onClick()}
             style={{
               ...bar.style,
-              left: `${pct(bar.a)}%`,
-              width: `max(4px, calc(${pct(bar.b) - pct(bar.a)}% - 2px))`,
+              left: `${pct(a)}%`,
+              width: `max(4px, calc(${pct(b) - pct(a)}% - 2px))`,
               ...(tracks > 1 ? { top: 5 + track * trackH, bottom: "auto", height: trackH - 3 } : {}),
             }}
           >
             <span className="t">{bar.icon}{bar.title}</span>
             {bar.sub && trackH > 30 && <span className="s">{bar.sub}</span>}
+            {bar.shiftId && (["start", "end"] as const).map((edge) => (
+              <span key={edge} className={`slot-edge ${edge}`} aria-hidden="true"
+                onPointerDown={(e) => startTrim(e, bar.shiftId!, edge)} onPointerMove={moveTrim} onPointerUp={endTrim} onPointerCancel={() => setTrimming(null)}
+                onClick={(e) => e.stopPropagation()} />
+            ))}
+            {bar.shiftId && seams.has(bar.shiftId) && <span className="slot-seam" aria-hidden="true" title="Handover: dragging this end moves the next person's start too (hold Alt or Option to move just this one)">⇄</span>}
+            {live && trimming && (pv!.id === trimming.shiftId) && (
+              <span className={`trim-tip ${trimming.edge}`}>
+                {trimming.edge === "end" ? `Last day ${format(b - 1, "MMM d")}` : `First day ${format(a, "MMM d")}`}
+                {preview?.partner ? ` ⇄ ${data.people.find((p) => p.id === preview.partner!.personId)?.name ?? ""}` : ""}
+              </span>
+            )}
           </button>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -264,7 +325,7 @@ function buildRows(
               key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: p.role === "Pilot" ? "Flying" : "On call", sub: fmtDates(s.start, s.end),
               tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}`,
               className: personTrouble.has(`${p.id}:${m.id}`) || personTrouble.has(`${p.id}:`) ? "problem" : "",
-              style: slotStyle(missionLook(m)), onClick: () => open("season", m.id),
+              style: slotStyle(missionLook(m)), onClick: () => open("season", m.id), shiftId: s.id,
             })),
             shade: data.timeOff.filter((t) => t.personId === p.id).map((t) => [ms(t.start), ms(t.end)]),
           });
@@ -350,7 +411,7 @@ function buildRows(
               key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: m.name, sub: tails,
               tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}\n${tails}`,
               className: `${m.status === "Cancelled" ? "cancelled" : ""} ${personTrouble.has(`${p.id}:${m.id}`) || personTrouble.has(`${p.id}:`) ? "problem" : ""}`,
-              style: slotStyle(missionLook(m)), onClick: () => open("season", m.id),
+              style: slotStyle(missionLook(m)), onClick: () => open("season", m.id), shiftId: s.id,
             };
           })
           .filter((b): b is Bar => !!b),

@@ -32,6 +32,14 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
     ],
   },
   {
+    q: "Move a shift's first or last day",
+    steps: [
+      <>On the <b>Schedule</b>, find the shift (the <b>Crew</b> view is handiest) and grab either end: the cursor turns into ↔.</>,
+      <>Drag left or right. The new day shows above the bar; let go to keep it (Undo is in the message).</>,
+      <>Where someone takes over from them (⇄ on the bar), their replacement's first day moves with it, so the seat stays covered. Hold <b>Alt</b> (<b>Option</b> on a Mac) to move just the one.</>,
+    ],
+  },
+  {
     q: "Swap one pilot for another",
     steps: [
       <>Open the season: tap its bar on the <b>Schedule</b>, or go through <b>Missions</b> › the mission › <b>Seasons</b>.</>,

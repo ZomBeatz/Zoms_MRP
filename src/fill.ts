@@ -108,7 +108,10 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     if (role === "Maintainer" && (season.maintainerNeed?.mode ?? "always") !== "always")
       last = Math.min(last, gap.days ? dayAt(d, gap.days) : Infinity);
     while (end < last && canWork(pick, end) && fits(pick, d, dayAt(end, 1))) end = dayAt(end, 1);
-    const shift: Shift = { id: uid(), seasonId: season.id, personId: pick.id, start: toWhen(d), end: toWhen(end) };
+    // Taking over from someone whose shift on this job ends today (in this role, not already handed over).
+    const from_ = current.shifts.find((x) => x.seasonId === season.id && ms(x.end) === d && x.personId !== pick.id
+      && current.people.find((p) => p.id === x.personId)?.role === role && !current.shifts.some((y) => y.after === x.id));
+    const shift: Shift = { id: uid(), seasonId: season.id, personId: pick.id, start: toWhen(d), end: toWhen(end), ...(from_ ? { after: from_.id } : {}) };
     added.push(shift);
     current = { ...current, shifts: [...current.shifts, shift] };
     busyOf(pick).push([d, end]);
