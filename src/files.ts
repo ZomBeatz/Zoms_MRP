@@ -24,3 +24,21 @@ export async function showInFolder(path: string) {
   const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
   await revealItemInDir(path);
 }
+
+/** In the desktop app, where the plan file and its daily copies are kept. */
+export async function dataFolder(): Promise<string> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("data_folder");
+}
+
+/** Show the plan file in Finder or Explorer (or just open its folder if there's no file yet). */
+export async function openDataFolder() {
+  const dir = await dataFolder();
+  const opener = await import("@tauri-apps/plugin-opener");
+  const sep = dir.includes("\\") ? "\\" : "/";
+  try {
+    await opener.revealItemInDir(`${dir}${sep}mrp.json`);
+  } catch {
+    await opener.openPath(dir);
+  }
+}

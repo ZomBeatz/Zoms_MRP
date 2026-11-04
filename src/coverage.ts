@@ -21,6 +21,14 @@ export interface Issue {
   personId?: string;
   aircraftId?: string;
   jobId?: string;
+  /** The shift, course or time off it's about, so it can be opened right where it's fixed. */
+  shiftId?: string;
+  trainingId?: string;
+  timeOffId?: string;
+  /** The other half of a clash (a second season, shift or job). */
+  otherSeasonId?: string;
+  otherShiftId?: string;
+  otherJobId?: string;
 }
 
 /** Spans of [from, to] and how many of the intervals cover each one. */
@@ -116,7 +124,7 @@ export function findIssues(data: AppData): Issue[] {
       }
       for (const o of missions) {
         if (o.id > m.id && o.aircraftIds.includes(ac.id) && overlaps(from, to, ms(o.start), ms(o.end)))
-          issues.push({ id: `acdbl-${m.id}-${o.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, ms(o.start)), seasonId: m.id, aircraftId: ac.id });
+          issues.push({ id: `acdbl-${m.id}-${o.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, ms(o.start)), seasonId: m.id, aircraftId: ac.id, otherSeasonId: o.id });
       }
     }
 
@@ -149,15 +157,15 @@ export function findIssues(data: AppData): Issue[] {
     // Qualified on at least one of the job's aircraft types.
     const types = seasonTypes(data, m);
     if (types.length && !types.some((t) => p.quals.includes(t)))
-      issues.push({ id: `qual-${s.id}`, severity: "danger", title: `${p.name} isn't qualified on the ${types.join(" or ")}`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Swap them out or add the qualification.`, at: ms(s.start), seasonId: m.id, personId: p.id });
+      issues.push({ id: `qual-${s.id}`, severity: "danger", title: `${p.name} isn't qualified on the ${types.join(" or ")}`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Swap them out or add the qualification.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
     // Booked on their own off days.
     if (p.rotation && !onRotationFor(p, ms(s.start), ms(s.end)))
-      issues.push({ id: `offrot-${s.id}`, severity: "warn", title: `${p.name} is booked on their days off`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Their rotation is ${fmtRotation(p.rotation)}.`, at: ms(s.start), seasonId: m.id, personId: p.id });
+      issues.push({ id: `offrot-${s.id}`, severity: "warn", title: `${p.name} is booked on their days off`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Their rotation is ${fmtRotation(p.rotation)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
     // Maintainers often start before the mission (pre-flight) and stay after; pilots fly inside it.
     if (p.role === "Pilot" && (ms(s.start) < ms(m.start) || ms(s.end) > ms(m.end)))
-      issues.push({ id: `outside-${s.id}`, severity: "warn", title: `${p.name}'s shift runs outside “${m.name}”`, detail: `The shift is ${fmtRange(s.start, s.end)}; the mission is ${fmtRange(m.start, m.end)}.`, at: ms(s.start), seasonId: m.id, personId: p.id });
+      issues.push({ id: `outside-${s.id}`, severity: "warn", title: `${p.name}'s shift runs outside “${m.name}”`, detail: `The shift is ${fmtRange(s.start, s.end)}; the mission is ${fmtRange(m.start, m.end)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
     if (!(ms(s.end) > ms(s.start)))
-      issues.push({ id: `stime-${s.id}`, severity: "danger", title: `${p.name}'s shift ends before it starts`, detail: `On “${m.name}”.`, at: ms(s.start), seasonId: m.id, personId: p.id });
+      issues.push({ id: `stime-${s.id}`, severity: "danger", title: `${p.name}'s shift ends before it starts`, detail: `On “${m.name}”.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
   }
   for (const j of data.jobs) {
     if (j.done) continue;
@@ -177,30 +185,36 @@ export function findIssues(data: AppData): Issue[] {
         const x = duty[i], y = duty[k];
         if (y.a >= x.b) break;
         if (x.seasonId && x.seasonId === y.seasonId) continue; // two shifts on one season: a seat swap
-        issues.push({ id: `dbl-${p.id}-${x.a}-${y.a}`, severity: "danger", title: `${p.name} is booked twice`, detail: `“${x.label}” and “${y.label}” overlap, ${range(Math.max(x.a, y.a), Math.min(x.b, y.b))}.`, at: Math.max(x.a, y.a), personId: p.id, seasonId: x.seasonId ?? y.seasonId, jobId: x.jobId ?? y.jobId });
+        issues.push({ id: `dbl-${p.id}-${x.a}-${y.a}`, severity: "danger", title: `${p.name} is booked twice`, detail: `“${x.label}” and “${y.label}” overlap, ${range(Math.max(x.a, y.a), Math.min(x.b, y.b))}.`, at: Math.max(x.a, y.a), personId: p.id,
+          seasonId: x.seasonId, shiftId: x.shiftId, jobId: x.jobId, otherSeasonId: y.seasonId, otherShiftId: y.shiftId, otherJobId: y.jobId });
       }
     for (const t of data.timeOff.filter((t) => t.personId === p.id))
       for (const d of duty)
         if (overlaps(d.a, d.b, ms(t.start), ms(t.end)))
-          issues.push({ id: `off-${t.id}-${d.a}`, severity: "danger", title: `${p.name} is off${t.reason ? ` (${t.reason})` : ""}`, detail: `But booked on “${d.label}”, ${range(d.a, d.b)}.`, at: d.a, personId: p.id, seasonId: d.seasonId, jobId: d.jobId });
+          issues.push({ id: `off-${t.id}-${d.a}`, severity: "danger", title: `${p.name} is off${t.reason ? ` (${t.reason})` : ""}`, detail: `But booked on “${d.label}”, ${range(d.a, d.b)}.`, at: d.a, personId: p.id, seasonId: d.seasonId, shiftId: d.shiftId, jobId: d.jobId, timeOffId: t.id });
 
     // Hitches: bookings with fewer than the minimum days off between them count as one stretch on.
     let first = -1, last = -1;
+    // The booking that takes the stretch past the limit: where someone else can be rotated in.
+    let over: (typeof duty)[number] | undefined;
     const flush = () => {
       // Rounded, so a day that changes the clock (23 or 25 hours) still counts as one day.
       const days = Math.round(((last - first) / DAY) * 10) / 10;
       if (first >= 0 && days > maxDaysOn)
-        issues.push({ id: `duty-${p.id}-${first}`, severity: "danger", title: `${p.name} is on for ${fmtDays(days)} in a row`, detail: `${range(first, last)}. The most is ${plural(maxDaysOn, "day")}. Rotate someone in.`, at: first, personId: p.id });
+        issues.push({ id: `duty-${p.id}-${first}`, severity: "danger", title: `${p.name} is on for ${fmtDays(days)} in a row`, detail: `${range(first, last)}. The most is ${plural(maxDaysOn, "day")}. Rotate someone in.`, at: first, personId: p.id,
+          seasonId: over?.seasonId, shiftId: over?.shiftId, jobId: over?.jobId });
     };
     for (const d of duty) {
       if (first >= 0 && Math.round(((d.a - last) / DAY) * 10) / 10 < minDaysOff) {
+        if (!over && Math.round(((Math.max(last, d.b) - first) / DAY) * 10) / 10 > maxDaysOn) over = d;
         if (d.a > last)
-          issues.push({ id: `rest-${p.id}-${last}`, severity: "warn", title: `${p.name} gets only ${fmtDays((d.a - last) / DAY)} off`, detail: `Before “${d.label}”. The minimum is ${plural(minDaysOff, "day")}.`, at: d.a, personId: p.id, seasonId: d.seasonId, jobId: d.jobId });
+          issues.push({ id: `rest-${p.id}-${last}`, severity: "warn", title: `${p.name} gets only ${fmtDays((d.a - last) / DAY)} off`, detail: `Before “${d.label}”. The minimum is ${plural(minDaysOff, "day")}.`, at: d.a, personId: p.id, seasonId: d.seasonId, shiftId: d.shiftId, jobId: d.jobId });
         last = Math.max(last, d.b);
       } else {
         flush();
         first = d.a;
         last = d.b;
+        over = Math.round(((d.b - d.a) / DAY) * 10) / 10 > maxDaysOn ? d : undefined;
       }
     }
     flush();
@@ -221,7 +235,7 @@ export function findIssues(data: AppData): Issue[] {
         id: `train-${s.id}-${tid}`, severity: "danger",
         title: st.state === "missing" ? `${p.name} hasn't done ${t.name}` : st.state === "expired" ? `${p.name}'s ${t.name} has run out` : `${p.name}'s ${t.name} runs out during “${m.name}”`,
         detail: `“${m.name}” needs it.${st.expires ? ` It ${st.state === "expired" ? "ran out" : "runs out"} ${fmtDate(st.expires)}.` : ""} Swap them out or record the training.`,
-        at: ms(s.start), seasonId: m.id, personId: p.id,
+        at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id, trainingId: tid,
       });
     }
   }
@@ -239,10 +253,10 @@ export function findIssues(data: AppData): Issue[] {
       const needs = needers.length === 1 ? "needs" : "need";
       if (!latest || ms(`${latest}T00:00`) <= now)
         issues.push({ id: `lapsed-${p.id}-${tid}`, severity: "warn", title: latest ? `${p.name}'s ${t.name} has run out` : `${p.name} hasn't done ${t.name}`,
-          detail: `${missions} ${needs} it, so they can't be booked there until it's done.`, at: now, personId: p.id });
+          detail: `${missions} ${needs} it, so they can't be booked there until it's done.`, at: now, personId: p.id, trainingId: tid });
       else if (ms(`${latest}T00:00`) <= dayAt(now, data.settings.expiryWarningDays))
         issues.push({ id: `renew-${p.id}-${tid}`, severity: "warn", title: `${p.name}'s ${t.name} runs out ${fmtDate(latest)}`,
-          detail: `${missions} ${needs} it. Book the renewal before then.`, at: ms(`${latest}T00:00`), personId: p.id });
+          detail: `${missions} ${needs} it. Book the renewal before then.`, at: ms(`${latest}T00:00`), personId: p.id, trainingId: tid });
     }
   }
 

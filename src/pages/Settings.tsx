@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
-import { Download, FileSpreadsheet, FlaskConical, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
-import { Field, NumberInput } from "../components/ui";
+import { Dialog, Field, NumberInput } from "../components/ui";
 import { migrate } from "../migrate";
 import { downloadWorkbook } from "../excel";
-import { saveFile, showInFolder } from "../files";
+import { dataFolder, openDataFolder, saveFile, showInFolder } from "../files";
 import { isDesktopApp, isOnlineDemo, isServerBuild, withDemo } from "../platform";
 import { serverUser } from "../backends/server";
 import { DEMO_KEY } from "../backends";
@@ -18,6 +18,12 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   const { theme, rules } = data.settings;
   const fileRef = useRef<HTMLInputElement>(null);
   const [sureDemo, setSureDemo] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  // The desktop app's data folder, shown with a button to open it.
+  const [folder, setFolder] = useState<string | null>(null);
+  useEffect(() => {
+    if (isDesktopApp) dataFolder().then(setFolder, () => setFolder(null));
+  }, []);
   const hasDemo = demo || (() => {
     try {
       return !!localStorage.getItem(DEMO_KEY);
@@ -46,6 +52,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   return (
     <>
       <div className="page-head"><h1>Settings</h1></div>
+      {clearing && <ClearAllDialog onBackup={backup} onClose={() => setClearing(false)} onClear={() => { clearAll(); setClearing(false); }} />}
       <div style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 14 }}>
         {isServerBuild && <ServerSettings />}
         <section className="panel">
@@ -108,7 +115,13 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
                   ? "Everything is saved on this computer. Save a backup now and then."
                   : "Everything is saved on this computer, in this browser. Save a backup now and then."}
           </p>
+          {isDesktopApp && !demo && folder && (
+            <p className="small muted" style={{ marginTop: 0, wordBreak: "break-all" }}>Saved in <code>{folder}</code></p>
+          )}
           <div className="row gap wrap">
+            {isDesktopApp && !demo && (
+              <button className="btn" onClick={() => openDataFolder().catch(() => showToast("Couldn't open the folder."))}><FolderOpen size={14} /> Open folder</button>
+            )}
             <button className="btn" onClick={backup}><Download size={14} /> Save a backup</button>
             <button className="btn" onClick={() => downloadWorkbook(data).then((where) => showToast("Saved to Downloads. Post it in a Teams channel to share it.", where ? { label: "Show", run: () => showInFolder(where) } : undefined), () => showToast("Couldn't make the Excel file. Try again."))}>
               <FileSpreadsheet size={14} /> Export to Excel
@@ -118,7 +131,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               <>
                 <button className="btn" onClick={() => fileRef.current?.click()}><Upload size={14} /> Restore a backup…</button>
                 <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) restore(f); }} />
-                <button className="btn danger" onClick={() => clearAll()}>Clear all {demo ? "demo " : ""}data</button>
+                <button className="btn danger" onClick={() => setClearing(true)}>Clear all {demo ? "demo " : ""}data…</button>
               </>
             )}
           </div>
@@ -141,5 +154,40 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
         </section>
       </div>
     </>
+  );
+}
+
+/**
+ * Clearing everything is the one change that's hard to come back from (Undo only lasts until the app
+ * closes), so it says what goes, offers a backup first, and needs the word DELETE typed.
+ */
+function ClearAllDialog({ onBackup, onClose, onClear }: { onBackup: () => void; onClose: () => void; onClear: () => void }) {
+  const { data, demo } = useStore();
+  const [typed, setTyped] = useState("");
+  const ready = typed.trim().toUpperCase() === "DELETE";
+  const counts: [number, string, string][] = [
+    [data.aircraft.length, "aircraft", "aircraft"], [data.people.length, "person", "people"], [data.missions.length, "mission", "missions"],
+    [data.seasons.length, "season", "seasons"], [data.shifts.length, "shift", "shifts"], [data.jobs.length, "maintenance job", "maintenance jobs"],
+    [data.trainings.length, "training course", "training courses"], [data.timeOff.length, "time-off entry", "time-off entries"],
+  ];
+  const what = counts.filter(([n]) => n > 0).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`).join(", ");
+  return (
+    <Dialog title={`Delete all ${demo ? "demo " : ""}data?`} onClose={onClose}
+      foot={<>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn danger solid" disabled={!ready} onClick={onClear}>Delete everything</button>
+      </>}>
+      <div className="clear-warning">
+        <p style={{ marginTop: 0 }}>
+          <b>This deletes {what || "everything"}.</b>{" "}
+          {isServerBuild && !demo ? "It's the whole team's plan: everyone signed in loses it too." : "Your settings stay."}
+        </p>
+        <p>Save a backup first if there's any chance you'll want it back. <b>Undo</b> works only until the app is closed.</p>
+        <button className="btn" onClick={onBackup}><Download size={14} /> Save a backup first</button>
+        <Field label="Type DELETE to confirm" full>
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="DELETE" aria-label="Type DELETE to confirm" />
+        </Field>
+      </div>
+    </Dialog>
   );
 }

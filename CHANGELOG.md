@@ -1,5 +1,22 @@
 # Changelog
 
+## Not released yet
+
+**Fixing problems**
+- Every problem has a button for its fix that opens the right form, on the right tab, scrolled to what needs changing and outlined in red: an open seat, a shift to swap someone out of, the course to record, the rating to add, the aircraft or dates to change. When there's another way out, it has its own button too ("Pick another aircraft" or "Move the maintenance").
+- A season's own Problems tab fixes things in place: it switches to the tab and points instead of opening the season again.
+- When nobody can take an open seat, the season says why for the people closest to it (not rated on the type, training run out, time off, off rotation) with a button to fix each.
+- The Overview's problem list has **Show all** instead of stopping at ten.
+
+**Confirming**
+- **Confirm** buttons on planned seasons: on the Overview's Coming up, the Missions page and a mission's seasons, with Undo. In a season, the status is a row of buttons, and a planned one has **Confirm** at the top.
+
+**Safer**
+- **Clear all data** says exactly what it deletes, offers a backup first, and needs DELETE typed before it goes.
+
+**Desktop app**
+- **Settings › Your data** shows the folder the plan is kept in, and **Open folder** shows the file in Finder or Explorer.
+
 ## 0.2.1
 
 **The app opens empty**

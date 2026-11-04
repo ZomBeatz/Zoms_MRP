@@ -1,30 +1,49 @@
-import { useMemo } from "react";
-import { AlertTriangle, BookOpen, CheckCircle2, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, BookOpen, Check, CheckCircle2, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
 import { missionCoverage, type Issue } from "../coverage";
 import { format } from "date-fns";
-import { dayAt, fmtRange, ms, overlaps, plural, today } from "../time";
+import { dayAt, fmtRange, ms, overlaps, today } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { StatusPill } from "../components/ui";
 import { fleetUse } from "../fleet";
 import { seasonTails } from "../rotation";
 import { withDemo } from "../platform";
 import { Setup } from "./Guide";
+import { fixesFor, type Fix } from "../fixes";
+import type { Booking } from "../types";
 
-/** Open whatever an issue is about, so it can be fixed in one click. */
-export function useOpenIssue() {
-  const open = useStore((s) => s.open);
-  return (i: Issue) => {
-    if (i.seasonId) open("season", i.seasonId);
-    else if (i.jobId) open("job", i.jobId);
-    else if (i.personId) open("person", i.personId);
-    else if (i.aircraftId) open("aircraft", i.aircraftId);
-  };
+/** One tap to confirm a planned season, with Undo in the message. */
+export function ConfirmButton({ season }: { season: Pick<Booking, "id" | "name" | "start" | "end" | "status"> }) {
+  const change = useStore((s) => s.change);
+  if (season.status !== "Planned") return null;
+  return (
+    <button className="btn sm confirm" title="Mark it confirmed" onClick={(e) => {
+      e.stopPropagation();
+      change((d) => ({ ...d, seasons: d.seasons.map((x) => (x.id === season.id ? { ...x, status: "Confirmed" } : x)) }), `Confirmed “${season.name}”, ${fmtRange(season.start, season.end)}`);
+    }}><Check size={14} /> Confirm</button>
+  );
 }
 
-export function IssueList({ issues, limit }: { issues: Issue[]; limit?: number }) {
-  const openIssue = useOpenIssue();
+/** Open the form where a problem is fixed, on the right tab, pointing at what to change. */
+export function useFix() {
+  const open = useStore((s) => s.open);
+  return (f: Fix) => open(f.kind, f.id, undefined, { tab: f.tab, spot: f.spot });
+}
+
+/**
+ * Problems, each with a button for its usual fix and any other ways out. `onFix` lets a form handle
+ * fixes inside itself (a season's own problems switch its tab instead of opening it again).
+ */
+export function IssueList({ issues, limit, onFix }: { issues: Issue[]; limit?: number; onFix?: (f: Fix) => boolean }) {
+  const data = useStore((s) => s.data);
+  const openFix = useFix();
+  const [all, setAll] = useState(false);
+  const shown = all ? undefined : limit;
+  const go = (f: Fix) => {
+    if (!onFix?.(f)) openFix(f);
+  };
   if (!issues.length)
     return (
       <div className="issue">
@@ -34,17 +53,29 @@ export function IssueList({ issues, limit }: { issues: Issue[]; limit?: number }
     );
   return (
     <div className="issues">
-      {issues.slice(0, limit).map((i) => (
-        <button key={i.id} className={`issue ${i.severity}`} onClick={() => openIssue(i)}>
-          {i.severity === "danger" ? <CircleAlert size={16} aria-label="Problem" /> : <AlertTriangle size={16} aria-label="Warning" />}
-          <span className="grow">
-            <b>{i.title}</b>
-            <div className="small muted">{i.detail}</div>
-          </span>
-          <span className={`pill ${i.severity}`}>{i.severity === "danger" ? "Problem" : "Check"}</span>
-        </button>
-      ))}
-      {limit && issues.length > limit && <div className="small muted">And {plural(issues.length - limit, "more")}.</div>}
+      {issues.slice(0, shown).map((i) => {
+        const fixes = fixesFor(data, i);
+        return (
+          <div key={i.id} className={`issue-card ${i.severity}`}>
+            <button className={`issue ${i.severity}`} onClick={() => fixes[0] && go(fixes[0])} title={fixes[0]?.label}>
+              {i.severity === "danger" ? <CircleAlert size={16} aria-label="Problem" /> : <AlertTriangle size={16} aria-label="Warning" />}
+              <span className="grow">
+                <b>{i.title}</b>
+                <div className="small muted">{i.detail}</div>
+              </span>
+              <span className={`pill ${i.severity}`}>{i.severity === "danger" ? "Problem" : "Check"}</span>
+            </button>
+            {fixes.length > 0 && (
+              <div className="issue-fixes">
+                {fixes.map((f, k) => <button key={k} className={`btn sm ${k === 0 ? "primary" : ""}`} onClick={() => go(f)}>{f.label}</button>)}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {shown && issues.length > shown && (
+        <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => setAll(true)}>Show all {issues.length} problems</button>
+      )}
     </div>
   );
 }
@@ -119,17 +150,20 @@ export function Overview({ issues }: { issues: Issue[] }) {
             const pct = Math.round(cov.covered * 100);
             const look = missionLook(m);
             return (
-              <button key={m.id} className="issue" onClick={() => open("season", m.id)}>
-                <span className="swatch" style={{ ...slotStyle(look), marginTop: 2 }} />
-                <span className="grow">
-                  <b>{m.name}</b>
-                  <div className="small muted">
-                    {fmtRange(m.start, m.end)} · {seasonTails(data, m, "No aircraft")}
-                  </div>
-                </span>
-                <span className={`pill ${pct === 100 ? "ok" : "danger"}`}>{pct === 100 ? "Crewed" : `${pct}% crewed`}</span>
-                <StatusPill status={m.status} />
-              </button>
+              <div key={m.id} className="issue-card row-card">
+                <button className="issue" onClick={() => open("season", m.id)}>
+                  <span className="swatch" style={{ ...slotStyle(look), marginTop: 2 }} />
+                  <span className="grow">
+                    <b>{m.name}</b>
+                    <div className="small muted">
+                      {fmtRange(m.start, m.end)} · {seasonTails(data, m, "No aircraft")}
+                    </div>
+                  </span>
+                  <span className={`pill ${pct === 100 ? "ok" : "danger"}`}>{pct === 100 ? "Crewed" : `${pct}% crewed`}</span>
+                  <StatusPill status={m.status} />
+                </button>
+                <ConfirmButton season={m} />
+              </div>
             );
           })}
         </div>
