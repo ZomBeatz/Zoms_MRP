@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen, FlaskConical,
-  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale
+  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale, ClipboardCheck
 } from "lucide-react";
 import { useStore } from "./store";
 import { RELEASES_URL, isDesktopApp, isOnlineDemo } from "./platform";
 import { findIssues } from "./coverage";
+import { autoPlans } from "./program";
 import type { Page } from "./types";
 import { Wordmark, LogoMark } from "./components/Logo";
 import { Overview } from "./pages/Overview";
@@ -16,6 +17,7 @@ import { People } from "./pages/People";
 import { Maintenance } from "./pages/Maintenance";
 import { Reports } from "./pages/Reports";
 import { Balance } from "./pages/Balance";
+import { Inspections } from "./pages/Inspections";
 import { TrainingPage } from "./pages/Training";
 import { SettingsPage } from "./pages/Settings";
 import { Dialogs } from "./dialogs";
@@ -31,6 +33,7 @@ const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "people", label: "Crew", icon: Users },
   { page: "maintenance", label: "Maintenance", icon: Wrench },
   { page: "training", label: "Training", icon: GraduationCap },
+  { page: "inspections", label: "Inspections", icon: ClipboardCheck },
   { page: "balance", label: "Balance", icon: Scale },
   { page: "reports", label: "Reports", icon: BarChart3 },
 ];
@@ -81,6 +84,15 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [page, open, undo, redo, updateSettings]);
 
+  // Automatic planning (Settings › Maintenance programs): when the app opens or it's turned on, inspections
+  // overdue or due soon are booked in their tail's best free stretch. Not on every change, so Undo sticks.
+  const { enabled: mxOn, autoPlan } = data.settings.maintenance;
+  useEffect(() => {
+    if (!started || !canEdit || !mxOn || !autoPlan) return;
+    const jobs = autoPlans(useStore.getState().data);
+    if (jobs.length) useStore.getState().change((d) => ({ ...d, jobs: [...d.jobs, ...jobs] }), `Planned ${jobs.length === 1 ? "1 inspection" : `${jobs.length} inspections`} automatically`);
+  }, [started, canEdit, mxOn, autoPlan]);
+
   if (!started) return <Welcome />;
 
   const navTo = (p: Page) => {
@@ -119,7 +131,7 @@ export default function App() {
           <Plus size={16} />
           {(!collapsed || drawer) && "New mission"}
         </button>
-        {NAV.map(({ page: p, label, icon: Icon }) => (
+        {NAV.filter((n) => n.page !== "inspections" || data.settings.maintenance.enabled).map(({ page: p, label, icon: Icon }) => (
           <button key={p} className={`nav-item ${page === p ? "active" : ""}`} onClick={() => navTo(p)} title={collapsed ? label : undefined}>
             <Icon size={16} />
             {(!collapsed || drawer) && label}
@@ -173,6 +185,7 @@ export default function App() {
           {page === "maintenance" && <Maintenance />}
           {page === "training" && <TrainingPage />}
           {page === "balance" && <Balance />}
+          {page === "inspections" && data.settings.maintenance.enabled && <Inspections />}
           {page === "reports" && <Reports />}
           {page === "settings" && <SettingsPage onHelp={() => navTo("guide")} />}
           {page === "guide" && <Guide />}

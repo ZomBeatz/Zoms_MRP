@@ -24,6 +24,7 @@ export const emptyData = (): AppData => ({
   shifts: [],
   jobs: [],
   programs: [],
+  ignored: [],
   timeOff: [],
   settings: defaultSettings(),
 });
@@ -346,7 +347,11 @@ export function sampleData(settings = defaultSettings()): AppData {
     ...(type === "AW139" ? [{ id: `pg-${i}-ph`, type, title: "Phase inspection", everyHours: 300, everyMonths: 24, days: 4, grounds: true }] : []),
   ]);
   const read = format(dayAt(t0, -20), "yyyy-MM-dd");
-  for (const a of aircraft) a.hours = { hours: Math.round(1800 + rnd() * 4000), on: read };
+  for (const a of aircraft) {
+    a.hours = { hours: Math.round(1800 + rnd() * 4000), on: read };
+    // About what the demo's inspection jobs allow for (a 100 hour inspection every few months).
+    a.hoursPerDay = 1.2;
+  }
 
-  return { version: 1, aircraft, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, settings };
+  return { version: 1, aircraft, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, ignored: [], settings };
 }

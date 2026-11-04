@@ -98,6 +98,24 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
     ],
   },
   {
+    q: "Someone can't get back for a renewal",
+    steps: [
+      <>On the training problem, press <b>Extend it</b> (or open the person, <b>Training</b>, and their course).</>,
+      <>Tick <b>Extend it</b>, pick the day it counts as current until, and write why, like <b>On the North Slope job until June</b>.</>,
+      <>It counts as current until then, shows <b>Extended</b> with the reason, and the problem goes away. Only use it where your operation allows.</>,
+      <>For any other problem you've decided to live with, press <b>Ignore…</b> and say why. <b>Show ignored</b> under the list brings it back.</>,
+    ],
+  },
+  {
+    q: "Plan inspections from the maintenance manual",
+    steps: [
+      <>Go to <b>Inspections</b>, then <b>Programs</b>. For each aircraft type, add its inspections: every so many flight hours and/or months, how many days it takes, and whether it grounds the aircraft.</>,
+      <>Under <b>Flight hours</b>, type each tail's hours when you have them. In between, Zom's MRP adds mission days × hours per flying day.</>,
+      <>Under <b>Due</b>, press <b>Record last done…</b> where there's no record yet. Then each tail shows when it's due, and <b>Plan it…</b> books it in the latest free days before then.</>,
+      <>To have that happen on its own, tick <b>Plan inspections automatically</b> in <b>Settings › Maintenance programs</b>. If another system already does all this, turn it off there.</>,
+    ],
+  },
+  {
     q: "See if we can do it with fewer people",
     steps: [
       <>Go to <b>Balance</b> and pick the period.</>,
@@ -280,6 +298,14 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
         <li>Hitches longer than the limit, or too few days off between them (Settings › Hitches and days off)</li>
       </ul>
     ),
+  },
+  {
+    id: "inspections", title: "Inspections",
+    body: <p>Each aircraft type's maintenance program: its inspections every so many flight hours and/or months, whichever comes first. A job on the tail with the same name counts as doing it. <b>Due</b> lists every tail's inspections with when they were last done and when they're due; <b>Plan it…</b> books one in the latest free days before it's due. <b>Flight hours</b> takes readings, and between them counts mission days × hours per flying day. Overdue and due-soon inspections show under Needs attention. Turn it all off, or have it plan by itself, in <b>Settings › Maintenance programs</b>.</p>,
+  },
+  {
+    id: "limits", title: "Work limits",
+    body: <p>Settings › Hitches and days off sets the rule for everyone. A person, a mission and a season can each have <b>Own limits</b> under Work limits; the safest wins (the fewest days on, the most days off). A season can tick <b>Override</b> to use its own numbers instead of the mission's and Settings', but a person's own limits always apply to them. The checks, Fill the schedule and Rebalance all follow them.</p>,
   },
   {
     id: "balance", title: "Balance",

@@ -3,7 +3,7 @@ import { Check, CopyPlus, Plus, Trash2, Wand2 } from "lucide-react";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
 import { keepForm, keptForm, useStore } from "./store";
-import { findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
+import { dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
 import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
@@ -12,8 +12,10 @@ import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPil
 import { bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
 import { rulesFor, seasonRules, stricter } from "./limits";
+import { flightHours } from "./program";
 import { ConfirmButton, IssueList } from "./pages/Overview";
 import type { Fix } from "./fixes";
+import { validUntil } from "./types";
 import type { Aircraft, AppData, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
 
 /** Opens the right dialog for whatever `editing` points at. */
@@ -840,6 +842,23 @@ function AircraftDialog({ id, fix = {} }: Props) {
           <div className="field"><span>Pilot seats</span><Stepper label="pilot seats" min={1} max={2} value={a.seats} onChange={(seats) => set({ seats })} /></div>
         </div>
         <Field label="Base" full><input value={a.base} onChange={(e) => set({ base: e.target.value })} /></Field>
+        {data.settings.maintenance.enabled && (
+          <div className="field full" data-spot="hours">
+            <span>Flight hours</span>
+            <div className="pair">
+              <Field label="Hours on the airframe">
+                <input type="number" inputMode="decimal" step="0.1" min={0} value={a.hours?.hours ?? ""} placeholder="4812.5"
+                  onChange={(e) => set({ hours: e.target.value === "" ? null : { hours: Number(e.target.value), on: a.hours?.on ?? format(today(), "yyyy-MM-dd") } })} />
+              </Field>
+              <DateInput label="As of" today value={a.hours?.on ?? format(today(), "yyyy-MM-dd")} onChange={(on) => set({ hours: { hours: a.hours?.hours ?? 0, on } })} />
+            </div>
+            <Field label="Hours on a mission day" hint={`Empty: ${data.settings.maintenance.hoursPerDay} from Settings.`}>
+              <input type="number" inputMode="decimal" step="0.1" min={0} value={a.hoursPerDay ?? ""} placeholder={String(data.settings.maintenance.hoursPerDay)}
+                onChange={(e) => set({ hoursPerDay: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
+            {existing && a.hours && <span className="hint">About {flightHours({ ...data, aircraft: data.aircraft.map((x) => (x.id === a.id ? a : x)) }, a, today().getTime())} hours now, counting its mission days since then.</span>}
+          </div>
+        )}
         <div className="field full" data-spot="rated">
           <span>Crew rated on {type ? `the ${type}` : "this type"}</span>
           {!type ? <span className="small muted">Type the aircraft type first.</span>
@@ -914,6 +933,7 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
           <PersonRotationField value={p.rotation} onChange={(rotation) => set({ rotation })} />
           <LimitsField value={p.limits} onChange={(limits) => set({ limits })} who="them" applies={rulesFor(data, p)} />
           <Field label="Notes" full><textarea rows={2} value={p.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
+          {existing && <NextBookings personId={p.id} />}
           {existing && (
             <div className="field full">
               <span>Time off coming up</span>
@@ -954,6 +974,28 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
       )}
       {tab === "training" && <TrainingRecords person={p} onChange={(training) => set({ training })} spot={spot} />}
     </Dialog>
+  );
+}
+
+/** Where someone is booked next: shifts and maintenance, soonest first, each opening where it is. */
+function NextBookings({ personId }: { personId: string }) {
+  const { data, open } = useStore();
+  const now = Date.now();
+  const next = dutyOf(data, personId).filter((d) => d.b > now).slice(0, 5);
+  return (
+    <div className="field full">
+      <span>Booked next</span>
+      {next.length ? (
+        <div className="lines">
+          {next.map((d) => (
+            <button key={`${d.seasonId ?? d.jobId}-${d.a}`} className="line" onClick={() => (d.seasonId ? open("season", d.seasonId, undefined, d.shiftId ? { spot: `shift:${d.shiftId}`, tab: data.people.find((x) => x.id === personId)?.role === "Maintainer" ? "maintainers" : "pilots" } : undefined) : d.jobId && open("job", d.jobId))}>
+              <span className="name">{d.label}</span>
+              <span className="when">{d.a <= now ? `Now, until ${format(d.b - 1, "MMM d")}` : fmtSpan(toWhen(d.a), toWhen(d.b))}</span>
+            </button>
+          ))}
+        </div>
+      ) : <span className="small muted">Nothing booked.</span>}
+    </div>
   );
 }
 
@@ -1175,7 +1217,15 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
   const focusId = spot?.startsWith("training:") ? spot.slice(9) : null;
   const focus = focusId ? trainings.find((t) => t.id === focusId) : undefined;
   const focusState = focus ? trainingStatus(person, focus.id, Date.now(), Date.now() + 1) : null;
-  const focusLatest = focus ? person.training.filter((r) => r.trainingId === focus.id).map((r) => r.expires).sort().at(-1) : undefined;
+  const focusLatest = focus ? person.training.filter((r) => r.trainingId === focus.id).map((r) => validUntil(r)).sort().at(-1) : undefined;
+  /** Extend the newest record of the course the problem is about, and open it to set the date and why. */
+  const extend = (tid: string) => {
+    const k = order.find(({ r }) => r.trainingId === tid)?.i;
+    if (k === undefined || !person.training[k].expires) return;
+    const r = person.training[k];
+    setAt(k, { extendedTo: r.extendedTo ?? addMonthsTo(format(today(), "yyyy-MM-dd") > r.expires! ? format(today(), "yyyy-MM-dd") : r.expires!, 3), extensionNote: r.extensionNote ?? "" });
+    setEditing(k);
+  };
   return (
     <>
       {focus && focusState && (
@@ -1185,15 +1235,20 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
             {focusState.state === "missing" ? "isn't on record yet." : focusState.state === "expired" ? `ran out ${fmtDay(focusState.expires!)}.` : focusLatest ? `runs out ${fmtDay(focusLatest)}.` : "is current."}
             <span className="small muted" style={{ display: "block" }}>Add the date they did it (or will do it). The old record stays as history.</span>
           </span>
-          <button className="btn sm primary" onClick={() => add(focus.id)}><Plus size={14} /> Add the new date</button>
+          <span className="row gap-sm wrap">
+            <button className="btn sm primary" onClick={() => add(focus.id)}><Plus size={14} /> Add the new date</button>
+            {person.training.some((r) => r.trainingId === focus.id && r.expires) && <button className="btn sm" onClick={() => extend(focus.id)}>Extend it…</button>}
+          </span>
         </div>
       )}
       {person.training.length > 0 && (
         <div className="lines">
           {order.map(({ r, i }) => {
             const t = trainings.find((x) => x.id === r.trainingId);
-            const expired = !!r.expires && r.expires <= todayStr;
-            const due = !expired && !!r.expires && r.expires <= soon;
+            const until = validUntil(r);
+            const expired = !!until && until <= todayStr;
+            const due = !expired && !!until && until <= soon;
+            const extended = !!r.expires && until !== r.expires;
             if (editing === i)
               return (
                 <div key={i} className="line-edit">
@@ -1206,9 +1261,24 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
                     </select>
                   </Field>
                   <div className="pair">
-                    <DateInput label="Completed" value={r.completed} onChange={(v) => setAt(i, { completed: v, expires: t?.validMonths ? addMonthsTo(v, t.validMonths) : r.expires })} />
+                    <DateInput label="Completed" today value={r.completed} onChange={(v) => setAt(i, { completed: v, expires: t?.validMonths ? addMonthsTo(v, t.validMonths) : r.expires })} />
                     <DateInput label="Runs out" hint="Empty if it never does." value={r.expires ?? ""} min={r.completed} clearable="Never runs out" onChange={(v) => setAt(i, { expires: v || null })} />
                   </div>
+                  {r.expires && (
+                    <div className="field">
+                      <label className="check">
+                        <input type="checkbox" checked={!!r.extendedTo} onChange={(e) => setAt(i, e.target.checked ? { extendedTo: addMonthsTo(r.expires!, 3), extensionNote: r.extensionNote ?? "" } : { extendedTo: null, extensionNote: "" })} />
+                        Extend it (they can't get back for the renewal yet)
+                      </label>
+                      {r.extendedTo && (
+                        <div className="pair" style={{ marginTop: 6 }}>
+                          <DateInput label="Counted as current until" value={r.extendedTo} min={r.expires} onChange={(v) => setAt(i, { extendedTo: v })} />
+                          <Field label="Why"><input value={r.extensionNote ?? ""} placeholder="On the North Slope job until June" onChange={(e) => setAt(i, { extensionNote: e.target.value })} /></Field>
+                        </div>
+                      )}
+                      <span className="hint">Only for a real reason your operation allows; the reason shows wherever the extension does.</span>
+                    </div>
+                  )}
                   <div className="row gap-sm">
                     <button className="btn sm danger" onClick={() => { onChange(person.training.filter((_, k) => k !== i)); setEditing(null); }}><Trash2 size={14} /> Remove</button>
                     <span className="grow" />
@@ -1221,9 +1291,10 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
                 <span className="name">{t?.name ?? "Deleted course"}</span>
                 {renewed.has(i) ? <span className="when">Renewed</span>
                   : !needs.has(r.trainingId) ? <span className="small muted">Not needed</span> : null}
-                {renewed.has(i) ? null : expired ? <span className="pill danger">Ran out {fmtDay(r.expires!)}</span>
-                  : due ? <span className="pill warn">Runs out {fmtDay(r.expires!)}</span>
-                  : <span className="when">{r.expires ? `To ${fmtDay(r.expires)}` : "Never runs out"}</span>}
+                {renewed.has(i) ? null : expired ? <span className="pill danger">Ran out {fmtDay(until!)}</span>
+                  : due ? <span className="pill warn">Runs out {fmtDay(until!)}</span>
+                  : <span className="when">{until ? `To ${fmtDay(until)}` : "Never runs out"}</span>}
+                {!renewed.has(i) && extended && <span className="pill accent" title={r.extensionNote || "Extended"}>Extended{r.extensionNote ? `: ${r.extensionNote}` : ""}</span>}
               </button>
             );
           })}

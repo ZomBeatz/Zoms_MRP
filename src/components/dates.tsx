@@ -108,8 +108,10 @@ export function DateRange({ first, last, onChange, min, max, labels = ["First da
 }
 
 /** One date with a calendar beside it. `clearable` adds "No date" (training that never runs out). */
-export function DateInput({ value, onChange, min, max, label, hint, clearable, ariaLabel }: {
+export function DateInput({ value, onChange, min, max, label, hint, clearable, ariaLabel, today }: {
   value: string; onChange: (v: string) => void; min?: string; max?: string; label?: string; hint?: string; clearable?: string; ariaLabel?: string;
+  /** Show a Today button (when something was done just now). */
+  today?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => startOfMonth(day(value || ymd(new Date()))));
@@ -121,6 +123,7 @@ export function DateInput({ value, onChange, min, max, label, hint, clearable, a
         onClick={() => { setOpen(!open); setMonth(startOfMonth(day(value || ymd(new Date())))); }}>
         <CalendarDays size={18} />
       </button>
+      {today && <button type="button" className="btn sm" onClick={() => set(ymd(new Date()))}>Today</button>}
     </span>
   );
   return (

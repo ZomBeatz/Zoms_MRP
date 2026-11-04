@@ -51,7 +51,17 @@ export interface TrainingRecord {
   completed: string;
   /** null = doesn't expire. */
   expires: string | null;
+  /**
+   * Counted as current until this day instead (someone away on a long job who can't get back for the
+   * renewal yet), with why. Empty = no extension.
+   */
+  extendedTo?: string | null;
+  extensionNote?: string;
 }
+
+/** The day a record really runs out: its extension if it has one and it's later, else its own date. */
+export const validUntil = (r: Pick<TrainingRecord, "expires" | "extendedTo">): string | null =>
+  r.expires === null ? null : r.extendedTo && r.extendedTo > r.expires ? r.extendedTo : r.expires;
 
 export interface Person {
   id: ID;
@@ -195,6 +205,16 @@ export interface ProgramItem {
   grounds: boolean;
 }
 
+export interface IgnoredIssue {
+  /** The problem's id (see src/coverage.ts). */
+  id: string;
+  /** What it said, for the list of ignored problems. */
+  title: string;
+  note: string;
+  /** When it was ignored ("2026-11-04"). */
+  on: string;
+}
+
 export interface Rules {
   /** Most days in a row someone can be on assignment (a hitch). */
   maxDaysOn: number;
@@ -235,7 +255,9 @@ export interface AppData {
   timeOff: TimeOff[];
   /** Maintenance programs, item by item for each aircraft type. */
   programs: ProgramItem[];
+  /** Problems someone chose to ignore, with why. They stay ignored while the same problem is there. */
+  ignored: IgnoredIssue[];
   settings: Settings;
 }
 
-export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "balance" | "reports" | "settings" | "guide";
+export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "inspections" | "balance" | "reports" | "settings" | "guide";
