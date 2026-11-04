@@ -91,8 +91,9 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
   {
     q: "Share the plan with the team",
     steps: [
-      <>On <b>Reports</b>, press <b>Export to Excel</b> for one workbook to post in Teams or email.</>,
-      <>Or on the <b>Schedule</b>, press <b>Print</b> for a paper copy of what's on screen.</>,
+      <>On <b>Reports</b>, pick the period: one of the ready-made ones, or <b>Pick dates</b> for your own first and last day.</>,
+      <>Press <b>PDF report</b> for pages to email, print or put on a screen, or <b>Excel report</b> for a workbook to post in Teams.</>,
+      <>For the whole plan in one workbook, use <b>Settings › Your data › Export to Excel</b>.</>,
     ],
   },
   {
@@ -264,7 +265,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
   },
   {
     id: "reports", title: "Reports and Excel",
-    body: <p>Pick a period to see fleet use, days per mission, how busy each person is and how much of the flying was fully crewed. <b>Export to Excel</b> makes one workbook (fleet board, seasons, crew, training, maintenance, problems) to post in Teams. The desktop app can also keep an Excel copy up to date in a folder you pick, such as a Teams channel's synced folder (Settings › Excel copy for Teams).</p>,
+    body: <p>Pick a period (or <b>Pick dates</b> for your own) to see fleet use, days per mission, how busy each person is and how much of the flying was fully crewed. <b>PDF report</b> and <b>Excel report</b> make the same period into pages that are easy to read: the numbers and charts, the fleet and crew boards colored like the app, the missions, workload, a training grid, maintenance and problems. <b>Settings › Your data › Export to Excel</b> makes one workbook of the whole plan. The desktop app can also keep an Excel copy up to date in a folder you pick, such as a Teams channel's synced folder (Settings › Excel copy for Teams).</p>,
   },
   {
     id: "data", title: "Your data",

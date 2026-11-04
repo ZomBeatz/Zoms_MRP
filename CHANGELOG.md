@@ -6,6 +6,12 @@
 - The app (desktop, web and server) opens straight to an empty plan, with the setup steps on the Overview: aircraft, training, pilots, maintainers, missions, and a link to the Guide.
 - The Guide is in the app; its hands-on lessons and tours, and the demo data, are only in the online demo for now. Any demo kept on the device is removed.
 
+**Reports**
+- **PDF report** and **Excel report** on the Reports page, for any period: the ready-made ones or **Pick dates** for your own first and last day.
+- The PDF has a summary page (the numbers, days by mission, aircraft free each day and each tail's use), the fleet and crew boards colored like the app, the missions with how well each is crewed, crew workload, a training grid (people down the side, courses across), maintenance and problems. It looks the same from every version, the Mac app included.
+- The Excel report has the same parts as sheets: tiles and in-cell bars on the summary, the boards colored day by day (week by week for long periods), and every sheet printing landscape, one page wide.
+- The old **Print** buttons on Reports and the Schedule are gone; the reports replace them.
+
 **Mac**
 - One Mac app for Apple silicon and Intel, macOS 10.15 or later. It's ad-hoc signed, so it opens after **Privacy & Security > Open Anyway** once; the README explains how, and how to sign and notarize it with an Apple Developer account.
 
