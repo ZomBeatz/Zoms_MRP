@@ -11,9 +11,10 @@ import { SWATCHES, missionLook, slotStyle } from "./look";
 import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useSpot } from "./components/ui";
 import { bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
+import { rulesFor, seasonRules, stricter } from "./limits";
 import { ConfirmButton, IssueList } from "./pages/Overview";
 import type { Fix } from "./fixes";
-import type { Aircraft, AppData, MaintainerNeed, MaintenanceJob, Mission, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
+import type { Aircraft, AppData, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
 
 /** Opens the right dialog for whatever `editing` points at. */
 export function Dialogs() {
@@ -218,6 +219,7 @@ function MissionDialog({ id, defaults }: Props) {
           </Field>
           <Field label="Contact"><input value={m.contact} placeholder="Who to call" onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="Location"><input value={m.location} onChange={(e) => set({ location: e.target.value })} /></Field>
+          <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this mission" applies={stricter(data.settings.rules, m.limits)} />
           <div className="full">
             <h4 className="form-section">Look on the schedule</h4>
             <LookPicker color={m.color} pattern={m.pattern} onChange={(color, pattern) => set({ color, pattern })} />
@@ -399,6 +401,43 @@ function MaintainerNeedField({ value, onChange }: { value?: MaintainerNeed; onCh
         </span>
       )}
       <span className="hint">{info.hint(days)}</span>
+    </div>
+  );
+}
+
+/**
+ * Work limits of its own (stricter than Settings), for a person, a mission or a season. A season can
+ * also override: use its numbers instead of the mission's and Settings'.
+ */
+function LimitsField({ value, onChange, who, canOverride, applies }: { value?: Limits; onChange: (l: Limits | undefined) => void; who: string; canOverride?: boolean; applies: Rules }) {
+  const settings = useStore((s) => s.data.settings.rules);
+  const on = !!value && (value.maxDaysOn != null || value.minDaysOff != null || !!value.override);
+  const v = { maxDaysOn: value?.maxDaysOn ?? settings.maxDaysOn, minDaysOff: value?.minDaysOff ?? settings.minDaysOff, override: !!value?.override };
+  return (
+    <div className="field full" data-spot="limits">
+      <span>Work limits</span>
+      <label className="check">
+        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked ? { maxDaysOn: v.maxDaysOn, minDaysOff: v.minDaysOff } : undefined)} />
+        Own limits for {who}
+      </label>
+      {on && (
+        <>
+          <span className="rotation" style={{ marginTop: 6 }}>
+            At most <NumberInput min={1} max={365} aria-label="Most days on in a row" value={v.maxDaysOn} onChange={(maxDaysOn) => onChange({ ...value, maxDaysOn })} /> days on in a row,
+            at least <NumberInput min={0} max={90} aria-label="Fewest days off between" value={v.minDaysOff} onChange={(minDaysOff) => onChange({ ...value, minDaysOff })} /> days off between
+          </span>
+          {canOverride && (
+            <label className="check" style={{ marginTop: 6 }}>
+              <input type="checkbox" checked={v.override} onChange={(e) => onChange({ ...value, override: e.target.checked })} />
+              Override the mission and Settings (people's own limits still apply)
+            </label>
+          )}
+        </>
+      )}
+      <span className="hint">
+        {on ? (v.override ? "These replace the mission's and Settings' limits for this season." : "The safest wins: these only count where they're stricter than Settings and the mission.") : `Following ${canOverride ? "the mission and Settings" : "Settings"}.`}
+        {" "}Applies: at most {plural(applies.maxDaysOn, "day")} on, {plural(applies.minDaysOff, "day")} off.
+      </span>
     </div>
   );
 }
@@ -664,6 +703,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           <CrewSize season={season} onChange={set} />
           <RotationField label="Pilot rotation" value={season.pilotRotation} onChange={(pilotRotation) => set({ pilotRotation })} />
           <RotationField label="Maintainer rotation" value={season.maintainerRotation} onChange={(maintainerRotation) => set({ maintainerRotation })} />
+          <LimitsField value={season.limits} onChange={(limits) => set({ limits })} who="this season" canOverride applies={seasonRules(data, season)} />
           <Field label="Notes" full><textarea rows={2} value={season.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
           {mission && (
             <p className="form-note full" style={{ margin: 0 }}>
@@ -872,6 +912,7 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
           <Field label="Base"><input value={p.base} onChange={(e) => set({ base: e.target.value })} /></Field>
           <Field label="Phone"><input type="tel" value={p.phone} onChange={(e) => set({ phone: e.target.value })} /></Field>
           <PersonRotationField value={p.rotation} onChange={(rotation) => set({ rotation })} />
+          <LimitsField value={p.limits} onChange={(limits) => set({ limits })} who="them" applies={rulesFor(data, p)} />
           <Field label="Notes" full><textarea rows={2} value={p.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
           {existing && (
             <div className="field full">

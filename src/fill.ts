@@ -1,6 +1,7 @@
 import type { AppData, Person, Role, Rotation, Season, Shift } from "./types";
 import { dutyOf, missionCoverage, requiredTraining, trainingStatus } from "./coverage";
 import { onRotation, seasonTypes } from "./rotation";
+import { seasonRules, stricter } from "./limits";
 import { DAY, dayAt, ms, overlaps, toWhen, uid } from "./time";
 
 /**
@@ -19,8 +20,11 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
   // Only open days inside `window` (the Balance page's period) are filled, and shifts stop at its end.
   const from = Math.max(ms(season.start), opts.window?.[0] ?? -Infinity), to = Math.min(ms(season.end), opts.window?.[1] ?? Infinity);
   if (need <= 0 || !(to > from)) return [];
-  // The job's rotation, but never longer than the most days on in a row allowed (Settings).
-  const on = Math.max(1, Math.min(rotation?.on ?? opts.maxDaysOn, opts.maxDaysOn));
+  // The limits for this season (Settings, its mission and season), then each person's own on top.
+  const base = seasonRules(data, season, opts);
+  const limitsOf = (p: Person) => stricter(base, p.limits);
+  // The job's rotation, but never longer than the most days on in a row allowed.
+  const on = Math.max(1, Math.min(rotation?.on ?? base.maxDaysOn, base.maxDaysOn));
   const off = Math.max(0, rotation?.off ?? opts.minDaysOff);
   const mission = data.missions.find((m) => m.id === season.missionId);
   const types = seasonTypes(data, season);
@@ -59,7 +63,7 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     const spans = [...busyOf(p), [a, b] as [number, number]].sort((x, y) => x[0] - y[0]);
     let lo = -1, hi = -1, found = 0;
     for (const [x, y] of spans) {
-      if (lo >= 0 && Math.round(((x - hi) / DAY) * 10) / 10 < opts.minDaysOff) hi = Math.max(hi, y);
+      if (lo >= 0 && Math.round(((x - hi) / DAY) * 10) / 10 < limitsOf(p).minDaysOff) hi = Math.max(hi, y);
       else {
         if (lo <= a && a < hi) found = hi - lo;
         lo = x;
@@ -72,9 +76,9 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
   /** Some days off but fewer than the minimum, between [a, b) and their other bookings. */
   const shortRest = (p: Person, a: number, b: number) => busyOf(p).some(([x, y]) => {
     const gap = Math.round(((x >= b ? x - b : a - y) / DAY) * 10) / 10;
-    return (x >= b || y <= a) && gap > 0 && gap < opts.minDaysOff;
+    return (x >= b || y <= a) && gap > 0 && gap < limitsOf(p).minDaysOff;
   });
-  const fits = (p: Person, a: number, b: number) => stretch(p, a, b) <= opts.maxDaysOn && !shortRest(p, a, b);
+  const fits = (p: Person, a: number, b: number) => stretch(p, a, b) <= limitsOf(p).maxDaysOn && !shortRest(p, a, b);
 
   const pool = data.people
     .filter((p) => p.role === role && !opts.skip?.has(p.id) && (!types.length || types.some((t) => p.quals.includes(t))))

@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import type { AppData, Mission, Person, Season, Shift } from "./types";
 import { bookings } from "./bookings";
 import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
+import { rulesFor } from "./limits";
 import { DAY, dayAt, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
@@ -226,28 +227,37 @@ export function findIssues(data: AppData): Issue[] {
         if (overlaps(d.a, d.b, ms(t.start), ms(t.end)))
           issues.push({ id: `off-${t.id}-${d.a}`, severity: "danger", title: `${p.name} is off${t.reason ? ` (${t.reason})` : ""}`, detail: `But booked on “${d.label}”, ${range(d.a, d.b)}.`, at: d.a, personId: p.id, seasonId: d.seasonId, shiftId: d.shiftId, jobId: d.jobId, timeOffId: t.id });
 
-    // Hitches: bookings with fewer than the minimum days off between them count as one stretch on.
-    let first = -1, last = -1;
+    // Hitches: bookings with fewer than the minimum days off between them count as one stretch on. Each
+    // booking brings its own limits (Settings, its mission and season, the person's own); the safest wins.
+    const ruleOf = (d: (typeof duty)[number]) => rulesFor(data, p, d.seasonId ? missionById.get(d.seasonId) : null);
+    let first = -1, last = -1, most = maxDaysOn, rest = minDaysOff;
     // The booking that takes the stretch past the limit: where someone else can be rotated in.
     let over: (typeof duty)[number] | undefined;
+    const days = (a: number, b: number) => Math.round(((b - a) / DAY) * 10) / 10;
     const flush = () => {
       // Rounded, so a day that changes the clock (23 or 25 hours) still counts as one day.
-      const days = Math.round(((last - first) / DAY) * 10) / 10;
-      if (first >= 0 && days > maxDaysOn)
-        issues.push({ id: `duty-${p.id}-${first}`, severity: "danger", title: `${p.name} is on for ${fmtDays(days)} in a row`, detail: `${range(first, last)}. The most is ${plural(maxDaysOn, "day")}. Rotate someone in.`, at: first, personId: p.id,
+      const n = days(first, last);
+      if (first >= 0 && n > most)
+        issues.push({ id: `duty-${p.id}-${first}`, severity: "danger", title: `${p.name} is on for ${fmtDays(n)} in a row`, detail: `${range(first, last)}. The most is ${plural(most, "day")}. Rotate someone in.`, at: first, personId: p.id,
           seasonId: over?.seasonId, shiftId: over?.shiftId, jobId: over?.jobId });
     };
     for (const d of duty) {
-      if (first >= 0 && Math.round(((d.a - last) / DAY) * 10) / 10 < minDaysOff) {
-        if (!over && Math.round(((Math.max(last, d.b) - first) / DAY) * 10) / 10 > maxDaysOn) over = d;
+      const r = ruleOf(d);
+      const needOff = Math.max(rest, r.minDaysOff);
+      if (first >= 0 && days(last, d.a) < needOff) {
         if (d.a > last)
-          issues.push({ id: `rest-${p.id}-${last}`, severity: "warn", title: `${p.name} gets only ${fmtDays((d.a - last) / DAY)} off`, detail: `Before “${d.label}”. The minimum is ${plural(minDaysOff, "day")}.`, at: d.a, personId: p.id, seasonId: d.seasonId, shiftId: d.shiftId, jobId: d.jobId });
+          issues.push({ id: `rest-${p.id}-${last}`, severity: "warn", title: `${p.name} gets only ${fmtDays((d.a - last) / DAY)} off`, detail: `Before “${d.label}”. The minimum is ${plural(needOff, "day")}.`, at: d.a, personId: p.id, seasonId: d.seasonId, shiftId: d.shiftId, jobId: d.jobId });
+        most = Math.min(most, r.maxDaysOn);
+        rest = needOff;
+        if (!over && days(first, Math.max(last, d.b)) > most) over = d;
         last = Math.max(last, d.b);
       } else {
         flush();
         first = d.a;
         last = d.b;
-        over = Math.round(((d.b - d.a) / DAY) * 10) / 10 > maxDaysOn ? d : undefined;
+        most = r.maxDaysOn;
+        rest = r.minDaysOff;
+        over = days(d.a, d.b) > most ? d : undefined;
       }
     }
     flush();
