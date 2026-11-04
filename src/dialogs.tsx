@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, CopyPlus, Plus, Trash2, Wand2 } from "lucide-react";
+import { Check, CopyPlus, Download, Plus, Trash2, Wand2 } from "lucide-react";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
 import { keepForm, keptForm, useStore } from "./store";
@@ -1081,6 +1081,16 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
           <LimitsField value={p.limits} onChange={(limits) => set({ limits })} who="them" applies={rulesFor(data, p)} />
           <Field label="Notes" full><textarea rows={2} value={p.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
           {existing && <NextBookings personId={p.id} />}
+          {existing && (
+            <div className="full">
+              <button type="button" className="btn sm" onClick={async () => {
+                const { buildPersonPdf } = await import("./reportPdf");
+                const { saveFile, showInFolder } = await import("./files");
+                const where = await saveFile(`zoms-mrp-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-schedule.pdf`, await buildPersonPdf(data, p.id));
+                showToast(where ? "Saved to Downloads." : "Schedule made. Look in your downloads.", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
+              }}><Download size={14} /> Their schedule (PDF)</button>
+            </div>
+          )}
           {existing && (
             <div className="field full">
               <span>Time off coming up</span>
