@@ -20,6 +20,8 @@ export interface Aircraft {
   hours?: { hours: number; on: string } | null;
   /** Average flight hours on a day it flies a mission; empty = the Settings default. */
   hoursPerDay?: number | null;
+  /** What a flight hour costs (fuel, parts, reserves), for cost per mission. */
+  hourCost?: number | null;
 }
 
 export type Role = "Pilot" | "Maintainer";
@@ -76,6 +78,8 @@ export interface Person {
   rotation: PersonRotation | null;
   /** Their own work limits, if stricter than the rules. */
   limits?: Limits;
+  /** What a day on duty costs (pay, per diem), for cost per mission. */
+  dayRate?: number | null;
   /** The last day they flew each type outside this plan ("Bell 412" → "2026-10-02"), for currency. */
   flew?: Record<string, string>;
   base: string;
@@ -106,6 +110,8 @@ export interface Mission {
   notes: string;
   /** Work limits for this customer's jobs, if stricter than the rules. */
   limits?: Limits;
+  /** What the customer is charged per day of a season, for the margin. */
+  dayCharge?: number | null;
 }
 
 /**
@@ -126,6 +132,8 @@ export interface Season {
   maintainerNeed?: MaintainerNeed;
   /** Work limits for this season; with `override`, these replace the mission's and Settings'. */
   limits?: Limits;
+  /** Hours on duty in a day on this job (for the duty-hours limit in Settings). Empty = not tracked. */
+  dutyHours?: number | null;
   /** How pilots and maintainers rotate through the job (they can differ). null = no set pattern. */
   pilotRotation: Rotation | null;
   maintainerRotation: Rotation | null;
@@ -244,6 +252,8 @@ export interface Settings {
   expiryWarningDays: number;
   /** A pilot is current on a type if they flew it within this many days. 0 = don't check. */
   currencyDays: number;
+  /** Most hours on duty in a day; a season with longer days is flagged. 0 = don't check. */
+  maxDutyHours: number;
   /** Maintenance programs and flight hours (off for anyone who tracks them in another system). */
   maintenance: {
     enabled: boolean;
