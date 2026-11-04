@@ -3,6 +3,7 @@ import { ClipboardCheck, Download, FileSpreadsheet, FlaskConical, FolderOpen, Ke
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
+import type { ImportPlan } from "../importer";
 import { migrate } from "../migrate";
 import { downloadWorkbook } from "../excel";
 import { dataFolder, openDataFolder, saveFile, showInFolder } from "../files";
@@ -20,6 +21,22 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [sureDemo, setSureDemo] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // Importing: the file picker, and the plan to preview before anything changes.
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState<{ name: string; plan: ImportPlan } | null>(null);
+  const startImport = async (f: File) => {
+    try {
+      const { planImport, readFile } = await import("../importer");
+      setImporting({ name: f.name, plan: planImport(data, await readFile(f)) });
+    } catch {
+      showToast("Couldn't read that file. Use the template, saved as .xlsx or .csv.");
+    }
+  };
+  const template = async () => {
+    const { buildTemplate } = await import("../importer");
+    const where = await saveFile("zoms-mrp-import-template.xlsx", await buildTemplate());
+    showToast(where ? "Template saved to Downloads." : "Template made. Look in your downloads.", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
+  };
   // The desktop app's data folder, shown with a button to open it.
   const [folder, setFolder] = useState<string | null>(null);
   useEffect(() => {
@@ -53,6 +70,8 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   return (
     <>
       <div className="page-head"><h1>Settings</h1></div>
+      {importing && <ImportDialog name={importing.name} plan={importing.plan} onClose={() => setImporting(null)}
+        onImport={() => { change(() => importing.plan.data, `Imported ${importing.name}`); setImporting(null); }} />}
       {clearing && <ClearAllDialog onBackup={backup} onClose={() => setClearing(false)} onClear={() => { clearAll(); setClearing(false); }} />}
       <div style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 14 }}>
         {isServerBuild && <ServerSettings />}
@@ -156,6 +175,14 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               <button className="btn" onClick={() => openDataFolder().catch(() => showToast("Couldn't open the folder."))}><FolderOpen size={14} /> Open folder</button>
             )}
             <button className="btn" onClick={backup}><Download size={14} /> Save a backup</button>
+            {(!isServerBuild || demo || serverUser()?.role !== "viewer") && (
+              <>
+                <button className="btn" onClick={() => importRef.current?.click()}><Upload size={14} /> Import from Excel or CSV…</button>
+                <input ref={importRef} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) startImport(f); }} />
+                <button className="btn" onClick={template}><FileSpreadsheet size={14} /> Download the import template</button>
+              </>
+            )}
             <button className="btn" onClick={() => downloadWorkbook(data).then((where) => showToast("Saved to Downloads. Post it in a Teams channel to share it.", where ? { label: "Show", run: () => showInFolder(where) } : undefined), () => showToast("Couldn't make the Excel file. Try again."))}>
               <FileSpreadsheet size={14} /> Export to Excel
             </button>
@@ -221,6 +248,34 @@ function ClearAllDialog({ onBackup, onClose, onClear }: { onBackup: () => void; 
           <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="DELETE" aria-label="Type DELETE to confirm" />
         </Field>
       </div>
+    </Dialog>
+  );
+}
+
+/** What an import will add and update, and the rows it couldn't use, before anything changes. */
+function ImportDialog({ name, plan, onClose, onImport }: { name: string; plan: ImportPlan; onClose: () => void; onImport: () => void }) {
+  const { added, updated, skipped } = plan;
+  const parts = (o: Record<string, number>, words: Record<string, [string, string]>) =>
+    Object.entries(o).filter(([, n]) => n).map(([k, n]) => `${n} ${n === 1 ? words[k][0] : words[k][1]}`).join(", ");
+  const words = { people: ["person", "people"], aircraft: ["aircraft", "aircraft"], courses: ["course", "courses"], records: ["training record", "training records"] } as Record<string, [string, string]>;
+  const adds = parts(added, words), updates = parts(updated, words);
+  const nothing = !adds && !updates;
+  return (
+    <Dialog title={`Import ${name}`} onClose={onClose}
+      foot={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={nothing} onClick={onImport}>Import</button></>}>
+      {nothing ? <p style={{ marginTop: 0 }}>Nothing to import. Check the sheets have the template's headings and a row under them.</p> : (
+        <>
+          {adds && <p style={{ marginTop: 0 }}><b>Adds</b> {adds}.</p>}
+          {updates && <p><b>Updates</b> {updates} already here (matched by name, or tail number).</p>}
+          <p className="small muted">Undo works right after, from the message.</p>
+        </>
+      )}
+      {skipped.length > 0 && (
+        <>
+          <h4 className="form-section">Couldn't use {skipped.length === 1 ? "1 row" : `${skipped.length} rows`}</h4>
+          <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{skipped.slice(0, 20).map((x, i) => <li key={i}>{x}</li>)}</ul>
+        </>
+      )}
     </Dialog>
   );
 }
