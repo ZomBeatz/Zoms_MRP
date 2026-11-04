@@ -23,6 +23,9 @@
 
 **Also**
 - A person's form shows where they're **booked next**, each opening right at that shift.
+- **Find** anything by name (Ctrl or ⌘ K, or the search button): people, tails, missions and seasons, jobs and courses.
+- A form with unsaved changes asks **Discard the changes you made?** before Cancel, ✕ or Esc throw them away.
+- Balance, Reports and Inspections remember the period or tab you last picked.
 
 **Fill the schedule follows the rules more closely**
 - It never books a stretch longer than the most days on in a row, counting bookings either side; it leaves the minimum days off before and after; and it stops at the open days instead of putting more people on than there are seats.

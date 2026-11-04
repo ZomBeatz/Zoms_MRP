@@ -1,4 +1,4 @@
-import { useEffect, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import type { AircraftStatus, MissionStatus, Person } from "../types";
 import { PATTERNS, SWATCHES, slotStyle } from "../look";
@@ -13,17 +13,50 @@ export interface Tab { key: string; label: ReactNode; /** A red dot: something o
 /** Focus a form's first box only with a mouse: on a touch screen it would pop up the keyboard over the form. */
 export const autoFocusBox = typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs, tab, onTab }: {
+/** Inside a form: close it, asking first if there are unsaved changes (Cancel uses it). */
+const GuardedClose = createContext<(() => void) | null>(null);
+export const useGuardedClose = () => useContext(GuardedClose);
+
+/** A choice remembered on this device (a page's period or tab), falling back to `initial`. */
+export function usePref<T extends string>(key: string, initial: T): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => {
+    try {
+      return (localStorage.getItem(`zoms-mrp:pref:${key}`) as T | null) ?? initial;
+    } catch {
+      return initial;
+    }
+  });
+  const set = (x: T) => {
+    setV(x);
+    try {
+      localStorage.setItem(`zoms-mrp:pref:${key}`, x);
+    } catch { /* only a convenience */ }
+  };
+  return [v, set];
+}
+
+/** Whether a form's draft has changed since it opened. */
+export function useDirty(value: unknown) {
+  const json = (v: unknown) => JSON.stringify(v, (_, x) => (x instanceof Set ? [...x].sort() : x));
+  const [initial] = useState(() => json(value));
+  return json(value) !== initial;
+}
+
+export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs, tab, onTab, dirty }: {
   title: ReactNode; onClose: () => void; children: ReactNode; foot: ReactNode; wide?: boolean;
   /** A swatch or avatar before the title. */ icon?: ReactNode;
   /** The thing at a glance, under the title. */ meta?: ReactNode;
   tabs?: Tab[]; tab?: string; onTab?: (key: string) => void;
+  /** Unsaved changes: closing asks first. */
+  dirty?: boolean;
 }) {
+  const [asking, setAsking] = useState(false);
+  const tryClose = () => (dirty ? setAsking(true) : onClose());
   useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const k = (e: KeyboardEvent) => e.key === "Escape" && (asking ? setAsking(false) : dirty ? setAsking(true) : onClose());
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
+  }, [onClose, dirty, asking]);
   return (
     // Clicking outside doesn't close it: a stray click shouldn't throw away what's been typed.
     <div className="backdrop">
@@ -32,7 +65,7 @@ export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs,
           <div className="dialog-title">
             {icon}
             <h2>{title}</h2>
-            <button className="icon-btn" aria-label="Close" onClick={onClose}>
+            <button className="icon-btn" aria-label="Close" onClick={tryClose}>
               <X size={18} />
             </button>
           </div>
@@ -48,7 +81,15 @@ export function Dialog({ title, onClose, children, foot, wide, icon, meta, tabs,
           )}
         </div>
         <div className="dialog-body">{children}</div>
-        <div className="dialog-foot">{foot}</div>
+        <div className="dialog-foot">
+          {asking ? (
+            <>
+              <span className="grow discard-q">Discard the changes you made?</span>
+              <button className="btn" onClick={() => setAsking(false)} autoFocus>Keep editing</button>
+              <button className="btn danger solid" onClick={() => { setAsking(false); onClose(); }}>Discard</button>
+            </>
+          ) : <GuardedClose.Provider value={tryClose}>{foot}</GuardedClose.Provider>}
+        </div>
       </div>
     </div>
   );
