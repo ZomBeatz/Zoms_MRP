@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { addDays, addMonths, differenceInCalendarDays, format, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { useStore } from "../store";
 
 /**
  * Picking dates. The date boxes stay (typing works, and so do the lessons), with a calendar beside them:
@@ -18,7 +19,8 @@ function Calendar({ month, setMonth, from, to, min, max, pick, picking }: {
   month: Date; setMonth: (d: Date) => void; from?: string; to?: string; min?: string; max?: string;
   pick: (d: string) => void; picking?: "first" | "last";
 }) {
-  const start = startOfWeek(startOfMonth(month));
+  const weekStartsOn = useStore((s) => s.data.settings.weekStart ?? 1);
+  const start = startOfWeek(startOfMonth(month), { weekStartsOn });
   const days = Array.from({ length: 42 }, (_, i) => addDays(start, i));
   const weeks = days.slice(35).some((d) => isSameMonth(d, month)) ? 6 : 5;
   const today = ymd(new Date());

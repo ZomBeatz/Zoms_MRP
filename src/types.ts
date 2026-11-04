@@ -254,6 +254,14 @@ export interface Settings {
   currencyDays: number;
   /** Most hours on duty in a day; a season with longer days is flagged. 0 = don't check. */
   maxDutyHours: number;
+  /** The first day of the week in calendars and the week sheet: 1 Monday, 0 Sunday. */
+  weekStart: 0 | 1;
+  /** Pages left out of the menu (an operator that doesn't use them). */
+  hiddenPages: Page[];
+  /** What a new season starts with when its mission has none before it. */
+  seasonDefaults: { pilots: number; maintainers: number; pilotRotation: Rotation | null; dutyHours: number | null };
+  /** Shown before amounts ($, €, £, kr). */
+  currencySymbol: string;
   /** Maintenance programs and flight hours (off for anyone who tracks them in another system). */
   maintenance: {
     enabled: boolean;

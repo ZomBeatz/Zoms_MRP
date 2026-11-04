@@ -45,6 +45,7 @@ export function Reports() {
   const r = useMemo(() => report(data, from, to), [data, from, to]);
   // Cost columns only once some rate is set (day rates, cost per flight hour, charge per day).
   const costs = hasRates(data);
+  const sym = data.settings.currencySymbol ?? "$";
   const fleetUse = r.fleet.length ? r.fleet.reduce((t, f) => t + f.flying, 0) / (r.fleet.length * r.days) : 0;
   const crewDays = r.crew.reduce((t, c) => t + c.on, 0);
   const crewShare = r.crew.length ? crewDays / (r.crew.length * r.days) : 0;
@@ -56,7 +57,8 @@ export function Reports() {
   const week = async () => {
     const { showToast } = useStore.getState();
     const t = today();
-    const monday = dayAt(t, -((t.getDay() + 6) % 7) + (weekOf === "next" ? 7 : 0));
+    const first = data.settings.weekStart ?? 1;
+    const monday = dayAt(t, -((t.getDay() - first + 7) % 7) + (weekOf === "next" ? 7 : 0));
     setMaking("week");
     try {
       const blob = await (await import("../reportPdf")).buildWeekPdf(data, monday);
@@ -201,9 +203,9 @@ export function Reports() {
                     {costs && (() => {
                       const c = seasonCost(data, m, from, to);
                       return <>
-                        <td className="r">{money(c.crew)}</td><td className="r">{money(c.flying)}</td><td className="r"><b>{money(c.total)}</b></td>
-                        <td className="r">{c.charged === null ? "—" : money(c.charged)}</td>
-                        <td className="r">{c.margin === null ? "—" : <span className={c.margin < 0 ? "danger-text" : "ok-text"}>{money(c.margin)}</span>}</td>
+                        <td className="r">{money(c.crew, sym)}</td><td className="r">{money(c.flying, sym)}</td><td className="r"><b>{money(c.total, sym)}</b></td>
+                        <td className="r">{c.charged === null ? "—" : money(c.charged, sym)}</td>
+                        <td className="r">{c.margin === null ? "—" : <span className={c.margin < 0 ? "danger-text" : "ok-text"}>{money(c.margin, sym)}</span>}</td>
                       </>;
                     })()}
                   </tr>

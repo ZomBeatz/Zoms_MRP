@@ -1,6 +1,6 @@
 [package]
 name = "zoms-mrp"
-version = "0.2.2"
+version = "0.2.3"
 description = "Zom's MRP: the Mission Ready Planner on one computer"
 license = "MIT"
 edition = "2021"

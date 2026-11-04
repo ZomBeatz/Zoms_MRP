@@ -13,6 +13,10 @@ export const defaultSettings = (): Settings => ({
   expiryWarningDays: 30,
   currencyDays: 90,
   maxDutyHours: 14,
+  weekStart: 1,
+  hiddenPages: [],
+  seasonDefaults: { pilots: 1, maintainers: 0, pilotRotation: null, dutyHours: null },
+  currencySymbol: "$",
   maintenance: { enabled: true, autoPlan: false, hoursPerDay: 3, dueSoonDays: 30 },
 });
 

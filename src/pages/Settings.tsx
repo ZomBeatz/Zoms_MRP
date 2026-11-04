@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClipboardCheck, Download, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { ClipboardCheck, Download, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
@@ -18,6 +18,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   const { data, demo, updateSettings, setDemo, resetDemo, removeDemo, change, clearAll, showToast } = useStore();
   const { theme, rules } = data.settings;
   const mx = data.settings.maintenance;
+  const sd = data.settings.seasonDefaults ?? { pilots: 1, maintainers: 0, pilotRotation: null, dutyHours: null };
   const fileRef = useRef<HTMLInputElement>(null);
   const [sureDemo, setSureDemo] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -83,6 +84,46 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
                 {t === "system" ? "Match my computer" : t === "light" ? "Light" : "Dark"}
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <h3><SlidersHorizontal size={16} /> Preferences</h3>
+          <div className="form-grid">
+            <div className="field">
+              <span>Week starts on</span>
+              <div className="seg">
+                {([[1, "Monday"], [0, "Sunday"]] as const).map(([v, l]) => <button key={v} className={(data.settings.weekStart ?? 1) === v ? "active" : ""} onClick={() => updateSettings({ weekStart: v })}>{l}</button>)}
+              </div>
+            </div>
+            <Field label="Currency symbol" hint="Before amounts in cost per mission.">
+              <input value={data.settings.currencySymbol ?? "$"} maxLength={4} style={{ width: 80 }} onChange={(e) => updateSettings({ currencySymbol: e.target.value })} />
+            </Field>
+          </div>
+          <div className="field" style={{ marginTop: 12 }}>
+            <span>Pages in the menu</span>
+            <div className="picker-row">
+              {([["aircraft", "Fleet"], ["schedule", "Schedule"], ["missions", "Missions"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Training"], ["balance", "Balance"], ["reports", "Reports"]] as const).map(([pg, label]) => {
+                const hidden = (data.settings.hiddenPages ?? []).includes(pg);
+                return (
+                  <label key={pg} className={`chip pick ${hidden ? "" : "on"}`}>
+                    <input type="checkbox" checked={!hidden} onChange={() => updateSettings({ hiddenPages: hidden ? (data.settings.hiddenPages ?? []).filter((x) => x !== pg) : [...(data.settings.hiddenPages ?? []), pg] })} />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+            <span className="hint">Untick pages you don't use to keep the menu short. Inspections has its own switch below.</span>
+          </div>
+          <div className="field" style={{ marginTop: 12 }}>
+            <span>New seasons start with</span>
+            <span className="rotation">
+              <NumberInput min={0} max={8} aria-label="Pilots at a time" value={sd.pilots} onChange={(pilots) => updateSettings({ seasonDefaults: { ...sd, pilots } })} /> pilots,
+              <NumberInput min={0} max={8} aria-label="Maintainers at a time" value={sd.maintainers} onChange={(maintainers) => updateSettings({ seasonDefaults: { ...sd, maintainers } })} /> maintainers,
+              rotation <NumberInput min={0} max={90} aria-label="Days on" value={sd.pilotRotation?.on ?? 0} onChange={(on) => updateSettings({ seasonDefaults: { ...sd, pilotRotation: on ? { on, off: sd.pilotRotation?.off ?? 7 } : null } })} /> on
+              <NumberInput min={0} max={90} aria-label="Days off" value={sd.pilotRotation?.off ?? 0} onChange={(off) => updateSettings({ seasonDefaults: { ...sd, pilotRotation: sd.pilotRotation ? { ...sd.pilotRotation, off } : null } })} /> off
+            </span>
+            <span className="hint">For a mission's first season; later seasons start from the one before. Rotation 0 on: the hitch rules below.</span>
           </div>
         </section>
 

@@ -1,6 +1,22 @@
 # Changelog
 
-## Not released yet
+## 0.2.3
+
+**Setting up and sharing**
+- **Import from Excel or CSV** (Settings › Your data): people, aircraft, training courses and who has done which. **Download the import template** gives the headings, notes on each and examples. A preview shows what's added, updated (matched by name or tail) and skipped before anything changes.
+- **Record a course for several people** at once, from the Training page or a course: pick the course and day, tick who attended (those who need it first).
+- **Their schedule (PDF)** on a person: their next 90 days on a page, with handovers, notes, maintenance, time off and training.
+
+**Schedule**
+- Drag the middle of a shift (mouse or pen) to move it, or drop it on another person's row to give it to them, only if they can legally take it.
+- Keys: ← → move through time, T jumps to today, + and − zoom.
+
+**Missions**
+- Tick several seasons in a mission to confirm, cancel or delete them together.
+
+**Settings**
+- **Preferences:** the week starts on Monday or Sunday, the currency symbol for costs, which pages show in the menu, and what a mission's first season starts with (crew sizes and rotation).
+
 
 **Balance**
 - A **Balance** page shows how busy everyone is over the next 30 days, 90 days or 6 months: each person's share of the days they can work (time off doesn't count), colored from hardly used to very busy.

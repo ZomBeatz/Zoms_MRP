@@ -1,11 +1,11 @@
-import { Fragment, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } from "../components/timeline";
 import { StickyNote, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { byId, useStore } from "../store";
 import { missionCoverage, requiredTraining, trainingStatus, whoCanCover, type Issue } from "../coverage";
 import { fmtRotation, offRotationSpans, seasonTails, seasonTypes } from "../rotation";
-import { dayAt, fmtDates, fmtRange, ms, overlaps, toWhen } from "../time";
+import { dayAt, fmtDates, fmtRange, ms, overlaps, toWhen, today } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, StatusPill } from "../components/ui";
 import type { AppData, Booking, Person, Settings } from "../types";
@@ -79,6 +79,24 @@ export function Schedule({ issues }: { issues: Issue[] }) {
 
   const sections = useMemo(() => buildRows(data, view, from, to, issues, open, missionId), [data, view, from, to, issues, open, missionId]);
   const shown = sections.filter((s) => s.rows.length);
+
+  // Keys: ← → move through time, T today, + − zoom (not while typing or in a form).
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.ctrlKey || e.metaKey || e.altKey || useStore.getState().editing || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
+      const step = Math.max(1, Math.round(tl.span / 4));
+      if (e.key === "ArrowLeft") tl.setStart(dayAt(tl.start, -step));
+      else if (e.key === "ArrowRight") tl.setStart(dayAt(tl.start, step));
+      else if (e.key === "t" || e.key === "T") tl.setStart(dayAt(today(), -tl.back));
+      else if (e.key === "+" || e.key === "=") tl.setSpan(tl.span * 0.7);
+      else if (e.key === "-") tl.setSpan(tl.span / 0.7);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [tl]);
 
   // Dragging a shift's end, like trimming a clip; a handover (the next shift starting that day) moves with it.
   const change = useStore((s) => s.change);
