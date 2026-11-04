@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { CheckCircle2, Clock, PlayCircle } from "lucide-react";
 import { LESSONS, TOURS, useTour, type Tour } from "../tour";
 import { useStore } from "../store";
-import { isOnlineDemo, isServerBuild } from "../platform";
+import { isDesktopApp, isOnlineDemo, isServerBuild, withDemo } from "../platform";
 
 const mac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 const mod = mac ? "⌘" : "Ctrl";
@@ -183,7 +183,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
         <li>If Save can't save yet, it tells you what's missing, like a name or a date.</li>
         <li><b>Delete</b> asks once more before it deletes. After you add or delete something, the message at the bottom has an <b>Undo</b> button. {mod} Z undoes any change.</li>
         <li>On a phone, the back button closes the form you're in, then goes back to the page before.</li>
-        <li>In the demo, try anything. <b>Reset demo</b> puts it all back.</li>
+        {withDemo && <li>In the demo, try anything. <b>Reset demo</b> puts it all back.</li>}
       </ul>
     ),
   },
@@ -272,9 +272,12 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
       <>
         <p>
           {isServerBuild ? "On the server, everyone signs in to the same plan. Admins add people as Admin, Scheduler (changes the plan) or Viewer (looks only). If two people save at once, the second is told and nothing is overwritten. The server keeps a copy every day."
-            : "The desktop app keeps the plan in a file on this computer and a copy every day for a month. Settings › Your data makes a backup file you can restore anywhere."}
+            : isDesktopApp || !withDemo
+              ? `${isDesktopApp ? "The desktop app keeps the plan in a file on this computer and a copy every day for a month." : "The plan is kept in this browser, on this device."} Settings › Your data makes a backup file you can restore anywhere.`
+              : "The demo is kept in this browser, apart from anything else."}
         </p>
-        <p>The demo data is kept apart from your own. Switch it on or off in Settings › Demo data, where <b>Remove demo data</b> takes it off this device. To start fresh with real data, use <b>Settings › Your data › Clear all data</b>.</p>
+        {withDemo && !isOnlineDemo && <p>The demo data is kept apart from your own. Switch it on or off in Settings › Demo data, where <b>Remove demo data</b> takes it off this device.</p>}
+        <p>To start over with nothing, use <b>Settings › Your data › Clear all data</b>.</p>
       </>
     ),
   },
@@ -334,7 +337,7 @@ export function Setup() {
   );
 }
 
-/** How every part works and how it's meant to be used, with walkthroughs of the demo. */
+/** How every part works and how it's meant to be used, with walkthroughs where there's a demo to run them on. */
 export function Guide() {
   const start = useTour((s) => s.start);
   const demo = useStore((s) => s.demo);
@@ -342,17 +345,23 @@ export function Guide() {
     <div className="guide">
       <div className="page-head"><h1>Guide</h1></div>
 
-      <h2 style={{ marginTop: 0 }}>Learn it step by step</h2>
-      <p className="muted" style={{ marginTop: -4 }}>
-        Short lessons you do yourself on the demo, a few minutes each. Every step says what to tap and moves on when you've done it; <b>Do it for me</b> does it for you.
-        Each lesson starts from a fresh copy of the demo and puts it back when it's over, so try anything. Take a break between lessons any time: finished ones are ticked off here.
-        {demo || isOnlineDemo ? "" : " Starting one switches to the demo, and you're back on your own data when it ends. Your data isn't touched."}
-      </p>
-      <TourCards tours={LESSONS} onStart={start} numbered />
+      {withDemo ? (
+        <>
+          <h2 style={{ marginTop: 0 }}>Learn it step by step</h2>
+          <p className="muted" style={{ marginTop: -4 }}>
+            Short lessons you do yourself on the demo, a few minutes each. Every step says what to tap and moves on when you've done it; <b>Do it for me</b> does it for you.
+            Each lesson starts from a fresh copy of the demo and puts it back when it's over, so try anything. Take a break between lessons any time: finished ones are ticked off here.
+            {demo || isOnlineDemo ? "" : " Starting one switches to the demo, and you're back on your own data when it ends. Your data isn't touched."}
+          </p>
+          <TourCards tours={LESSONS} onStart={start} numbered />
 
-      <h2>Look around</h2>
-      <p className="muted" style={{ marginTop: -4 }}>Tours that point at one thing at a time and explain it. You can scroll and tap the page while they run.</p>
-      <TourCards tours={TOURS} onStart={start} />
+          <h2>Look around</h2>
+          <p className="muted" style={{ marginTop: -4 }}>Tours that point at one thing at a time and explain it. You can scroll and tap the page while they run.</p>
+          <TourCards tours={TOURS} onStart={start} />
+        </>
+      ) : (
+        <p className="muted" style={{ marginTop: 0 }}>How Zom's MRP works, and how to do the everyday jobs. Tap a topic to jump to it.</p>
+      )}
 
       <nav className="guide-toc" aria-label="Contents">
         {SECTIONS.map((s) => <a key={s.id} href={`#guide-${s.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(`guide-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{s.title}</a>)}
@@ -363,7 +372,7 @@ export function Guide() {
         <section key={s.id} id={`guide-${s.id}`} className="guide-section">
           <div className="row gap-sm wrap">
             <h2 className="grow">{s.title}</h2>
-            {s.tour && <button className="btn sm" onClick={() => start(s.tour!)}><PlayCircle size={14} /> Show me</button>}
+            {s.tour && withDemo && <button className="btn sm" onClick={() => start(s.tour!)}><PlayCircle size={14} /> Show me</button>}
           </div>
           {s.body}
         </section>

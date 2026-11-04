@@ -1,21 +1,23 @@
 # Changelog
 
-## Not released yet
+## 0.2.1
 
 **The app opens empty**
-- The app (desktop, web and server) opens straight to an empty plan, with the setup steps on the Overview: aircraft, training, pilots, maintainers, missions. Demo data, the Guide and the lessons are only in the online demo for now, and any demo kept on the device is removed.
+- The app (desktop, web and server) opens straight to an empty plan, with the setup steps on the Overview: aircraft, training, pilots, maintainers, missions, and a link to the Guide.
+- The Guide is in the app; its hands-on lessons and tours, and the demo data, are only in the online demo for now. Any demo kept on the device is removed.
 
-**Learn it step by step**
+**Mac**
+- One Mac app for Apple silicon and Intel, macOS 10.15 or later. It's ad-hoc signed, so it opens after **Privacy & Security > Open Anyway** once; the README explains how, and how to sign and notarize it with an Apple Developer account.
+
+**Learn it step by step** (in the online demo)
 - Six hands-on lessons in the Guide: add a training course, add an aircraft, add a pilot, a customer calls with dates, a pilot calls in sick, and a job needs another aircraft. Each step says what to tap and moves on once it's done; **Do it for me** does it instead.
 - Finished lessons and tours are ticked off, and each lesson ends with **Take a break** or the next one.
 - Every lesson and tour starts on a fresh demo and puts it back when it's over.
-- A lesson started from your own data takes you back to it when it ends, and switching to your own data mid-lesson ends the lesson, so lessons never touch your data.
 - On a phone the lesson card is small: just what to tap and the buttons, with **Why?** for the explanation.
 - The page can be scrolled and used while a tour runs, and its card can be made small to see what's under it.
 
 **Easier to use**
 - Save is never greyed out: if something's missing, it says what. Delete asks once more.
-- **Settings › Demo data › Remove demo data** takes the demo off this device without touching your own data. Turning it on again starts a fresh copy.
 - A mission's Crew tab shows who's on it, who could join, and folds away people not rated on its aircraft.
 - On a phone: the demo banner is one slim line, summary numbers sit two to a row, and time off, training courses and maintenance show as lists.
 - The Guide adds a setup checklist for your own data, a list of the words Zom's MRP uses, and how to undo mistakes.

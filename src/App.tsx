@@ -4,7 +4,7 @@ import {
   BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X,
 } from "lucide-react";
 import { useStore } from "./store";
-import { RELEASES_URL, isDesktopApp, isOnlineDemo, showLearning } from "./platform";
+import { RELEASES_URL, isDesktopApp, isOnlineDemo } from "./platform";
 import { findIssues } from "./coverage";
 import type { Page } from "./types";
 import { Wordmark, LogoMark } from "./components/Logo";
@@ -73,7 +73,7 @@ export default function App() {
         const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training" } as const)[page as "aircraft"] ?? "mission";
         open(kind, "new");
       } else if (e.key === "[") updateSettings({ sidebarCollapsed: !useStore.getState().data.settings.sidebarCollapsed });
-      else if (e.key === "?" && showLearning) useStore.getState().go("guide");
+      else if (e.key === "?") useStore.getState().go("guide");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -125,12 +125,10 @@ export default function App() {
           </button>
         ))}
         <div className="nav-gap" />
-        {showLearning && (
-          <button className={`nav-item ${page === "guide" ? "active" : ""}`} onClick={() => navTo("guide")} title={collapsed ? "Guide" : undefined}>
-            <BookOpen size={16} />
-            {(!collapsed || drawer) && "Guide"}
-          </button>
-        )}
+        <button className={`nav-item ${page === "guide" ? "active" : ""}`} onClick={() => navTo("guide")} title={collapsed ? "Guide" : undefined}>
+          <BookOpen size={16} />
+          {(!collapsed || drawer) && "Guide"}
+        </button>
         <button className={`nav-item ${page === "settings" ? "active" : ""}`} onClick={() => navTo("settings")} title={collapsed ? "Settings" : undefined}>
           <Cog size={16} />
           {(!collapsed || drawer) && "Settings"}
@@ -174,7 +172,7 @@ export default function App() {
           {page === "training" && <TrainingPage />}
           {page === "reports" && <Reports />}
           {page === "settings" && <SettingsPage onHelp={() => navTo("guide")} />}
-          {page === "guide" && showLearning && <Guide />}
+          {page === "guide" && <Guide />}
         </div>
       </main>
 
