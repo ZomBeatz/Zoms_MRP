@@ -16,9 +16,9 @@
 
 1. Download Zom's MRP for your computer from the [latest release](https://github.com/ZomBeatz/Zoms_MRP/releases/latest): **Windows** (`.exe`), **Mac** (`.dmg`) or **Linux** (`.deb`, `.rpm` or `.AppImage`).
 2. Install it with a double-click and open it.
-3. Choose **Try it with demo data** to look around, or **Start empty** to plan your own operation.
+3. It opens empty. The **Getting started** card on the Overview lists what to add, in order: aircraft, training, pilots, maintainers, then each customer as a mission.
 
-The **Guide** in the sidebar (or **?**) explains every part, and its walkthroughs take you through the demo one step at a time.
+The **Guide** in the sidebar (or **?**) explains every part and has step-by-step answers for everyday jobs. The online demo also has hands-on lessons and tours.
 
 Everything stays on that computer. For a team, see [Server](#server) below.
 
@@ -81,13 +81,15 @@ In the desktop app, in a file in the app's data folder on that computer, with a 
 <details>
 <summary><b>Windows or macOS warns about the installer</b></summary>
 
-The installers aren't signed with a paid certificate yet. On Windows choose **More info > Run anyway**; on a Mac, right-click the app and choose **Open**.
+The installers aren't signed with a paid certificate yet. On Windows choose **More info > Run anyway**.
+
+On a Mac, open the `.dmg` and drag **Zom's MRP** to **Applications**. The first time you open it, macOS says it can't check it: choose **Done**, then go to **System Settings > Privacy & Security**, scroll down to the message about Zom's MRP and choose **Open Anyway**. On macOS 14 or older, right-clicking the app and choosing **Open** also works. After that it opens normally. The Mac app runs on Apple silicon and Intel Macs with macOS 10.15 or later.
 </details>
 
 <details>
-<summary><b>Does the demo touch my own data?</b></summary>
+<summary><b>Where's the demo data?</b></summary>
 
-No. The demo is kept apart. Turn it off in **Settings > Demo data** (or **Use my own data** on the banner) and your own data comes back as you left it.
+Only in the [online demo](https://zombeatz.github.io/Zoms_MRP/), which keeps it in your browser. The app itself opens empty, ready for your own operation.
 </details>
 
 <details>
@@ -135,6 +137,24 @@ npm run build:server && cargo test --manifest-path server/Cargo.toml   # the ser
 - `src/excel.ts`: **Export to Excel**.
 - `server/`: the server (Rust: axum and SQLite), with the web app built in. `Dockerfile` and `docker-compose.yml` package it with Caddy.
 - `src-tauri/`: the desktop app (Tauri 2). `npm run app` runs it; `npm run bundle` makes the installer.
+</details>
+
+<details>
+<summary><b>Making a release, and signing the Mac app</b></summary>
+
+1. Put the new version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, and give the changelog a heading for it.
+2. Push a tag like `v0.2.1`. The **Desktop app** workflow builds the Windows, Mac (one app for Apple silicon and Intel) and Linux installers and puts them in a draft release. Check it, then publish it. The workflow can also be run from the Actions tab without a tag; the installers are then under the run's Artifacts.
+
+Without Apple secrets, the Mac app is ad-hoc signed and people open it once with **Open Anyway** (see Questions). To have it open with no warning, it needs an Apple Developer account (99 USD a year). Add these repository secrets (Settings > Secrets and variables > Actions) and the next build is signed and notarized:
+
+| Secret | What it is |
+|---|---|
+| `APPLE_CERTIFICATE` | The **Developer ID Application** certificate exported from Keychain Access as a `.p12`, as base64 (`base64 -i cert.p12`) |
+| `APPLE_CERTIFICATE_PASSWORD` | The password chosen when exporting it |
+| `APPLE_SIGNING_IDENTITY` | Its name, like `Developer ID Application: ZomBeatz Media (TEAMID)` |
+| `APPLE_ID` | The Apple Account email of the developer account |
+| `APPLE_PASSWORD` | An app-specific password for it, made at account.apple.com |
+| `APPLE_TEAM_ID` | The 10-character team ID from developer.apple.com |
 </details>
 
 ## License

@@ -6,7 +6,7 @@ import { Field, NumberInput } from "../components/ui";
 import { migrate } from "../migrate";
 import { downloadWorkbook } from "../excel";
 import { saveFile, showInFolder } from "../files";
-import { isDesktopApp, isOnlineDemo, isServerBuild, showLearning } from "../platform";
+import { isDesktopApp, isOnlineDemo, isServerBuild, withDemo } from "../platform";
 import { serverUser } from "../backends/server";
 import { DEMO_KEY } from "../backends";
 import { ServerSettings } from "./ServerSettings";
@@ -58,7 +58,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
         </section>
 
         {/* The online demo is only the demo; there's no own data to switch to. */}
-        {showLearning && !isOnlineDemo && (
+        {withDemo && !isOnlineDemo && (
           <section className="panel">
             <h3><FlaskConical size={16} /> Demo data</h3>
             <label className="check">
@@ -127,9 +127,9 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
         <section className="panel kbd-hint">
           <h3><Keyboard size={16} /> Shortcuts</h3>
           <table className="table" style={{ boxShadow: "none" }}>
-            <tbody>{SHORTCUTS.filter(([k]) => showLearning || k !== "?").map(([k, d]) => <tr key={k} style={{ cursor: "default" }}><td style={{ width: 160 }}><kbd>{k}</kbd></td><td>{d}</td></tr>)}</tbody>
+            <tbody>{SHORTCUTS.map(([k, d]) => <tr key={k} style={{ cursor: "default" }}><td style={{ width: 160 }}><kbd>{k}</kbd></td><td>{d}</td></tr>)}</tbody>
           </table>
-          {showLearning && <button className="btn sm" style={{ marginTop: 8 }} onClick={onHelp}>Open the guide</button>}
+          <button className="btn sm" style={{ marginTop: 8 }} onClick={onHelp}>Open the guide</button>
         </section>
 
         <section className="panel">
