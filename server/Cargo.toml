@@ -1,6 +1,6 @@
 [package]
 name = "zoms-mrp-server"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Zom's MRP Server: the Mission Ready Planner for a team, on your own server, behind sign-in"
 license = "MIT"
