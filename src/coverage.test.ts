@@ -135,3 +135,28 @@ describe("filling maintainers who are needed only some days", () => {
     expect(added.map((s) => [new Date(s.start).getDate(), new Date(s.end).getDate()])).toEqual([[1, 3], [27, 29]]);
   });
 });
+
+describe("training extensions", () => {
+  it("counts training as current until its extension, with the reason kept", () => {
+    const p = pilot("p", "P", ["Bell 412"]);
+    p.training = [{ trainingId: "nvg", completed: "2030-01-01", expires: "2030-11-05" }];
+    const a = new Date(d(1)).getTime(), b = new Date(d(20)).getTime();
+    expect(trainingStatus(p, "nvg", a, b).state).toBe("runs-out");
+    p.training[0] = { ...p.training[0], extendedTo: "2030-12-31", extensionNote: "On the North Slope job" };
+    expect(trainingStatus(p, "nvg", a, b)).toEqual({ state: "ok", expires: "2030-12-31" });
+  });
+});
+
+describe("ignoring problems", () => {
+  it("leaves an ignored problem out, and lists it while it's still there", async () => {
+    const { ignoredIssues } = await import("./coverage");
+    const data = base();
+    const [gap] = findIssues(data);
+    data.ignored = [{ id: gap.id, title: gap.title, note: "Customer agreed", on: "2030-11-01" }];
+    expect(findIssues(data).some((i) => i.id === gap.id)).toBe(false);
+    expect(ignoredIssues(data).map((x) => x.note)).toEqual(["Customer agreed"]);
+    // Once it's fixed, it drops off the ignored list too.
+    data.seasons[0].pilotsNeeded = 0;
+    expect(ignoredIssues(data)).toEqual([]);
+  });
+});

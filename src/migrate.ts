@@ -57,6 +57,7 @@ export function migrate(raw: any): AppData {
 
   // 0.2.3: maintenance programs, and settings for them.
   d.programs = d.programs ?? [];
+  d.ignored = d.ignored ?? [];
   const settings = { ...defaultSettings(), ...d.settings, rules: { ...defaultSettings().rules, ...d.settings?.rules }, maintenance: { ...defaultSettings().maintenance, ...d.settings?.maintenance } };
   settings.scheduleSpan = Math.min(365, Math.max(7, Math.round(Number(settings.scheduleSpan) || 30)));
   if (!["missions", "aircraft", "people"].includes(settings.scheduleGroup)) settings.scheduleGroup = "aircraft";

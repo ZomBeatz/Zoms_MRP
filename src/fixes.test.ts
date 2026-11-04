@@ -14,7 +14,9 @@ const TABS: Record<string, (string | undefined)[]> = {
 /** The fix points at something that exists, on a tab its form has. */
 function checkFix(data: AppData, f: ReturnType<typeof fixesFor>[number]) {
   const list = { season: data.seasons, person: data.people, job: data.jobs, aircraft: data.aircraft, timeOff: data.timeOff }[f.kind];
-  expect(list.some((x) => x.id === f.id), `${f.kind} ${f.id} exists`).toBe(true);
+  // A new one, filled in (Plan it), or something that exists.
+  if (f.id === "new") expect(f.defaults, "a new one comes filled in").toBeTruthy();
+  else expect(list.some((x) => x.id === f.id), `${f.kind} ${f.id} exists`).toBe(true);
   expect(TABS[f.kind]).toContain(f.tab);
   const spot = f.spot ?? "";
   if (spot.startsWith("shift:")) {

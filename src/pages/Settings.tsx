@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { ClipboardCheck, Download, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
@@ -16,6 +16,7 @@ import { SHORTCUTS } from "./Guide";
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
   const { data, demo, updateSettings, setDemo, resetDemo, removeDemo, change, clearAll, showToast } = useStore();
   const { theme, rules } = data.settings;
+  const mx = data.settings.maintenance;
   const fileRef = useRef<HTMLInputElement>(null);
   const [sureDemo, setSureDemo] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -102,6 +103,32 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               <NumberInput min={0} max={365} value={data.settings.expiryWarningDays} onChange={(expiryWarningDays) => updateSettings({ expiryWarningDays })} />
             </Field>
           </div>
+        </section>
+
+        <section className="panel">
+          <h3><ClipboardCheck size={16} /> Maintenance programs</h3>
+          <label className="check">
+            <input type="checkbox" checked={mx.enabled} onChange={(e) => updateSettings({ maintenance: { ...mx, enabled: e.target.checked } })} />
+            Track inspections and flight hours here
+          </label>
+          <p className="small muted" style={{ margin: "6px 0 0" }}>Each aircraft type's inspections (every so many hours or months), when each tail is due, and its flight hours, on the Inspections page. Turn it off if another system already does this.</p>
+          {mx.enabled && (
+            <>
+              <label className="check" style={{ marginTop: 10 }}>
+                <input type="checkbox" checked={mx.autoPlan} onChange={(e) => updateSettings({ maintenance: { ...mx, autoPlan: e.target.checked } })} />
+                Plan inspections automatically
+              </label>
+              <p className="small muted" style={{ margin: "4px 0 0" }}>When the app opens, inspections overdue or due soon are booked in their tail's best free days before they're due. You still pick who does them.</p>
+              <div className="form-grid" style={{ marginTop: 10 }}>
+                <Field label="Flight hours on a mission day" hint="An aircraft can have its own on its form.">
+                  <NumberInput min={1} max={24} value={mx.hoursPerDay} onChange={(hoursPerDay) => updateSettings({ maintenance: { ...mx, hoursPerDay } })} />
+                </Field>
+                <Field label="Due soon" hint="Days ahead.">
+                  <NumberInput min={1} max={365} value={mx.dueSoonDays} onChange={(dueSoonDays) => updateSettings({ maintenance: { ...mx, dueSoonDays } })} />
+                </Field>
+              </div>
+            </>
+          )}
         </section>
 
         <section className="panel">

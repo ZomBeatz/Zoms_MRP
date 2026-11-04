@@ -6,7 +6,7 @@ import { neededTraining } from "../coverage";
 import { DAY } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, Empty } from "../components/ui";
-import type { Person, Training } from "../types";
+import { validUntil, type Person, type Training } from "../types";
 
 /**
  * Training is set by each mission, and people only need what the missions they work ask for.
@@ -20,8 +20,8 @@ interface Standing { label: string; tone: string; date?: string }
 function standing(p: Person, t: Training, warnDays: number): Standing {
   const recs = p.training.filter((r) => r.trainingId === t.id);
   if (!recs.length) return { label: "Not done", tone: "danger" };
-  if (recs.some((r) => !r.expires)) return { label: "Current", tone: "ok" };
-  const latest = recs.map((r) => r.expires!).sort().at(-1)!;
+  if (recs.some((r) => !validUntil(r))) return { label: "Current", tone: "ok" };
+  const latest = recs.map((r) => validUntil(r)!).sort().at(-1)!;
   const end = new Date(`${latest}T00:00`).getTime();
   const date = format(end, "MMM d, yyyy");
   if (end <= Date.now()) return { label: "Ran out", tone: "danger", date };

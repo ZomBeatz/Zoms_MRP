@@ -1,6 +1,7 @@
 import type { AppData } from "./types";
 import type { Issue } from "./coverage";
 import { bookings } from "./bookings";
+import { dueList, planFor } from "./program";
 
 /**
  * Where each problem is fixed: which form, on which tab, and what in it to point at. The first fix is the
@@ -13,7 +14,9 @@ import { bookings } from "./bookings";
 export interface Fix {
   label: string;
   kind: "season" | "person" | "job" | "aircraft" | "timeOff";
+  /** "new" with `defaults` opens a new one filled in (a planned inspection). */
   id: string;
+  defaults?: Record<string, unknown>;
   tab?: string;
   spot?: string;
 }
@@ -32,6 +35,8 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
     seasonId ? [{ label, kind: "season", id: seasonId, tab, spot: shiftId ? `shift:${shiftId}` : undefined }] : [];
   const job = (label: string, spot: string, id = i.jobId): Fix[] => (id ? [{ label, kind: "job", id, spot }] : []);
   const who = (label: string, tab: string, spot: string): Fix[] => (i.personId ? [{ label, kind: "person", id: i.personId, tab, spot }] : []);
+  /** When there's a record to extend: the same course, where Extend it is. */
+  const extendIt = (): Fix[] => (person?.training.some((r) => r.trainingId === i.trainingId && r.expires) ? who("Extend it", "training", `training:${i.trainingId}`) : []);
   /** A booking that's either a season's shift or a maintenance job. */
   const booking = (label: string, seasonId?: string, shiftId?: string, jobId?: string) =>
     seasonId ? shift(label, seasonId, shiftId) : job(label, "maintainers", jobId);
@@ -72,9 +77,16 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
     ];
     case "duty": return booking("Rotate someone in", i.seasonId, i.shiftId, i.jobId);
     case "rest": return booking("Move this booking", i.seasonId, i.shiftId, i.jobId);
-    case "train": return [...who("Record the training", "training", `training:${i.trainingId}`), ...shift("Swap them out")];
-    case "lapsed": return who("Record the training", "training", `training:${i.trainingId}`);
-    case "renew": return who("Record the renewal", "training", `training:${i.trainingId}`);
+    case "train": return [...who("Record the training", "training", `training:${i.trainingId}`), ...shift("Swap them out"), ...extendIt()];
+    case "lapsed": return [...who("Record the training", "training", `training:${i.trainingId}`), ...extendIt()];
+    case "mxdue": {
+      const due = dueList(data).find((d) => `mxdue-${d.aircraft.id}-${d.item.id}` === i.id);
+      return [
+        ...(due ? [{ label: "Plan it", kind: "job" as const, id: "new", defaults: { ...planFor(data, due) }, spot: "maintainers" }] : []),
+        { label: "Update hours", kind: "aircraft", id: i.aircraftId!, spot: "hours" },
+      ];
+    }
+    case "renew": return [...who("Record the renewal", "training", `training:${i.trainingId}`), ...extendIt()];
   }
   // Anything new: at least open what it's about.
   if (i.seasonId) return season("Open the season", "details");

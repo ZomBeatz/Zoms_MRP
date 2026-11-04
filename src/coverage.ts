@@ -1,8 +1,9 @@
 import { format } from "date-fns";
-import type { AppData, Mission, Person, Season, Shift } from "./types";
+import { validUntil, type AppData, type Mission, type Person, type Season, type Shift } from "./types";
 import { bookings } from "./bookings";
 import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
 import { rulesFor } from "./limits";
+import { dueList } from "./program";
 import { DAY, dayAt, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
@@ -290,8 +291,8 @@ export function findIssues(data: AppData): Issue[] {
       if (!t) continue;
       const done = p.training.filter((r) => r.trainingId === tid && ms(`${r.completed}T00:00`) <= now);
       const booked = p.training.some((r) => r.trainingId === tid && ms(`${r.completed}T00:00`) > now);
-      if (booked || done.some((r) => !r.expires)) continue;
-      const latest = done.map((r) => r.expires!).sort().at(-1);
+      if (booked || done.some((r) => !validUntil(r))) continue;
+      const latest = done.map((r) => validUntil(r)!).sort().at(-1);
       const missions = needers.map((m) => `“${m.name}”`).join(", ");
       const needs = needers.length === 1 ? "needs" : "need";
       if (!latest || ms(`${latest}T00:00`) <= now)
@@ -303,7 +304,28 @@ export function findIssues(data: AppData): Issue[] {
     }
   }
 
-  return issues.sort((a, b) => (a.severity === b.severity ? a.at - b.at : a.severity === "danger" ? -1 : 1));
+  // Inspections from the maintenance programs: overdue, or due soon and not planned.
+  if (data.settings.maintenance?.enabled)
+    for (const due of dueList(data)) {
+      if (due.state !== "overdue" && due.state !== "soon") continue;
+      const late = due.state === "overdue";
+      const when = due.at !== null ? format(due.at, "MMM d, yyyy") : "";
+      issues.push({
+        id: `mxdue-${due.aircraft.id}-${due.item.id}`, severity: late ? "danger" : "warn", at: due.at ?? Date.now(), aircraftId: due.aircraft.id,
+        title: late ? `${due.aircraft.tail}'s ${due.item.title} is overdue` : `${due.aircraft.tail}'s ${due.item.title} is due ${when}`,
+        detail: (due.by === "hours" ? `At about ${due.hoursDue} flight hours${due.hoursNow !== null ? ` (about ${due.hoursNow} now)` : ""}` : `${due.item.everyMonths} months since it was last done`) + `${late ? `, ${when}` : ""}. Plan it in a free stretch before then.`,
+      });
+    }
+
+  const ignored = new Set((data.ignored ?? []).map((x) => x.id));
+  return issues.filter((i) => !ignored.has(i.id)).sort((a, b) => (a.severity === b.severity ? a.at - b.at : a.severity === "danger" ? -1 : 1));
+}
+
+/** The ignored problems that are still there (fixed ones drop off the list). */
+export function ignoredIssues(data: AppData) {
+  if (!data.ignored?.length) return [];
+  const live = new Set(findIssues({ ...data, ignored: [] }).map((i) => i.id));
+  return data.ignored.filter((x) => live.has(x.id));
 }
 
 /** Pilots or maintainers free for the whole of [a, b], qualified on the type, best first. */
@@ -364,8 +386,8 @@ export type TrainingState = "ok" | "missing" | "expired" | "runs-out";
 export function trainingStatus(p: Person, trainingId: string, a: number, b: number): { state: TrainingState; expires?: string } {
   const recs = p.training.filter((r) => r.trainingId === trainingId && ms(`${r.completed}T00:00`) <= a);
   if (!recs.length) return { state: "missing" };
-  if (recs.some((r) => !r.expires)) return { state: "ok" };
-  const latest = recs.map((r) => r.expires!).sort().at(-1)!;
+  if (recs.some((r) => !validUntil(r))) return { state: "ok" };
+  const latest = recs.map((r) => validUntil(r)!).sort().at(-1)!;
   const end = ms(`${latest}T00:00`);
   if (end <= a) return { state: "expired", expires: latest };
   if (end < b) return { state: "runs-out", expires: latest };

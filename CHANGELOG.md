@@ -10,6 +10,20 @@
 **Work limits**
 - A person, a mission and a season can each have their own most days on in a row and fewest days off. The safest wins; a season can **Override** the mission and Settings, but a person's own limits always apply. The checks, Fill the schedule and Rebalance all follow them.
 
+**Inspections and flight hours**
+- An **Inspections** page with each aircraft type's maintenance program: inspections every so many flight hours and/or months, whichever comes first, how long they take and whether they ground it.
+- Flight hours: type a tail's hours when you have them; in between, mission days × hours per flying day carry them forward.
+- **Due** shows every tail's inspections, last done, when due and whether planned. **Plan it** books one in the latest free days before it's due; **Record last done** starts the count. Overdue and due-soon ones show under Needs attention and on an Overview tile.
+- **Settings › Maintenance programs** turns it off (for anyone with another system) or plans due inspections automatically.
+
+**Training and problems**
+- Training dates have a **Today** button.
+- **Extend it** keeps training current until a later day, with a reason (someone on a long job who can't get back for the renewal). It shows as Extended wherever it does.
+- Any problem can be **Ignored** with a reason; **Show ignored** lists them, with Restore.
+
+**Also**
+- A person's form shows where they're **booked next**, each opening right at that shift.
+
 **Fill the schedule follows the rules more closely**
 - It never books a stretch longer than the most days on in a row, counting bookings either side; it leaves the minimum days off before and after; and it stops at the open days instead of putting more people on than there are seats.
 

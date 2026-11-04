@@ -647,3 +647,24 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
   .balance-person-name { grid-area: name; } .balance-person .lock { grid-area: lock; }
   .load-track { grid-area: bar; } .load-words { grid-area: words; }
 }
+
+/* Ignoring a problem: a reason, then Ignore it. */
+.ignore-row { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 12px 10px 38px; }
+.ignore-row input { flex: 1 1 220px; min-width: 0; }
+.ignored { margin-top: 8px; }
+
+/* ---------- Inspections: due list, programs per type, flight hours ---------- */
+.mono { font-family: var(--zb-font-mono); }
+.issue-card.due-overdue { box-shadow: var(--zb-shadow), inset 3px 0 0 var(--zb-danger); }
+.issue-card.due-soon { box-shadow: var(--zb-shadow), inset 3px 0 0 var(--zb-warn); }
+.program { margin-bottom: 12px; }
+.program h3 { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.program-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 0; border-bottom: 1px solid var(--zb-border); }
+.program-item:last-of-type { margin-bottom: 8px; }
+.program-title { flex: 1 1 200px; min-width: 0; font-weight: 600; }
+.program-item .rotation input[type="number"] { width: 64px; }
+.hours-row { display: flex; flex-wrap: wrap; align-items: center; }
+.hours-row > .issue { flex: 1 1 240px; }
+.hours-entry { display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
+.hours-entry > input { width: 110px; }
+.hours-entry .date-single { margin: 0; }

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, BookOpen, Check, CheckCircle2, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
-import { missionCoverage, type Issue } from "../coverage";
+import { ignoredIssues, missionCoverage, type Issue } from "../coverage";
 import { format } from "date-fns";
 import { dayAt, fmtRange, ms, overlaps, today } from "../time";
 import { missionLook, slotStyle } from "../look";
@@ -12,7 +12,36 @@ import { seasonTails } from "../rotation";
 import { withDemo } from "../platform";
 import { Setup } from "./Guide";
 import { fixesFor, type Fix } from "../fixes";
+import { dueList } from "../program";
 import type { Booking } from "../types";
+
+/** Problems someone ignored, with why, and Restore to bring one back. */
+export function IgnoredList() {
+  const { data, change } = useStore();
+  const [open, setOpen] = useState(false);
+  const list = ignoredIssues(data);
+  if (!list.length) return null;
+  return (
+    <div className="ignored">
+      <button className="link" onClick={() => setOpen(!open)}>{open ? "Hide" : "Show"} {list.length} ignored {list.length === 1 ? "problem" : "problems"}</button>
+      {open && (
+        <div className="issues" style={{ marginTop: 8 }}>
+          {list.map((x) => (
+            <div key={x.id} className="issue-card row-card">
+              <div className="issue">
+                <span className="grow">
+                  <b>{x.title}</b>
+                  <div className="small muted">Ignored {format(new Date(`${x.on}T00:00`), "MMM d")}{x.note ? `: ${x.note}` : ""}</div>
+                </span>
+              </div>
+              <button className="btn sm" onClick={() => change((d) => ({ ...d, ignored: d.ignored.filter((y) => y.id !== x.id) }), `Restored “${x.title}”`)}>Restore</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** One tap to confirm a planned season, with Undo in the message. */
 export function ConfirmButton({ season }: { season: Pick<Booking, "id" | "name" | "start" | "end" | "status"> }) {
@@ -29,7 +58,7 @@ export function ConfirmButton({ season }: { season: Pick<Booking, "id" | "name" 
 /** Open the form where a problem is fixed, on the right tab, pointing at what to change. */
 export function useFix() {
   const open = useStore((s) => s.open);
-  return (f: Fix) => open(f.kind, f.id, undefined, { tab: f.tab, spot: f.spot });
+  return (f: Fix) => open(f.kind, f.id, f.defaults, { tab: f.tab, spot: f.spot });
 }
 
 /**
@@ -41,6 +70,15 @@ export function IssueList({ issues, limit, onFix }: { issues: Issue[]; limit?: n
   const openFix = useFix();
   const [all, setAll] = useState(false);
   const shown = all ? undefined : limit;
+  // Ignoring one: which, and why.
+  const [ignoring, setIgnoring] = useState<string | null>(null);
+  const [why, setWhy] = useState("");
+  const change = useStore((s) => s.change);
+  const ignore = (i: Issue) => {
+    change((d) => ({ ...d, ignored: [...(d.ignored ?? []), { id: i.id, title: i.title, note: why.trim(), on: format(new Date(), "yyyy-MM-dd") }] }), `Ignored “${i.title}”`);
+    setIgnoring(null);
+    setWhy("");
+  };
   const go = (f: Fix) => {
     if (!onFix?.(f)) openFix(f);
   };
@@ -65,9 +103,16 @@ export function IssueList({ issues, limit, onFix }: { issues: Issue[]; limit?: n
               </span>
               <span className={`pill ${i.severity}`}>{i.severity === "danger" ? "Problem" : "Check"}</span>
             </button>
-            {fixes.length > 0 && (
-              <div className="issue-fixes">
-                {fixes.map((f, k) => <button key={k} className={`btn sm ${k === 0 ? "primary" : ""}`} onClick={() => go(f)}>{f.label}</button>)}
+            <div className="issue-fixes">
+              {fixes.map((f, k) => <button key={k} className={`btn sm ${k === 0 ? "primary" : ""}`} onClick={() => go(f)}>{f.label}</button>)}
+              {ignoring !== i.id && <button className="btn sm ghost" onClick={() => { setIgnoring(i.id); setWhy(""); }} title="Hide it from this list, with a reason">Ignore…</button>}
+            </div>
+            {ignoring === i.id && (
+              <div className="ignore-row">
+                <input value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why? (optional, like: on a year-long job, renewal agreed for June)" aria-label="Why ignore it"
+                  onKeyDown={(e) => { if (e.key === "Enter") ignore(i); if (e.key === "Escape") setIgnoring(null); }} />
+                <button className="btn sm" onClick={() => ignore(i)}>Ignore it</button>
+                <button className="btn sm ghost" onClick={() => setIgnoring(null)}>Cancel</button>
               </div>
             )}
           </div>
@@ -132,6 +177,16 @@ export function Overview({ issues }: { issues: Issue[] }) {
           <div className="label"><Users size={14} /> On duty now</div>
           <div className="value">{stats.onDuty}</div>
         </button>
+        {data.settings.maintenance.enabled && data.programs.length > 0 && (() => {
+          const due = dueList(data).filter((d) => d.state === "overdue" || d.state === "soon");
+          const late = due.filter((d) => d.state === "overdue").length;
+          return (
+            <button className="tile" onClick={() => go("inspections")}>
+              <div className="label"><ClipboardCheck size={14} /> Inspections due</div>
+              <div className={`value ${late ? "danger" : due.length ? "warn" : ""}`}>{due.length}{late ? <small> {late} overdue</small> : null}</div>
+            </button>
+          );
+        })()}
       </div>
 
       <h2>Fleet, next 30 days</h2>
@@ -139,6 +194,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
 
       <h2>Needs attention</h2>
       <IssueList issues={issues} limit={10} />
+      <IgnoredList />
 
       <h2>Coming up</h2>
       {upcoming.length === 0 ? (
