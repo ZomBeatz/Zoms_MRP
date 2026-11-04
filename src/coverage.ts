@@ -224,7 +224,7 @@ export function findIssues(data: AppData): Issue[] {
         issues.push({ id: `dbl-${p.id}-${x.a}-${y.a}`, severity: "danger", title: `${p.name} is booked twice`, detail: `“${x.label}” and “${y.label}” overlap, ${range(Math.max(x.a, y.a), Math.min(x.b, y.b))}.`, at: Math.max(x.a, y.a), personId: p.id,
           seasonId: x.seasonId, shiftId: x.shiftId, jobId: x.jobId, otherSeasonId: y.seasonId, otherShiftId: y.shiftId, otherJobId: y.jobId });
       }
-    for (const t of data.timeOff.filter((t) => t.personId === p.id))
+    for (const t of data.timeOff.filter((t) => t.personId === p.id && !t.soft))
       for (const d of duty)
         if (overlaps(d.a, d.b, ms(t.start), ms(t.end)))
           issues.push({ id: `off-${t.id}-${d.a}`, severity: "danger", title: `${p.name} is off${t.reason ? ` (${t.reason})` : ""}`, detail: `But booked on “${d.label}”, ${range(d.a, d.b)}.`, at: d.a, personId: p.id, seasonId: d.seasonId, shiftId: d.shiftId, jobId: d.jobId, timeOffId: t.id });
@@ -351,7 +351,7 @@ export function whoCanCover(data: AppData, role: Person["role"], a: number, b: n
     .filter((p) => p.role === role)
     .map((p) => {
       const busy = dutyOf(data, p.id).some((d) => !except.includes(d.shiftId ?? "") && overlaps(a, b, d.a, d.b));
-      const off = data.timeOff.some((t) => t.personId === p.id && overlaps(a, b, ms(t.start), ms(t.end)));
+      const off = data.timeOff.some((t) => t.personId === p.id && !t.soft && overlaps(a, b, ms(t.start), ms(t.end)));
       const qualified = !anyOf.length || anyOf.some((t) => p.quals.includes(t));
       const onRot = onRotationFor(p, a, b);
       const trained = required.every((id) => {

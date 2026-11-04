@@ -44,7 +44,9 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     if (!busy.has(p.id)) busy.set(p.id, dutyOf(current, p.id).map((d) => [d.a, d.b] as [number, number]));
     return busy.get(p.id)!;
   };
-  const offOf = (p: Person) => data.timeOff.filter((t) => t.personId === p.id).map((t) => [ms(t.start), ms(t.end)] as [number, number]);
+  const offOf = (p: Person) => data.timeOff.filter((t) => t.personId === p.id && !t.soft).map((t) => [ms(t.start), ms(t.end)] as [number, number]);
+  /** Days they'd rather not work (a preference): booked only when nobody else can. */
+  const prefersOff = (p: Person, d: number) => data.timeOff.some((t) => t.personId === p.id && t.soft && overlaps(d, dayAt(d, 1), ms(t.start), ms(t.end)));
 
   /** Can this person work the day starting at `d` (ignoring rest)? */
   const canWork = (p: Person, d: number) => {
@@ -98,7 +100,7 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     const pick = pool
       // Not current on the type (Settings) counts like training that's run out: Fill won't book them.
       .filter((p) => canWork(p, d) && rested(p, d) && fits(p, d, dayAt(d, 1)) && !staleOn(current, p, types, d))
-      .sort((a, b) => Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)) || (worked.get(a.id) ?? 0) - (worked.get(b.id) ?? 0) || a.name.localeCompare(b.name))[0];
+      .sort((a, b) => Number(prefersOff(a, d)) - Number(prefersOff(b, d)) || Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)) || (worked.get(a.id) ?? 0) - (worked.get(b.id) ?? 0) || a.name.localeCompare(b.name))[0];
     if (!pick) {
       skipUntil = dayAt(d, 1); // nobody for this day: leave it open
       continue;

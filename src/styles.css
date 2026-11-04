@@ -712,3 +712,6 @@ body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
 .rotation-head { margin-bottom: 4px; align-items: center; }
 .line-edit.sub-in { background: color-mix(in srgb, var(--zb-danger) 6%, var(--zb-surface)); }
 .avatar.open { background: transparent; border: 1.5px dashed var(--zb-danger); color: var(--zb-danger); width: 26px; height: 26px; font-size: 10.5px; }
+
+/* A day someone would rather not work: lighter than time off, since they can still be booked. */
+.slot.off.soft { opacity: .55; background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(127,127,127,.18) 6px 9px); }

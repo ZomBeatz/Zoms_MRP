@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } from "../components/timeline";
-import { Wrench } from "lucide-react";
+import { StickyNote, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { byId, useStore } from "../store";
 import { missionCoverage, requiredTraining, trainingStatus, type Issue } from "../coverage";
@@ -322,8 +322,8 @@ function buildRows(
             label: <span className="t ellipsis"><Avatar person={p} />{p.name}</span>,
             onLabel: () => open("person", p.id),
             bars: shifts.filter((s) => s.personId === p.id).map((s) => ({
-              key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: p.role === "Pilot" ? "Flying" : "On call", sub: fmtDates(s.start, s.end),
-              tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}`,
+              key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: p.role === "Pilot" ? "Flying" : "On call", sub: s.note || fmtDates(s.start, s.end), icon: s.note ? <StickyNote size={11} /> : undefined,
+              tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}${s.note ? `\nNote: ${s.note}` : ""}`,
               className: personTrouble.has(`${p.id}:${m.id}`) || personTrouble.has(`${p.id}:`) ? "problem" : "",
               style: slotStyle(missionLook(m)), onClick: () => open("season", m.id), shiftId: s.id,
             })),
@@ -398,7 +398,7 @@ function buildRows(
         </>
       ),
       onLabel: () => open("person", p.id),
-      shade: off.map((t) => [ms(t.start), ms(t.end)] as [number, number]),
+      shade: off.filter((t) => !t.soft).map((t) => [ms(t.start), ms(t.end)] as [number, number]),
       rotationOff: offRotationSpans(p, from, to),
       bars: [
         ...data.shifts
@@ -408,8 +408,8 @@ function buildRows(
             if (!m) return null;
             const tails = seasonTails(data, m, "No aircraft");
             return {
-              key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: m.name, sub: tails,
-              tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}\n${tails}`,
+              key: `s-${s.id}`, a: ms(s.start), b: ms(s.end), title: m.name, sub: s.note || tails, icon: s.note ? <StickyNote size={11} /> : undefined,
+              tip: `${p.name} on ${m.name}\n${fmtRange(s.start, s.end)}\n${tails}${s.note ? `\nNote: ${s.note}` : ""}`,
               className: `${m.status === "Cancelled" ? "cancelled" : ""} ${personTrouble.has(`${p.id}:${m.id}`) || personTrouble.has(`${p.id}:`) ? "problem" : ""}`,
               style: slotStyle(missionLook(m)), onClick: () => open("season", m.id), shiftId: s.id,
             };
@@ -417,8 +417,9 @@ function buildRows(
           .filter((b): b is Bar => !!b),
         ...data.jobs.filter((j) => j.maintainerIds.includes(p.id) && !j.done && inView(j.start, j.end)).map(jobBar),
         ...off.filter((t) => inView(t.start, t.end)).map((t): Bar => ({
-          key: `o-${t.id}`, a: ms(t.start), b: ms(t.end), title: t.reason || "Time off", tip: `${p.name}: ${t.reason || "Time off"}\n${fmtRange(t.start, t.end)}`,
-          className: "off", onClick: () => open("timeOff", t.id),
+          key: `o-${t.id}`, a: ms(t.start), b: ms(t.end), title: t.soft ? `Rather not${t.reason ? `: ${t.reason}` : ""}` : t.reason || "Time off",
+          tip: `${p.name}: ${t.soft ? "would rather not work" : t.reason || "Time off"}${t.soft && t.reason ? ` (${t.reason})` : ""}\n${fmtRange(t.start, t.end)}${t.soft ? "\nA preference: they can still be booked." : ""}`,
+          className: t.soft ? "off soft" : "off", onClick: () => open("timeOff", t.id),
         })),
       ],
     };

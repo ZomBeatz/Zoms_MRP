@@ -29,6 +29,10 @@
 - Pilot currency: days since each pilot last flew each type, from the schedule or a "last flew" date typed on their Ratings. A booking past the limit (Settings, 90 days) is a warning, and Fill won't book a pilot who isn't current. Without a record, it doesn't nag.
 - The Training page has a **Needs training** list with only the people who have training missing, run out or running out, or who aren't current on a type, each opening right at the fix.
 
+**Notes and preferences**
+- Shifts can have a note ("Bring the cold-weather kit"), shown on the Schedule bar and in the season.
+- Time off can be **only a preference**: they'd rather not work those days but can be booked. Fill and Rebalance book someone else when they can, it's never a problem if they're booked anyway, and it shows lighter on the Schedule.
+
 **Drag to change dates**
 - On the Schedule, drag either end of someone's shift (the cursor turns into ↔) to move their first or last day, like trimming a clip. It snaps to whole days, shows the new date while you drag, and Undo is in the message.
 - Handovers move together: when one person takes over from another on the same job (marked ⇄), dragging that end moves both, so the seat stays covered. Fill the schedule links who takes over from whom, so with two pilots swapping the same day the right one moves; if it can't tell, only the dragged shift moves. Hold Alt (Option) to move just one.

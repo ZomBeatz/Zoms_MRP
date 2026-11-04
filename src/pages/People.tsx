@@ -66,7 +66,7 @@ export function People({ issues }: { issues: Issue[] }) {
                     <tr key={t.id} onClick={() => open("timeOff", t.id)}>
                       <td className="name">{p ? <span className="row gap-sm"><Avatar person={p} />{p.name}</span> : "Removed person"}</td>
                       <td>{fmtRange(t.start, t.end)}</td>
-                      <td>{t.reason || <span className="muted">None given</span>}</td>
+                      <td>{t.soft && <span className="pill accent" style={{ marginRight: 6 }}>Rather not</span>}{t.reason || <span className="muted">None given</span>}</td>
                     </tr>
                   );
                 })}

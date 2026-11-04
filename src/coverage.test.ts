@@ -160,3 +160,16 @@ describe("ignoring problems", () => {
     expect(ignoredIssues(data)).toEqual([]);
   });
 });
+
+describe("days someone would rather not work", () => {
+  it("are never a problem, and Fill books someone else when it can", async () => {
+    const { fillSeason } = await import("./fill");
+    const data = base();
+    data.timeOff = [{ id: "t", personId: "p1", start: d(1), end: d(29), reason: "Moving house", soft: true }];
+    data.shifts = [{ id: "x", seasonId: "m1", personId: "p1", start: d(1), end: d(15) }];
+    expect(findIssues(data).some((i) => i.id.startsWith("off-"))).toBe(false);
+    data.shifts = [];
+    const added = fillSeason(data, data.seasons[0], "Pilot", { on: 28, off: 0 }, { maxDaysOn: 30, minDaysOff: 0 });
+    expect(added.map((s) => s.personId)).toEqual(["p2"]);
+  });
+});
