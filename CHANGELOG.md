@@ -12,6 +12,7 @@
 
 **Easier to use**
 - Save is never greyed out: if something's missing, it says what. Delete asks once more.
+- **Settings › Demo data › Remove demo data** takes the demo off this device without touching your own data. Turning it on again starts a fresh copy.
 - A mission's Crew tab shows who's on it, who could join, and folds away people not rated on its aircraft.
 - On a phone: the demo banner is one slim line, summary numbers sit two to a row, and time off, training courses and maintenance show as lists.
 - The Guide adds a setup checklist for your own data, a list of the words Zom's MRP uses, and how to undo mistakes.
