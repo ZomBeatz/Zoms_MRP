@@ -12,6 +12,9 @@
 - The Excel report has the same parts as sheets: tiles and in-cell bars on the summary, the boards colored day by day (week by week for long periods), and every sheet printing landscape, one page wide.
 - The old **Print** buttons on Reports and the Schedule are gone; the reports replace them.
 
+**Desktop app**
+- Saving to Downloads works: **Save a backup**, **Export to Excel** and the PDF and Excel reports all failed in the installed app, because it wasn't allowed to save there.
+
 **Moving a plan**
 - **Restore a backup** brings the plan's hitch limits and training warning days with it, so a plan moved from the desktop app to a server (or back) keeps its rules. Theme and layout stay each device's own.
 
