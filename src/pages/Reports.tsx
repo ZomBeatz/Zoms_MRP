@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { CalendarDays, FileSpreadsheet, FileText } from "lucide-react";
 import { saveFile, showInFolder } from "../files";
 import { DateRange } from "../components/dates";
 import { useStore } from "../store";
@@ -47,7 +47,24 @@ export function Reports() {
   const crewShare = r.crew.length ? crewDays / (r.crew.length * r.days) : 0;
   const maxMission = Math.max(1, ...r.byMission.map((x) => x.days));
 
-  const [making, setMaking] = useState<"pdf" | "xlsx" | null>(null);
+  const [making, setMaking] = useState<"pdf" | "xlsx" | "week" | null>(null);
+  const [weekOf, setWeekOf] = usePref<"this" | "next">("week-sheet", "this");
+  /** The week sheet: Monday to Sunday, this week or next. */
+  const week = async () => {
+    const { showToast } = useStore.getState();
+    const t = today();
+    const monday = dayAt(t, -((t.getDay() + 6) % 7) + (weekOf === "next" ? 7 : 0));
+    setMaking("week");
+    try {
+      const blob = await (await import("../reportPdf")).buildWeekPdf(data, monday);
+      const where = await saveFile(`zoms-mrp-week-${format(monday, "yyyy-MM-dd")}.pdf`, blob);
+      showToast(where ? "Saved to Downloads." : "Week sheet made. Look in your downloads.", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
+    } catch {
+      showToast("Couldn't make the week sheet. Try again.");
+    } finally {
+      setMaking(null);
+    }
+  };
   /** Build the report for this period and hand it over (the desktop app puts it in Downloads). */
   const make = async (kind: "pdf" | "xlsx") => {
     const { showToast } = useStore.getState();
@@ -74,6 +91,13 @@ export function Reports() {
           <button className="btn" onClick={() => make("pdf")} disabled={!!making} title="A PDF of this period: the numbers, the fleet and crew boards, missions, workload, training, maintenance and problems">
             <FileText size={16} /> {making === "pdf" ? "Making the PDF…" : "PDF report"}
           </button>
+          <button className="btn" onClick={week} disabled={!!making} title="One page with who's on each day of the week, for the crew room or Teams">
+            <CalendarDays size={16} /> {making === "week" ? "Making it…" : "Week sheet"}
+          </button>
+          <select value={weekOf} onChange={(e) => setWeekOf(e.target.value as "this" | "next")} aria-label="Which week">
+            <option value="this">This week</option>
+            <option value="next">Next week</option>
+          </select>
           <button className="btn" onClick={() => make("xlsx")} disabled={!!making} title="An Excel workbook of this period, colored like the app, one sheet per part">
             <FileSpreadsheet size={16} /> {making === "xlsx" ? "Making the file…" : "Excel report"}
           </button>

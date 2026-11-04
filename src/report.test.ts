@@ -53,3 +53,13 @@ describe("reports", () => {
     await save("report.xlsx", bytes);
   });
 });
+
+describe("week sheet", () => {
+  it("makes a one-page PDF for a week", async () => {
+    const { buildWeekPdf } = await import("./reportPdf");
+    const blob = await buildWeekPdf(sampleData(), dayAt(today(), 0));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+    await save("week.pdf", bytes);
+  });
+});
