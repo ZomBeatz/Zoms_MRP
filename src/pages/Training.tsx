@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { GraduationCap, Plus } from "lucide-react";
+import { GraduationCap, Plus, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { neededTraining } from "../coverage";
@@ -53,6 +53,7 @@ export function TrainingPage() {
     <>
       <div className="page-head">
         <h1>Training</h1>
+        {data.trainings.length > 0 && data.people.length > 0 && <button className="btn" onClick={() => open("groupTraining", "new")}><Users size={16} /> Record for several people…</button>}
         <button className="btn primary" onClick={() => open("training", "new")}><Plus size={16} /> Add training…</button>
       </div>
       <div className="row gap wrap" style={{ marginBottom: 14 }}>

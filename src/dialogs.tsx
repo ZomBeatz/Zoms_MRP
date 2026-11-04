@@ -33,6 +33,7 @@ export function Dialogs() {
     case "training": return <TrainingDialog key={editing.id} {...props} />;
     case "support": return <SupportDialog key={editing.id} {...props} />;
     case "swap": return <SwapDialog key={editing.id} {...props} />;
+    case "groupTraining": return <GroupTrainingDialog key={editing.id} {...props} />;
   }
 }
 
@@ -1591,6 +1592,68 @@ function TrainingDialog({ id }: Props) {
           </select>
         </Field>
         <Field label="Notes" full><textarea rows={2} value={t.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
+        {existing && <div className="full"><button className="btn sm" onClick={() => useStore.getState().open("groupTraining", "new", { trainingId: t.id })}>Record it for several people…</button></div>}
+      </div>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- recording a course for a group
+
+/**
+ * One class, several people: pick the course and the day once, tick who attended. Those who need it
+ * (their missions ask for it and it's missing or running out) come first, with one tap to tick them all.
+ */
+function GroupTrainingDialog({ id, defaults }: Props) {
+  const { data, change, close } = useStore();
+  const [courseId, setCourseId] = useState(() => (defaults.trainingId as string) ?? (id !== "new" ? id : data.trainings[0]?.id ?? ""));
+  const [completed, setCompleted] = useState(() => format(today(), "yyyy-MM-dd"));
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const dirty = useDirty({ courseId, completed, chosen });
+  const course = data.trainings.find((t) => t.id === courseId);
+  const now = Date.now();
+  const soon = dayAt(now, data.settings.expiryWarningDays);
+  const people = data.people.filter((p) => !course || course.appliesTo === "Both" || course.appliesTo === p.role)
+    .map((p) => {
+      const needs = course ? neededTraining(data, p).has(course.id) : false;
+      const st = course ? trainingStatus(p, course.id, now, soon) : null;
+      return { p, needs, due: needs && !!st && st.state !== "ok" };
+    })
+    .sort((a, b) => Number(b.due) - Number(a.due) || Number(b.needs) - Number(a.needs) || a.p.name.localeCompare(b.p.name));
+  const expires = course?.validMonths ? addMonthsTo(completed, course.validMonths) : null;
+  const save = () => {
+    if (!course || !chosen.size) return;
+    change((d) => ({ ...d, people: d.people.map((p) => (chosen.has(p.id) ? { ...p, training: [...p.training, { trainingId: course.id, completed, expires }] } : p)) }),
+      `Recorded ${course.name} for ${plural(chosen.size, "person", "people")}`);
+    close();
+  };
+  return (
+    <Dialog title="Record a course for several people" onClose={close} dirty={dirty}
+      foot={<><button className="btn" onClick={close}>Cancel</button>
+        <button className="btn primary" onClick={() => (!course ? useStore.getState().showToast("Pick the course first.") : !chosen.size ? useStore.getState().showToast("Tick who attended.") : save())}>
+          Record for {plural(chosen.size, "person", "people")}
+        </button></>}>
+      <div className="form-grid">
+        <Field label="Course">
+          <select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+            {data.trainings.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </Field>
+        <DateInput label="Completed" today value={completed} onChange={setCompleted} hint={expires ? `Runs out ${fmtDay(expires)}.` : "Doesn't run out."} />
+        <div className="field full">
+          <span>Who attended</span>
+          <div className="row gap-sm wrap" style={{ marginBottom: 6 }}>
+            {people.some((x) => x.due) && <button type="button" className="btn sm" onClick={() => setChosen(new Set(people.filter((x) => x.due).map((x) => x.p.id)))}>Tick everyone who needs it ({people.filter((x) => x.due).length})</button>}
+            {chosen.size > 0 && <button type="button" className="btn sm ghost" onClick={() => setChosen(new Set())}>Clear</button>}
+          </div>
+          <div className="picker-row">
+            {people.map(({ p, needs, due }) => (
+              <Pick key={p.id} on={chosen.has(p.id)} onToggle={() => setChosen((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}>
+                {p.name}{due ? <span className="pill warn">Needs it</span> : needs ? <span className="pill ok">Current</span> : null}
+              </Pick>
+            ))}
+          </div>
+        </div>
       </div>
     </Dialog>
   );
