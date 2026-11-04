@@ -36,6 +36,9 @@
 **Swaps**
 - **Trade…** on a person's Booked next opens a swap: hand the shift to someone who can legally take it (crew first), or trade it for one of theirs where each can take the other's. One tap, with Undo.
 
+**Week sheet**
+- **Week sheet** on Reports makes a one-page PDF of this week or next: each job's crew day by day (» where someone takes over), open seats in red, and time off and maintenance that week. For the crew room or Teams.
+
 **Drag to change dates**
 - On the Schedule, drag either end of someone's shift (the cursor turns into ↔) to move their first or last day, like trimming a clip. It snaps to whole days, shows the new date while you drag, and Undo is in the message.
 - Handovers move together: when one person takes over from another on the same job (marked ⇄), dragging that end moves both, so the seat stays covered. Fill the schedule links who takes over from whom, so with two pilots swapping the same day the right one moves; if it can't tell, only the dragged shift moves. Hold Alt (Option) to move just one.

@@ -5,7 +5,8 @@ import { fullReport, REPORT_COLORS, TRAINING_WORDS, type FullReport, type Span }
 import { missionCoverage } from "./coverage";
 import { seasonTails } from "./rotation";
 import { textOn } from "./look";
-import { DAY, ms, today } from "./time";
+import { DAY, dayAt, ms, today } from "./time";
+import { bookings } from "./bookings";
 
 /**
  * The report as a PDF, drawn shape by shape so it looks the same from every build (a Mac's window can't
@@ -582,3 +583,108 @@ interface BoardRow { group?: string; label?: string; sub?: string; mono?: boolea
 
 type Cell = string | { swatch: string; text: string; pill?: never; bar?: never; color?: never } | { pill: string; text: string; swatch?: never; bar?: never; color?: never } | { bar: number; text: string; color?: string; swatch?: never; pill?: never };
 interface Col<T> { title: string; w: number; right?: boolean; bold?: boolean; muted?: boolean; get: (row: T) => Cell }
+
+/**
+ * One page for the coming week, for the crew room or Teams: a row per job running that week and a column
+ * per day, with who's on (pilots, then maintainers; ⇄ where someone takes over that day) and open seats in
+ * red, then time off and maintenance that week.
+ */
+export async function buildWeekPdf(data: AppData, from: number): Promise<Blob> {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter", compress: true });
+  const to = dayAt(from, 7);
+  const days = Array.from({ length: 7 }, (_, i) => dayAt(from, i));
+  const people = new Map(data.people.map((p) => [p.id, p]));
+  const short = (pid: string) => {
+    const n = people.get(pid)?.name ?? "?";
+    const parts = n.split(" ");
+    return parts.length > 1 ? `${parts[0][0]}. ${parts.slice(1).join(" ")}` : n;
+  };
+  const font = (size: number, weight: "normal" | "bold" = "normal", color = C.ink) => {
+    doc.setFont("helvetica", weight);
+    doc.setFontSize(size);
+    doc.setTextColor(color);
+  };
+  const fit = (s: string, w: number) => {
+    if (doc.getTextWidth(s) <= w) return s;
+    let t = s;
+    while (t.length > 1 && doc.getTextWidth(t + "…") > w) t = t.slice(0, -1);
+    return t + "…";
+  };
+  const box = (x: number, y: number, w: number, h: number, color: string, r = 0) => {
+    doc.setFillColor(color);
+    if (r) doc.roundedRect(x, y, w, h, r, r, "F");
+    else doc.rect(x, y, w, h, "F");
+  };
+
+  font(20, "bold");
+  doc.text(`Who's on: ${format(from, "MMM d")} to ${format(dayAt(to, -1), "MMM d, yyyy")}`, M, 46);
+  font(9, "normal", C.muted);
+  doc.text(`Made by Zom's MRP on ${format(new Date(), "MMM d, yyyy")}`, W - M, 46, { align: "right" });
+
+  const jobs = bookings(data).filter((b) => b.status !== "Cancelled" && ms(b.start) < to && ms(b.end) > from).sort((a, b) => ms(a.start) - ms(b.start));
+  const labelW = 150, x0 = M + labelW, colW = (W - M - x0) / 7;
+  let y = 64;
+  box(M, y, W - 2 * M, 22, C.panel, 4);
+  font(9, "bold", C.muted);
+  doc.text("Job", M + 6, y + 14);
+  days.forEach((d, i) => doc.text(format(d, "EEE MMM d"), x0 + i * colW + 4, y + 14));
+  y += 26;
+
+  for (const b of jobs) {
+    const cov = missionCoverage(data, b);
+    const shifts = data.shifts.filter((s) => s.seasonId === b.id && ms(s.start) < to && ms(s.end) > from);
+    const lines = days.map((d) => {
+      const e = dayAt(d, 1);
+      const on = shifts.filter((s) => ms(s.start) < e && ms(s.end) > d)
+        .sort((a, c) => Number(people.get(a.personId)?.role === "Maintainer") - Number(people.get(c.personId)?.role === "Maintainer"));
+      const out = on.map((s) => `${ms(s.start) === d && s.after ? "⇄ " : ""}${short(s.personId)}${people.get(s.personId)?.role === "Maintainer" ? " (M)" : ""}`);
+      const open = [...cov.pilotGaps, ...cov.maintainerGaps].filter((g) => g.a < e && g.b > d).reduce((t, g) => t + g.short, 0);
+      return { out, open };
+    });
+    const rowH = Math.max(28, 12 + 11 * Math.max(...lines.map((l) => l.out.length + (l.open ? 1 : 0))));
+    if (y + rowH > H - 120) break;
+    box(M, y, W - 2 * M, rowH, "#fafbfc");
+    box(M, y, 4, rowH, b.color);
+    font(9, "bold");
+    doc.text(fit(b.name, labelW - 16), M + 10, y + 13);
+    font(7.5, "normal", C.muted);
+    doc.text(fit(seasonTails(data, b, "No aircraft"), labelW - 16), M + 10, y + 24);
+    lines.forEach((l, i) => {
+      const cx = x0 + i * colW + 4;
+      l.out.forEach((t, k) => {
+        font(8, "normal", t.startsWith("⇄") ? C.blue : C.ink);
+        // The PDF's built-in font has no arrows; » marks someone taking over that day.
+        doc.text(fit(t.replace("⇄ ", "» "), colW - 8), cx, y + 12 + k * 11);
+      });
+      if (l.open) {
+        font(8, "bold", C.danger);
+        doc.text(`${l.open} open`, cx, y + 12 + l.out.length * 11);
+      }
+    });
+    doc.setDrawColor(C.line);
+    doc.line(M, y + rowH, W - M, y + rowH);
+    y += rowH + 2;
+  }
+  if (!jobs.length) {
+    font(11, "normal", C.muted);
+    doc.text("No jobs this week.", M, y + 14);
+    y += 30;
+  }
+
+  // Time off and maintenance that week, side by side.
+  y = Math.max(y + 16, H - 110);
+  const half = (W - 2 * M - 20) / 2;
+  const list = (title: string, x: number, items: string[]) => {
+    font(10, "bold");
+    doc.text(title, x, y);
+    font(8.5, "normal", items.length ? C.ink : C.muted);
+    (items.length ? items : ["None"]).slice(0, 6).forEach((t, i) => doc.text(fit(t, half), x, y + 14 + i * 11));
+  };
+  list("Time off", M, data.timeOff.filter((t) => ms(t.start) < to && ms(t.end) > from)
+    .map((t) => `${people.get(t.personId)?.name ?? "?"}: ${format(ms(t.start), "MMM d")} to ${format(ms(t.end) - DAY / 2, "MMM d")}${t.soft ? " (rather not)" : t.reason ? ` (${t.reason})` : ""}`));
+  const tails = new Map(data.aircraft.map((a) => [a.id, a.tail]));
+  list("Maintenance and inspections", M + half + 20, data.jobs.filter((j) => !j.done && ms(j.start) < to && ms(j.end) > from)
+    .map((j) => `${tails.get(j.aircraftId) ?? ""} ${j.title}: ${format(ms(j.start), "MMM d")} to ${format(ms(j.end) - DAY / 2, "MMM d")}${j.maintainerIds.length ? `, ${j.maintainerIds.map(short).join(", ")}` : ", nobody yet"}`));
+  return doc.output("blob");
+}
