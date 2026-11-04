@@ -63,3 +63,14 @@ describe("week sheet", () => {
     await save("week.pdf", bytes);
   });
 });
+
+describe("a person's schedule", () => {
+  it("makes a one-page PDF of their next days", async () => {
+    const { buildPersonPdf } = await import("./reportPdf");
+    const data = sampleData();
+    const person = data.shifts.find((s) => new Date(s.end).getTime() > Date.now())!.personId;
+    const bytes = new Uint8Array(await (await buildPersonPdf(data, person)).arrayBuffer());
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+    await save("person.pdf", bytes);
+  });
+});

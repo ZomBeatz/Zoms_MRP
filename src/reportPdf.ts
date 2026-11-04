@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import type { jsPDF as JsPDF } from "jspdf";
 import type { AppData } from "./types";
 import { fullReport, REPORT_COLORS, TRAINING_WORDS, type FullReport, type Span } from "./report";
-import { missionCoverage } from "./coverage";
+import { missionCoverage, neededTraining, trainingStatus } from "./coverage";
 import { seasonTails } from "./rotation";
 import { textOn } from "./look";
 import { DAY, dayAt, ms, today } from "./time";
@@ -686,5 +686,85 @@ export async function buildWeekPdf(data: AppData, from: number): Promise<Blob> {
   const tails = new Map(data.aircraft.map((a) => [a.id, a.tail]));
   list("Maintenance and inspections", M + half + 20, data.jobs.filter((j) => !j.done && ms(j.start) < to && ms(j.end) > from)
     .map((j) => `${tails.get(j.aircraftId) ?? ""} ${j.title}: ${format(ms(j.start), "MMM d")} to ${format(ms(j.end) - DAY / 2, "MMM d")}${j.maintainerIds.length ? `, ${j.maintainerIds.map(short).join(", ")}` : ", nobody yet"}`));
+  return doc.output("blob");
+}
+
+/**
+ * One person's next 90 days on a page: each shift (job, aircraft, dates, who they take over from and who
+ * takes over from them, the note), maintenance and time off, then where their training stands.
+ */
+export async function buildPersonPdf(data: AppData, personId: string, days = 90): Promise<Blob> {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "letter", compress: true });
+  const PW = 612, PH = 792;
+  const p = data.people.find((x) => x.id === personId)!;
+  const from = today().getTime(), to = dayAt(from, days);
+  const all = bookings(data);
+  const name = (id: string) => data.people.find((x) => x.id === id)?.name ?? "someone";
+  const font = (size: number, weight: "normal" | "bold" = "normal", color = C.ink) => { doc.setFont("helvetica", weight); doc.setFontSize(size); doc.setTextColor(color); };
+  let y = 56;
+  font(20, "bold");
+  doc.text(p.name, M, y);
+  font(10, "normal", C.muted);
+  doc.text(`${p.role}${p.quals.length ? ` · ${p.quals.join(", ")}` : ""} · ${format(from, "MMM d")} to ${format(dayAt(to, -1), "MMM d, yyyy")}`, M, y + 16);
+  doc.text(`Made by Zom's MRP on ${format(new Date(), "MMM d, yyyy")}`, PW - M, y, { align: "right" });
+  y += 40;
+
+  type Item = { a: number; b: number; title: string; lines: string[]; color: string };
+  const items: Item[] = [];
+  for (const s of data.shifts.filter((x) => x.personId === p.id && ms(x.end) > from && ms(x.start) < to)) {
+    const b = all.find((x) => x.id === s.seasonId);
+    if (!b || b.status === "Cancelled") continue;
+    const before = s.after ? data.shifts.find((x) => x.id === s.after) : undefined;
+    const next = data.shifts.find((x) => x.after === s.id);
+    items.push({
+      a: ms(s.start), b: ms(s.end), title: b.name, color: b.color,
+      lines: [
+        `${seasonTails(data, b, "No aircraft yet")}${b.location ? ` · ${b.location}` : ""}`,
+        ...(before ? [`Takes over from ${name(before.personId)}`] : []),
+        ...(next ? [`Hands over to ${name(next.personId)} on ${format(ms(next.start), "MMM d")}`] : []),
+        ...(s.note ? [`Note: ${s.note}`] : []),
+      ],
+    });
+  }
+  const tails = new Map(data.aircraft.map((a) => [a.id, a.tail]));
+  for (const j of data.jobs.filter((x) => x.maintainerIds.includes(p.id) && !x.done && ms(x.end) > from && ms(x.start) < to))
+    items.push({ a: ms(j.start), b: ms(j.end), title: `${j.title} (maintenance)`, color: REPORT_COLORS.maintenance, lines: [tails.get(j.aircraftId) ?? ""] });
+  for (const t of data.timeOff.filter((x) => x.personId === p.id && ms(x.end) > from && ms(x.start) < to))
+    items.push({ a: ms(t.start), b: ms(t.end), title: t.soft ? "Would rather not work" : "Time off", color: REPORT_COLORS.off, lines: t.reason ? [t.reason] : [] });
+  items.sort((x, z) => x.a - z.a);
+
+  if (!items.length) {
+    font(11, "normal", C.muted);
+    doc.text("Nothing booked in these days.", M, y);
+    y += 24;
+  }
+  for (const it of items) {
+    const h = 30 + it.lines.length * 12;
+    if (y + h > PH - 110) break;
+    doc.setFillColor(it.color);
+    doc.rect(M, y, 4, h - 8, "F");
+    font(9, "bold", C.muted);
+    doc.text(`${format(it.a, "EEE MMM d")} to ${format(it.b - DAY / 2, "EEE MMM d")} · ${Math.round((it.b - it.a) / DAY)} days`, M + 12, y + 10);
+    font(12, "bold");
+    doc.text(it.title, M + 12, y + 24);
+    font(9.5, "normal", C.muted);
+    it.lines.forEach((l, k) => doc.text(l, M + 12, y + 37 + k * 12));
+    y += h;
+  }
+
+  // Training they need, and where it stands.
+  const needs = [...neededTraining(data, p).keys()].map((id) => data.trainings.find((t) => t.id === id)).filter((t): t is NonNullable<typeof t> => !!t);
+  if (needs.length) {
+    y = Math.max(y + 10, PH - 100);
+    font(11, "bold");
+    doc.text("Training", M, y);
+    font(9.5, "normal");
+    needs.slice(0, 5).forEach((t, k) => {
+      const st = trainingStatus(p, t.id, from, dayAt(from, 1));
+      doc.setTextColor(st.state === "ok" ? C.ink : C.danger);
+      doc.text(`${t.name}: ${st.state === "ok" ? (st.expires ? `current, runs out ${format(ms(`${st.expires}T00:00`), "MMM d, yyyy")}` : "current") : TRAINING_WORDS[st.state].toLowerCase()}`, M, y + 14 + k * 12);
+    });
+  }
   return doc.output("blob");
 }
