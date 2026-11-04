@@ -74,6 +74,25 @@ jobs:
             if [ -n "${!v}" ]; then { echo "$v<<END_$v"; printf '%s\n' "${!v}"; echo "END_$v"; } >> "$GITHUB_ENV"; fi
           done
 
+      # Running again for the same tag (to sign the Mac app, say) replaces this system's files in the
+      # draft release instead of failing because they're already there.
+      - name: Remove this system's files from an earlier run
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          case "${{ matrix.name }}" in
+            windows) ext='\.exe(\.sig)?$' ;;
+            macos) ext='\.(dmg|app\.tar\.gz(\.sig)?)$' ;;
+            linux) ext='\.(deb|rpm|AppImage)(\.sig)?$' ;;
+          esac
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" --json assets --jq '.assets[].name' 2>/dev/null \
+            | grep -E "$ext" | while IFS= read -r f; do
+                echo "Replacing $f"
+                gh release delete-asset "${{ github.ref_name }}" "$f" --repo "${{ github.repository }}" --yes
+              done || true
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
