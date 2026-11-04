@@ -98,6 +98,15 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
     ],
   },
   {
+    q: "See if we can do it with fewer people",
+    steps: [
+      <>Go to <b>Balance</b> and pick the period.</>,
+      <>Under <b>Jobs in this period</b>, change a job's <b>Pilots</b> or <b>Maintainers</b>, say from 2 to 1. Nothing is saved yet.</>,
+      <>Lock any job or person that should stay as it is, then press <b>Rebalance</b>. The numbers at the top show before and after: open seat-days, conflicts and the busiest person. Each person's bar shows their share of the days they can work, with a line where they are now.</>,
+      <>Press <b>Apply</b> to keep it (Undo is in the message), or <b>Undo the changes here</b> to drop it. Time off, ratings, training, rotations and rest are always followed.</>,
+    ],
+  },
+  {
     q: "Share the plan with the team",
     steps: [
       <>On <b>Reports</b>, pick the period: one of the ready-made ones, or <b>Pick dates</b> for your own first and last day.</>,
@@ -271,6 +280,10 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
         <li>Hitches longer than the limit, or too few days off between them (Settings › Hitches and days off)</li>
       </ul>
     ),
+  },
+  {
+    id: "balance", title: "Balance",
+    body: <p>How busy everyone is over a period, and a way to make the most of them. Each person's bar is the share of the days they can work (time off doesn't count) that they're booked: red is very busy, green busy, blue light, grey hardly used. Try other crew sizes for a job, lock jobs or people that should stay as they are, and press <b>Rebalance</b>. It keeps the shifts that are there, fills open seats and starts over for jobs whose size you changed (or for every job, with <b>Start over for every job</b>), on the same rules as Fill the schedule. Before and after numbers show what it changes; nothing is saved until <b>Apply</b>.</p>,
   },
   {
     id: "reports", title: "Reports and Excel",

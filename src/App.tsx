@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen, FlaskConical,
-  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X,
+  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale
 } from "lucide-react";
 import { useStore } from "./store";
 import { RELEASES_URL, isDesktopApp, isOnlineDemo } from "./platform";
@@ -15,6 +15,7 @@ import { AircraftPage } from "./pages/Aircraft";
 import { People } from "./pages/People";
 import { Maintenance } from "./pages/Maintenance";
 import { Reports } from "./pages/Reports";
+import { Balance } from "./pages/Balance";
 import { TrainingPage } from "./pages/Training";
 import { SettingsPage } from "./pages/Settings";
 import { Dialogs } from "./dialogs";
@@ -30,6 +31,7 @@ const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "people", label: "Crew", icon: Users },
   { page: "maintenance", label: "Maintenance", icon: Wrench },
   { page: "training", label: "Training", icon: GraduationCap },
+  { page: "balance", label: "Balance", icon: Scale },
   { page: "reports", label: "Reports", icon: BarChart3 },
 ];
 
@@ -170,6 +172,7 @@ export default function App() {
           {page === "people" && <People issues={issues} />}
           {page === "maintenance" && <Maintenance />}
           {page === "training" && <TrainingPage />}
+          {page === "balance" && <Balance />}
           {page === "reports" && <Reports />}
           {page === "settings" && <SettingsPage onHelp={() => navTo("guide")} />}
           {page === "guide" && <Guide />}
