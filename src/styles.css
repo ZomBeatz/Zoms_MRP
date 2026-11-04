@@ -679,3 +679,20 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 .quickfind-hit.on, .quickfind-hit:hover { background: var(--zb-surface-2); }
 .find-item { margin-top: 4px; }
 @media (max-width: 700px), (max-height: 500px) { .quickfind-back { padding-top: 12px; } }
+
+/* ---------- Trimming a shift: grab either end (the cursor turns into ↔), a handover moves together ---------- */
+.slot.trimmable { padding-left: 10px; padding-right: 10px; }
+.slot-edge { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; touch-action: none; z-index: 3; }
+.slot-edge.start { left: 0; }
+.slot-edge.end { right: 0; }
+.slot-edge::after { content: ""; position: absolute; top: 25%; bottom: 25%; width: 3px; border-radius: 2px; background: currentColor; opacity: 0; transition: opacity .12s; }
+.slot-edge.start::after { left: 3px; }
+.slot-edge.end::after { right: 3px; }
+.slot.trimmable:hover .slot-edge::after, .slot.trimming .slot-edge::after { opacity: .7; }
+.slot.trimming { overflow: visible; z-index: 6; outline: 2px solid var(--zb-accent); outline-offset: 1px; }
+.slot-seam { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); z-index: 4; font-size: 10px; line-height: 1; padding: 1px 2px; border-radius: 3px; background: var(--zb-surface); color: var(--zb-text-2); box-shadow: var(--zb-shadow); pointer-events: none; }
+.trim-tip { position: absolute; bottom: calc(100% + 4px); white-space: nowrap; padding: 3px 7px; border-radius: 6px; background: var(--zb-text); color: var(--zb-bg, #fff); font-size: 12px; font-weight: 600; pointer-events: none; }
+.trim-tip.end { right: 0; } .trim-tip.start { left: 0; }
+body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
+/* Bigger handles for fingers. */
+@media (pointer: coarse) { .slot-edge { width: 16px; } .slot.trimmable { padding-left: 14px; padding-right: 14px; } }

@@ -21,6 +21,11 @@
 - **Extend it** keeps training current until a later day, with a reason (someone on a long job who can't get back for the renewal). It shows as Extended wherever it does.
 - Any problem can be **Ignored** with a reason; **Show ignored** lists them, with Restore.
 
+**Drag to change dates**
+- On the Schedule, drag either end of someone's shift (the cursor turns into ↔) to move their first or last day, like trimming a clip. It snaps to whole days, shows the new date while you drag, and Undo is in the message.
+- Handovers move together: when one person takes over from another on the same job (marked ⇄), dragging that end moves both, so the seat stays covered. Fill the schedule links who takes over from whom, so with two pilots swapping the same day the right one moves; if it can't tell, only the dragged shift moves. Hold Alt (Option) to move just one.
+- Pilots stay inside their season and every shift keeps at least a day; maintainers can come early or stay late.
+
 **Also**
 - A person's form shows where they're **booked next**, each opening right at that shift.
 - **Find** anything by name (Ctrl or ⌘ K, or the search button): people, tails, missions and seasons, jobs and courses.

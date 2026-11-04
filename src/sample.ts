@@ -335,7 +335,9 @@ export function sampleData(settings = defaultSettings()): AppData {
       for (const p of pick) {
         book(p, h, he);
         if (!p.missionIds.includes(m.missionId)) p.missionIds.push(m.missionId);
-        shifts.push({ id: `s-${shifts.length + 1}`, seasonId: m.id, personId: p.id, start: toWhen(h), end: toWhen(he) });
+        // A handover: take over from someone on this job whose shift ends today, not already handed over.
+        const prev = shifts.find((x) => x.seasonId === m.id && x.end === toWhen(h) && people.find((q) => q.id === x.personId)?.role === role && !shifts.some((y) => y.after === x.id));
+        shifts.push({ id: `s-${shifts.length + 1}`, seasonId: m.id, personId: p.id, start: toWhen(h), end: toWhen(he), ...(prev ? { after: prev.id } : {}) });
       }
     }
   }

@@ -153,6 +153,8 @@ export interface Shift {
   personId: ID;
   start: When;
   end: When;
+  /** The shift this one takes over from (a handover on the same job), so dragging one end moves the right person. */
+  after?: ID;
 }
 
 export type JobKind = "Inspection" | "Repair" | "Pre-flight" | "Other";
