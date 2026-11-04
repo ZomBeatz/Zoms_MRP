@@ -212,6 +212,7 @@ function MissionDialog({ id, defaults }: Props) {
         { key: "seasons", label: isNew ? "First season" : <>Seasons <span className="chip">{seasons.length}</span></>, alert: firstBad },
         { key: "training", label: <>Training <span className="chip">{m.requiredTrainingIds.length}</span></> },
         { key: "crew", label: <>Crew <span className="chip">{pool.size}</span></> },
+        ...(isNew ? [] : [{ key: "rotations", label: "Rotations" }]),
       ]}
       tab={tab} onTab={setTab}
       foot={<Foot isNew={isNew} label="mission" problem={!m.name.trim() ? "Give the mission a name first (Details tab)." : firstBad && "The first season's last day is before its first day."} onSave={save}
@@ -285,6 +286,8 @@ function MissionDialog({ id, defaults }: Props) {
         </>
       )}
 
+      {tab === "rotations" && !isNew && <RotationsTab missionId={m.id} pool={pool} />}
+
       {tab === "crew" && (
         <>
           <p className="form-note" style={{ marginTop: 0 }}>The people who rotate through this mission. They're picked first when a season is filled, and only they need its training.</p>
@@ -293,6 +296,126 @@ function MissionDialog({ id, defaults }: Props) {
         </>
       )}
     </Dialog>
+  );
+}
+
+/**
+ * A mission's seasons as rotations: each running or coming season's hitches in order (who, when, handovers
+ * and open seats), Fill from the crew (only the people on the Crew tab), and Sub in someone else for an open
+ * seat: people outside the crew who are rated, current, free and rested for those days.
+ */
+function RotationsTab({ missionId, pool }: { missionId: string; pool: Set<string> }) {
+  const { data, change, open } = useStore();
+  const [sub, setSub] = useState<{ seasonId: string; role: Person["role"]; a: number; b: number } | null>(null);
+  const now = Date.now();
+  const seasons = seasonsOf(data, missionId).filter((x) => ms(x.end) > now && x.status !== "Cancelled" && x.status !== "Done");
+  const people = new Map(data.people.map((p) => [p.id, p]));
+  const outside = new Set(data.people.filter((p) => !pool.has(p.id)).map((p) => p.id));
+
+  const fillFromCrew = (season: Season) => {
+    let d = data;
+    let n = 0;
+    for (const role of ["Pilot", "Maintainer"] as const) {
+      const added = fillSeason(d, season, role, role === "Pilot" ? season.pilotRotation : season.maintainerRotation, { ...d.settings.rules, skip: outside });
+      d = { ...d, shifts: [...d.shifts, ...added] };
+      n += added.length;
+    }
+    if (!n) return useStore.getState().showToast(pool.size ? "Nobody on the crew is free, rated and current for the open days. Sub in someone else." : "Pick the crew first, on the Crew tab.");
+    change(() => d, `Filled ${plural(n, "shift")} from the crew`);
+  };
+  /** People outside the crew for an open seat, as much of it as they can legally cover (maybe two splitting it). */
+  const subsFor = (season: Season, role: Person["role"], a: number, b: number) =>
+    fillSeason(data, season, role, role === "Pilot" ? season.pilotRotation : season.maintainerRotation,
+      { ...data.settings.rules, window: [a, b], skip: new Set([...pool]) });
+  const subIn = (shifts: Shift[]) => {
+    if (!shifts.length) return;
+    const list = [...new Set(shifts.map((x) => people.get(x.personId)?.name ?? "Someone"))];
+    const names = list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list.at(-1)}` : list[0];
+    change((d) => ({ ...d, shifts: [...d.shifts, ...shifts] }), `${names} sub${list.length === 1 ? "s" : ""} in`);
+    setSub(null);
+  };
+
+  if (!seasons.length) return <p className="muted" style={{ margin: 0 }}>No seasons running or coming up. Add one on the Seasons tab.</p>;
+  return (
+    <>
+      <p className="form-note" style={{ marginTop: 0 }}>
+        Each season's rotation, in order. <b>Fill from the crew</b> uses only the people on the Crew tab; where they can't cover, <b>Sub in someone else</b> finds who can.
+      </p>
+      {seasons.map((season) => {
+        const cov = missionCoverage(data, season);
+        return (
+          <section key={season.id} className="rotation-block">
+            <div className="row gap-sm wrap rotation-head">
+              <button className="link" onClick={() => open("season", season.id)}><b>{fmtSpan(season.start, season.end)}</b></button>
+              <StatusPill status={season.status} />
+              <span className={`pill ${cov.covered >= 1 ? "ok" : "danger"}`}>{Math.round(cov.covered * 100)}% crewed</span>
+              <span className="small muted grow">{seasonTails(data, season)}{season.pilotRotation ? ` · ${fmtRotation(season.pilotRotation)}` : ""}</span>
+              <button className="btn sm primary" onClick={() => fillFromCrew(season)}><Wand2 size={14} /> Fill from the crew</button>
+            </div>
+            {(["Pilot", "Maintainer"] as const).map((role) => {
+              const need = role === "Pilot" ? season.pilotsNeeded : season.maintainersNeeded;
+              if (!need) return null;
+              const gaps = role === "Pilot" ? cov.pilotGaps : cov.maintainerGaps;
+              type Row = { at: number; shift?: Shift; gap?: (typeof gaps)[number] };
+              const rows: Row[] = [
+                ...data.shifts.filter((x) => x.seasonId === season.id && people.get(x.personId)?.role === role && ms(x.end) > now).map((x): Row => ({ at: ms(x.start), shift: x })),
+                ...gaps.filter((g) => g.b > now).map((g): Row => ({ at: g.a, gap: g })),
+              ].sort((a, b) => a.at - b.at || Number(!!a.gap) - Number(!!b.gap));
+              return (
+                <div key={role}>
+                  <h4 className="form-section">{role === "Pilot" ? "Pilots" : "Maintainers"} · {need} at a time</h4>
+                  <div className="lines">
+                    {rows.map((r) => {
+                      if (r.gap) {
+                        const g = r.gap;
+                        const isOpen = !!sub && sub.seasonId === season.id && sub.role === role && sub.a === g.a;
+                        const proposal = isOpen ? subsFor(season, role, g.a, g.b) : [];
+                        const covered = proposal.reduce((t, x) => t + (ms(x.end) - ms(x.start)), 0) / DAY;
+                        return (
+                          <div key={`g${g.a}`} className="line-edit sub-in">
+                            <div className="row gap-sm wrap">
+                              <span className="avatar open">!</span>
+                              <span className="grow danger-text"><b>{g.short > 1 ? `${g.short} open seats` : "Open seat"}</b> · {fmtSpan(toWhen(g.a), toWhen(g.b), true)}</span>
+                              <button className="btn sm" onClick={() => setSub(isOpen ? null : { seasonId: season.id, role, a: g.a, b: g.b })}>{isOpen ? "Close" : "Sub in someone else…"}</button>
+                            </div>
+                            {isOpen && (
+                              proposal.length ? (
+                                <>
+                                  <span className="small muted">From outside the crew, rated, current, free and rested{Math.round(covered) < Math.round((g.b - g.a) / DAY) ? `; covers ${plural(Math.round(covered), "day")} of ${Math.round((g.b - g.a) / DAY)}` : ""}:</span>
+                                  {proposal.map((x) => (
+                                    <div key={x.id} className="row gap-sm">
+                                      <Plus size={13} /><b>{people.get(x.personId)?.name}</b>
+                                      <span className="small muted grow">{fmtSpan(x.start, x.end, true)}</span>
+                                    </div>
+                                  ))}
+                                  <div><button className="btn sm primary" onClick={() => subIn(proposal)}>Sub {proposal.length === 1 ? "them" : "these"} in</button></div>
+                                </>
+                              ) : <span className="small muted">Nobody outside the crew is rated, current, free and rested for any of these days.</span>
+                            )}
+                          </div>
+                        );
+                      }
+                      const x = r.shift!;
+                      const p = people.get(x.personId);
+                      const fromOutside = !!p && !pool.has(p.id);
+                      return (
+                        <button key={x.id} className="line" onClick={() => open("season", season.id, undefined, { tab: role === "Pilot" ? "pilots" : "maintainers", spot: `shift:${x.id}` })}>
+                          {p ? <Avatar person={p} /> : <span className="avatar">?</span>}
+                          <span className="name">{p?.name ?? "Someone deleted"}{x.after ? <span className="small muted"> ⇄</span> : null}</span>
+                          {fromOutside && <span className="pill accent">Sub</span>}
+                          <span className="when">{fmtSpan(x.start, x.end, true)}</span>
+                        </button>
+                      );
+                    })}
+                    {rows.length === 0 && <div className="line"><span className="muted">Nothing booked yet.</span></div>}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        );
+      })}
+    </>
   );
 }
 

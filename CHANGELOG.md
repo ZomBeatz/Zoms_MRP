@@ -21,6 +21,14 @@
 - **Extend it** keeps training current until a later day, with a reason (someone on a long job who can't get back for the renewal). It shows as Extended wherever it does.
 - Any problem can be **Ignored** with a reason; **Show ignored** lists them, with Restore.
 
+**Missions: crew and rotations**
+- A mission's **Rotations** tab shows each running or coming season's hitches in order: who, when, handovers and open seats. **Fill from the crew** uses only the people picked on its Crew tab.
+- **Sub in someone else** on an open seat proposes people outside the crew who are rated, current, free and rested, for as much of it as they can legally cover, and books them in one tap, marked Sub.
+
+**Currency and training**
+- Pilot currency: days since each pilot last flew each type, from the schedule or a "last flew" date typed on their Ratings. A booking past the limit (Settings, 90 days) is a warning, and Fill won't book a pilot who isn't current. Without a record, it doesn't nag.
+- The Training page has a **Needs training** list with only the people who have training missing, run out or running out, or who aren't current on a type, each opening right at the fix.
+
 **Drag to change dates**
 - On the Schedule, drag either end of someone's shift (the cursor turns into ↔) to move their first or last day, like trimming a clip. It snaps to whole days, shows the new date while you drag, and Undo is in the message.
 - Handovers move together: when one person takes over from another on the same job (marked ⇄), dragging that end moves both, so the seat stays covered. Fill the schedule links who takes over from whom, so with two pilots swapping the same day the right one moves; if it can't tell, only the dragged shift moves. Hold Alt (Option) to move just one.
