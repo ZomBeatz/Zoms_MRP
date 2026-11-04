@@ -82,7 +82,7 @@ interface State {
   page: Page;
   /** What's open in a dialog: a kind and an id ("new" for a new one), plus defaults for new items. */
   /** The open form. `fix` opens it on a tab and points at what needs fixing (see src/fixes.ts). */
-  editing: { kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "support"; id: string; defaults?: Record<string, unknown>; fix?: { tab?: string; spot?: string } } | null;
+  editing: { kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "support" | "swap"; id: string; defaults?: Record<string, unknown>; fix?: { tab?: string; spot?: string } } | null;
   past: AppData[];
   future: AppData[];
   toast: Toast | null;

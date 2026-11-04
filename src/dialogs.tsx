@@ -32,6 +32,7 @@ export function Dialogs() {
     case "timeOff": return <TimeOffDialog key={editing.id} {...props} />;
     case "training": return <TrainingDialog key={editing.id} {...props} />;
     case "support": return <SupportDialog key={editing.id} {...props} />;
+    case "swap": return <SwapDialog key={editing.id} {...props} />;
   }
 }
 
@@ -1137,14 +1138,93 @@ function NextBookings({ personId }: { personId: string }) {
       {next.length ? (
         <div className="lines">
           {next.map((d) => (
-            <button key={`${d.seasonId ?? d.jobId}-${d.a}`} className="line" onClick={() => (d.seasonId ? open("season", d.seasonId, undefined, d.shiftId ? { spot: `shift:${d.shiftId}`, tab: data.people.find((x) => x.id === personId)?.role === "Maintainer" ? "maintainers" : "pilots" } : undefined) : d.jobId && open("job", d.jobId))}>
-              <span className="name">{d.label}</span>
-              <span className="when">{d.a <= now ? `Now, until ${format(d.b - 1, "MMM d")}` : fmtSpan(toWhen(d.a), toWhen(d.b))}</span>
-            </button>
+            <div key={`${d.seasonId ?? d.jobId}-${d.a}`} className="line with-action">
+              <button className="line-main" onClick={() => (d.seasonId ? open("season", d.seasonId, undefined, d.shiftId ? { spot: `shift:${d.shiftId}`, tab: data.people.find((x) => x.id === personId)?.role === "Maintainer" ? "maintainers" : "pilots" } : undefined) : d.jobId && open("job", d.jobId))}>
+                <span className="name">{d.label}</span>
+                <span className="when">{d.a <= now ? `Now, until ${format(d.b - 1, "MMM d")}` : fmtSpan(toWhen(d.a), toWhen(d.b))}</span>
+              </button>
+              {d.shiftId && <button className="btn sm" onClick={() => open("swap", d.shiftId!)}>Trade…</button>}
+            </div>
           ))}
         </div>
       ) : <span className="small muted">Nothing booked.</span>}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- swapping a shift
+
+/**
+ * Give a shift to someone else, or trade it for one of theirs. Only legal moves are offered: the other
+ * person is rated, current on training and on the type, free and on rotation for these days, and for a
+ * trade the first person can take theirs too. The checks show anything left over; Undo is in the message.
+ */
+function SwapDialog({ id }: Props) {
+  const { data, change, close } = useStore();
+  const shift = data.shifts.find((s) => s.id === id);
+  const all = bookings(data);
+  const season = shift && all.find((b) => b.id === shift.seasonId);
+  const person = shift && data.people.find((p) => p.id === shift.personId);
+  if (!shift || !season || !person)
+    return <Dialog title="Swap" onClose={close} foot={<button className="btn" onClick={close}>Close</button>}><p className="muted">That shift isn't there any more.</p></Dialog>;
+  const name = (pid: string) => data.people.find((p) => p.id === pid)?.name ?? "Someone";
+  const mission = data.missions.find((m) => m.id === season.missionId);
+  const can = (role: Person["role"], who: string, s: Shift, except: string[]) => {
+    const b = all.find((x) => x.id === s.seasonId);
+    const m = b && data.missions.find((x) => x.id === b.missionId);
+    if (!b) return false;
+    return whoCanCover(data, role, ms(s.start), ms(s.end), seasonTypes(data, b), except, m ? requiredTraining(data, m, role) : [], b.missionId)
+      .some((c) => c.person.id === who && c.ok);
+  };
+  const givers = whoCanCover(data, person.role, ms(shift.start), ms(shift.end), seasonTypes(data, season), [shift.id], mission ? requiredTraining(data, mission, person.role) : [], season.missionId)
+    .filter((c) => c.ok && c.person.id !== person.id);
+  const near = 120 * DAY, now = Date.now();
+  const trades = data.shifts
+    .filter((s) => s.id !== shift.id && s.personId !== person.id && ms(s.end) > now && Math.abs(ms(s.start) - ms(shift.start)) <= near
+      && data.people.find((p) => p.id === s.personId)?.role === person.role && all.some((b) => b.id === s.seasonId && b.status !== "Cancelled" && b.status !== "Done"))
+    .filter((s) => can(person.role, s.personId, shift, [s.id, shift.id]) && can(person.role, person.id, s, [shift.id, s.id]))
+    .sort((a, b) => Math.abs(ms(a.start) - ms(shift.start)) - Math.abs(ms(b.start) - ms(shift.start)))
+    .slice(0, 12);
+
+  const give = (to: string) => {
+    change((d) => ({ ...d, shifts: d.shifts.map((s) => (s.id === shift.id ? { ...s, personId: to } : s)) }), `${name(to)} takes ${person.name}'s ${fmtSpan(shift.start, shift.end)} on ${season.name}`);
+    close();
+  };
+  const trade = (other: Shift) => {
+    change((d) => ({ ...d, shifts: d.shifts.map((s) => (s.id === shift.id ? { ...s, personId: other.personId } : s.id === other.id ? { ...s, personId: person.id } : s)) }),
+      `Traded: ${name(other.personId)} takes ${fmtSpan(shift.start, shift.end)}, ${person.name} takes ${fmtSpan(other.start, other.end)}`);
+    close();
+  };
+
+  return (
+    <Dialog title={`Swap ${person.name}'s shift`} onClose={close}
+      meta={<><span>{season.name}</span>·<span>{fmtSpan(shift.start, shift.end)}</span></>}
+      foot={<button className="btn" onClick={close}>Cancel</button>}>
+      <h4 className="form-section" style={{ marginTop: 0 }}>Hand it to someone</h4>
+      {givers.length ? (
+        <div className="picker-row">
+          {givers.map((c) => <button key={c.person.id} className="chip pick" onClick={() => give(c.person.id)}>{c.person.name}{c.regular ? <span className="pill ok">Crew</span> : null}</button>)}
+        </div>
+      ) : <p className="small muted">Nobody else of the same role is rated, current, free and on rotation for all of these days.</p>}
+      <h4 className="form-section">Trade with someone</h4>
+      {trades.length ? (
+        <div className="lines">
+          {trades.map((s) => {
+            const b = all.find((x) => x.id === s.seasonId)!;
+            return (
+              <button key={s.id} className="line" onClick={() => trade(s)}>
+                <span className="grow">
+                  <span className="name" style={{ display: "block" }}>{name(s.personId)} takes this</span>
+                  <span className="small muted">{person.name} takes {name(s.personId).split(" ")[0]}'s {b.name}, {fmtSpan(s.start, s.end, true)}</span>
+                </span>
+                <span className="btn sm">Trade</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : <p className="small muted">No trades within four months where both people can legally take the other's shift.</p>}
+      <p className="hint">Only moves the rules allow are offered (ratings, training, currency, time off, rotations). The problem list shows anything left, like rest between hitches.</p>
+    </Dialog>
   );
 }
 
