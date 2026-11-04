@@ -89,6 +89,15 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
     ],
   },
   {
+    q: "Plan an inspection and put maintainers on it",
+    steps: [
+      <>Go to <b>Maintenance</b> and press <b>New job</b>.</>,
+      <>Name it, like <b>100 hour inspection</b>, pick the aircraft and the first and last day.</>,
+      <>Under <b>Who's doing it</b>, tap the maintainers. Free ones rated on that aircraft come first; <b>Busy</b>, <b>Off</b> or <b>Not rated</b> says why someone else isn't a good pick.</>,
+      <>Leave <b>The aircraft can't fly during this job</b> ticked if it's grounded meanwhile, then <b>Save</b>. When it's done, open it and tick <b>Finished</b>.</>,
+    ],
+  },
+  {
     q: "Share the plan with the team",
     steps: [
       <>On <b>Reports</b>, pick the period: one of the ready-made ones, or <b>Pick dates</b> for your own first and last day.</>,
@@ -115,7 +124,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
         <ol>
           <li><b>Set up once.</b> Add your aircraft by tail number, your pilots and maintainers with the types they're rated on, and the training courses you track.</li>
           <li><b>Add each customer as a mission.</b> Pick its color, the training its crew need and its regular crew.</li>
-          <li><b>Give it a season</b> for each stretch of dates it flies. Add the aircraft when they're known, how many pilots and maintainers it needs at any time, and its rotation (like 14 on, 7 off).</li>
+          <li><b>Give it a season</b> for each stretch of dates it flies. Add the aircraft when they're known, how many pilots and maintainers it needs at a time, when it needs maintainers (all the time, some days a week, at the start and end, or on call), and its rotation (like 14 on, 7 off).</li>
           <li><b>Fill the schedule.</b> Zom's MRP rotates rated, current, free people through the season. Fix what's left by hand.</li>
           <li><b>Check the overview each day.</b> It lists every gap and conflict, each with a button that takes you to the fix.</li>
           <li><b>When a customer calls</b>, use <b>Can we take a job?</b> on the Fleet page before saying yes.</li>
@@ -206,7 +215,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
     body: (
       <>
         <p>A <b>mission</b> is one customer's kind of work, like “Interior Fire Service”. It keeps what stays the same: the contact, its color and pattern on the schedule, the <b>training</b> its crew need and its <b>crew</b> (the people who rotate through it). Names don't need a year; that's what seasons are for.</p>
-        <p>A <b>season</b> is one stretch of dates: its aircraft (any number, added whenever they're known), the pilots and maintainers needed at any time across them, and a <b>pilot rotation</b> and <b>maintainer rotation</b> that can differ. Its status runs Planned, Confirmed, Flying, Done. <b>Copy to next season</b> books next year's dates with the same setup.</p>
+        <p>A <b>season</b> is one stretch of dates: its aircraft (any number, added whenever they're known), the pilots and maintainers needed at a time across them, when maintainers are needed (<b>All the time</b>, <b>Days a week</b>, <b>Start and end</b> for set-up and tear-down, or <b>On call</b>, which is never a gap), and a <b>pilot rotation</b> and <b>maintainer rotation</b> that can differ. Its status runs Planned, Confirmed, Flying, Done. <b>Copy to next season</b> books next year's dates with the same setup.</p>
         <p>A season's form has tabs. <b>Pilots</b> and <b>Maintainers</b> show how much is crewed, then one line per shift with open seats in date order. A red dot on a tab means something there needs a look.</p>
       </>
     ),

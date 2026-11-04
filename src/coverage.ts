@@ -55,7 +55,8 @@ const active = (m: { status: Season["status"] }) => m.status !== "Cancelled" && 
 export interface MissionCoverage {
   /** Spans where fewer pilots than needed are on board, with how many are missing. */
   pilotGaps: { a: number; b: number; short: number }[];
-  maintainerGaps: { a: number; b: number; short: number }[];
+  /** Maintainer gaps, by the season's choice of when they're needed. `days`: days a week still to book (some days a week). */
+  maintainerGaps: { a: number; b: number; short: number; days?: number }[];
   /** 0 to 1: the share of mission time with every pilot seat covered. */
   covered: number;
 }
@@ -74,9 +75,37 @@ export function missionCoverage(data: AppData, m: Season): MissionCoverage {
   const gapTime = pilotGaps.reduce((t, g) => t + (g.b - g.a), 0);
   return {
     pilotGaps,
-    maintainerGaps: gaps("Maintainer", m.maintainersNeeded),
+    maintainerGaps: maintainerGaps(m, gaps("Maintainer", m.maintainersNeeded)),
     covered: to > from ? 1 - gapTime / (to - from) : 1,
   };
+}
+
+/** Of the times with too few maintainers, the ones that count by when the season needs them. */
+function maintainerGaps(m: Season, all: { a: number; b: number; short: number }[]): MissionCoverage["maintainerGaps"] {
+  const need = m.maintainerNeed ?? { mode: "always", days: 0 };
+  const from = ms(m.start), to = ms(m.end);
+  const n = Math.max(1, Math.round(need.days || 1));
+  if (need.mode === "oncall" || !all.length) return need.mode === "oncall" ? [] : all;
+  if (need.mode === "ends") {
+    // Set-up at the start and tear-down at the end: only those days count.
+    const windows: [number, number][] = [[from, Math.min(to, dayAt(from, n))], [Math.max(from, dayAt(to, -n)), to]];
+    if (windows[1][0] <= windows[0][1]) windows.splice(0, 2, [from, to]);
+    return all.flatMap((g) => windows.filter(([a, b]) => g.a < b && g.b > a).map(([a, b]) => ({ ...g, a: Math.max(g.a, a), b: Math.min(g.b, b) })));
+  }
+  if (need.mode === "weekly") {
+    // Each week from the first day: at least `n` days (or the whole week, if shorter) with enough on.
+    const out: MissionCoverage["maintainerGaps"] = [];
+    for (let w = from; w < to; w = dayAt(w, 7)) {
+      const end = Math.min(to, dayAt(w, 7));
+      const days: number[] = [];
+      for (let d = w; d < end; d = dayAt(d, 1)) days.push(d);
+      const open = days.filter((d) => all.some((g) => g.a < dayAt(d, 1) && g.b > d));
+      const missing = Math.min(n, days.length) - (days.length - open.length);
+      if (missing > 0) out.push({ a: open[0], b: end, short: m.maintainersNeeded, days: missing });
+    }
+    return out;
+  }
+  return all;
 }
 
 /** Everything one person is booked for, as time spans with what each one is. */
@@ -136,7 +165,11 @@ export function findIssues(data: AppData): Issue[] {
         detail: `${range(g.a, g.b)}. Add a pilot shift to cover it.`, at: g.a, seasonId: m.id,
       });
     for (const g of cov.maintainerGaps)
-      issues.push({ id: `mgap-${m.id}-${g.a}`, severity: "warn", title: `“${m.name}” needs ${plural(g.short, "maintainer")} on call`, detail: `${range(g.a, g.b)}.`, at: g.a, seasonId: m.id });
+      issues.push({
+        id: `mgap-${m.id}-${g.a}`, severity: "warn", at: g.a, seasonId: m.id,
+        title: g.days ? `“${m.name}” needs a maintainer ${plural(g.days, "more day")} the week of ${format(g.a, "MMM d")}` : `“${m.name}” needs ${plural(g.short, "maintainer")} on call`,
+        detail: g.days ? `${m.maintainerNeed?.days ?? 1} days a week are needed. Add a maintainer shift that week.` : `${range(g.a, g.b)}.`,
+      });
 
     if (tails.length) {
       const seats = tails.reduce((t, a) => t + a.seats, 0);

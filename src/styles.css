@@ -294,8 +294,7 @@ button.line:hover { background: var(--zb-surface-2); }
 .accent-text { color: var(--zb-accent); font-weight: 600; }
 .danger-text { color: var(--zb-danger); }
 /* Reports: a first and last day of your own. */
-.field-inline { display: inline-flex; align-items: center; gap: 6px; }
-.field-inline input { width: auto; }
+.report-dates { flex: 1 1 340px; max-width: 520px; }
 .lesson-no { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; background: var(--zb-accent-soft); color: var(--zb-accent); }
 .guide-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 26px 0 0; padding: 12px 0; border-top: 1px solid var(--zb-border); border-bottom: 1px solid var(--zb-border); }
 .guide-toc a { font-size: 13px; color: var(--zb-text-2); text-decoration: none; padding: 3px 10px; border-radius: 999px; background: var(--zb-surface-2); }
@@ -574,3 +573,47 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 .swatch-dash.open { border-color: var(--zb-danger); background: color-mix(in srgb, var(--zb-danger) 10%, transparent); }
 .getting-started { margin-bottom: 16px; border: 1px solid color-mix(in srgb, var(--zb-accent) 45%, transparent); }
 .getting-started p { margin: 0 0 12px; color: var(--zb-text-2); line-height: 1.5; }
+
+/* ---------- dates: the boxes, a calendar button, and a month to tap ---------- */
+.date-range { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.date-row { display: flex; gap: 10px; align-items: flex-end; }
+.date-row .field { flex: 1; min-width: 0; }
+.date-row .field input, .date-one input { width: 100%; min-width: 0; }
+/* The calendar button beside them does that job, and the boxes fit a phone without it. */
+.date-row input::-webkit-calendar-picker-indicator, .date-one input::-webkit-calendar-picker-indicator { display: none; }
+.cal-toggle { flex: none; height: 38px; width: 42px; padding: 0; justify-content: center; }
+.cal-toggle.on { background: var(--zb-accent-soft); border-color: var(--zb-accent); color: var(--zb-accent); }
+.date-sum { min-height: 18px; }
+.date-one { display: flex; gap: 8px; align-items: center; }
+.date-one input { flex: 1; min-width: 0; width: auto; }
+.date-single { position: relative; }
+.cal-pop { margin-top: 6px; padding: 12px; border: 1px solid var(--zb-border); border-radius: var(--zb-radius); background: var(--zb-surface); box-shadow: var(--zb-shadow); max-width: 360px; }
+.cal-hint { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cal-head b { font-size: 15px; }
+.cal-head .icon-btn:disabled { opacity: .3; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-dow { text-align: center; font-size: 11px; font-weight: 600; color: var(--zb-muted); padding: 4px 0; }
+.cal-day { height: 40px; border-radius: 8px; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--zb-text); }
+.cal-day:hover:not(:disabled) { background: var(--zb-surface-2); }
+.cal-day.other { color: var(--zb-muted); }
+.cal-day.today { box-shadow: inset 0 0 0 1.5px var(--zb-accent); }
+.cal-day.in { background: var(--zb-accent-soft); border-radius: 0; }
+.cal-day.from, .cal-day.to { background: var(--zb-accent); color: #fff; font-weight: 700; }
+.cal-day.from { border-radius: 8px 0 0 8px; }
+.cal-day.to { border-radius: 0 8px 8px 0; }
+.cal-day.from.to { border-radius: 8px; }
+.cal-day:disabled { color: var(--zb-muted); opacity: .35; text-decoration: line-through; cursor: not-allowed; }
+@media (max-width: 700px), (max-height: 500px) {
+  .cal-pop { max-width: none; }
+  .cal-day { height: 44px; font-size: 15px; }
+}
+
+/* Picking aircraft for a job: every tail to tap, by type, free ones in green. */
+.ac-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.ac-type { display: flex; flex-direction: column; gap: 4px; }
+.ac-type-name { font-size: 12px; font-weight: 600; color: var(--zb-text-2); }
+.ac-pick { gap: 6px; }
+.ac-pick.free .small { color: var(--zb-ok); font-weight: 600; }
+.ac-pick.busy { opacity: .75; }
+.ac-pick.busy .small { color: var(--zb-warn); }

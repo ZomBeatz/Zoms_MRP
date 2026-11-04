@@ -31,7 +31,7 @@ export function Maintenance() {
                 {list.map((j) => {
                   const ac = aircraft.get(j.aircraftId);
                   return (
-                    <tr key={j.id} onClick={() => open("job", j.id)}>
+                    <tr key={j.id} onClick={() => open("job", j.id, undefined, unstaffed(j.maintainerIds) && !j.done ? { spot: "maintainers" } : undefined)}>
                       <td className="name">{j.title}</td>
                       <td style={{ fontFamily: "var(--zb-font-mono)" }}>{ac?.tail ?? "Removed"}</td>
                       <td>{j.kind}</td>
@@ -50,7 +50,7 @@ export function Maintenance() {
           </div>
           <div className="cards-list">
             {list.map((j) => (
-              <button key={j.id} className="list-card" onClick={() => open("job", j.id)}>
+              <button key={j.id} className="list-card" onClick={() => open("job", j.id, undefined, unstaffed(j.maintainerIds) && !j.done ? { spot: "maintainers" } : undefined)}>
                 <span className="row gap-sm"><b className="grow">{j.title}</b>{j.done ? <span className="pill">Done</span> : j.grounds ? <span className="pill warn">Grounds aircraft</span> : null}</span>
                 <span className="small muted">{aircraft.get(j.aircraftId)?.tail} · {j.kind} · {fmtRange(j.start, j.end)}</span>
                 {unstaffed(j.maintainerIds) && !j.done && <span className="small" style={{ color: "var(--zb-warn)" }}>Nobody assigned yet</span>}

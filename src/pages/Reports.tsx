@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { saveFile, showInFolder } from "../files";
+import { DateRange } from "../components/dates";
 import { useStore } from "../store";
 import { missionCoverage } from "../coverage";
 import { report, reportName } from "../report";
@@ -84,9 +85,8 @@ export function Reports() {
           <button className={custom ? "active" : ""} onClick={() => setPeriod("custom")}>Pick dates</button>
         </div>
         {custom ? (
-          <div className="row gap-sm wrap report-dates">
-            <label className="field-inline"><span className="small muted">First day</span><input type="date" value={first} onChange={(e) => setFirst(e.target.value)} /></label>
-            <label className="field-inline"><span className="small muted">Last day</span><input type="date" value={last} min={first} onChange={(e) => setLast(e.target.value)} /></label>
+          <div className="report-dates">
+            <DateRange first={first} last={last} onChange={(f, l) => { setFirst(f); setLast(l); }} />
             {datesWrong && <span className="small danger-text">Pick a last day after the first, at most {MAX_DAYS / 366} years later.</span>}
           </div>
         ) : <span className="muted small">{fmtDates(toWhen(from), toWhen(to))}</span>}

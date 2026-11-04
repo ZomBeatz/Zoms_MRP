@@ -162,7 +162,7 @@ export const TOURS: Tour[] = [
     summary: "Set aircraft, crew numbers and a 14 on / 7 off rotation, then fill the schedule and close the gaps.",
     steps: [
       { before: () => openSeason("Details"), target: ".dialog-meta", title: "A season to crew", body: "This is next summer's fire season. The line under the title shows it at a glance: status, dates, tails and how much is crewed." },
-      { before: () => openSeason("Details"), target: ".dialog .tags", title: "Several aircraft on one job", body: "Add the tails when they're known; a planned job can wait for them. People rated on any of these types can crew it." },
+      { before: () => openSeason("Details"), target: '.dialog [data-spot="aircraft"]', title: "Several aircraft on one job", body: "Add the tails when they're known; a planned job can wait for them. Each tail says if it's free for these dates. People rated on any of these types can crew it." },
       { before: () => openSeason("Details"), target: ".dialog .stepper", title: "Crew needed at any time", body: "How many pilots and maintainers the whole job needs on any day, across all its aircraft." },
       { before: () => openSeason("Details"), target: ".dialog .rotation", title: "The job's rotation", body: "Like 14 days on, 7 off, or 21 on, 14 off. Pilots and maintainers can have different rotations." },
       { before: () => openSeason("Pilots"), target: ".dialog .cov-bar", title: "Where it's short", body: "Green is covered; red stripes are days with an open seat. The Pilots tab has a red dot while any are open." },
@@ -415,16 +415,12 @@ export const SCENARIOS: Tour[] = [
     steps: [
       {
         before: async () => { await openSeason("Details"); mark.tags = tagCount(); mark.pilots = pilotsAtATime(); },
-        target: ".dialog .tags", title: "One more aircraft",
-        body: "Interior Fire Service wants a third helicopter for next summer's season, with one more pilot on at a time.",
+        target: '.dialog [data-spot="aircraft"]', title: "One more aircraft",
+        body: "Interior Fire Service wants a third helicopter for next summer's season, with one more pilot on at a time. Each tail says whether it's free for these dates.",
         task: {
-          say: "Tap + Add aircraft and pick any tail.",
+          say: "Under Add another, tap a tail that says Free.",
           done: () => tagCount() > mark.tags,
-          doIt: async () => {
-            const sel = document.querySelector<HTMLSelectElement>(".dialog select.add-tag");
-            const opt = sel && [...sel.options].find((o) => o.value);
-            if (opt) await choose(".dialog select.add-tag", opt.value);
-          },
+          doIt: () => click(document.querySelector<HTMLElement>(".dialog .ac-pick.free") ? ".dialog .ac-pick.free" : ".dialog .ac-pick"),
         },
       },
       {

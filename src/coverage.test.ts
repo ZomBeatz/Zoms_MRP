@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { coverageSteps, findIssues, missionCoverage, neededTraining, trainingStatus } from "./coverage";
 import { emptyData } from "./sample";
-import type { AppData, Person } from "./types";
+import type { AppData, Person, Season } from "./types";
 
 const DAY = 86_400_000;
 /** Midnight on Nov `n`, 2030 (well clear of today, so nothing "runs out soon"). */
@@ -89,5 +89,49 @@ describe("coverage", () => {
     data.people[1].missionIds = ["night"];
     expect(neededTraining(data, data.people[0]).has("t1")).toBe(false);
     expect(neededTraining(data, data.people[1]).get("t1")?.map((m) => m.id)).toEqual(["night"]);
+  });
+});
+
+describe("when maintainers are needed", () => {
+  const maint = (id: string): Person => ({ ...pilot(id, id, ["Bell 412"]), role: "Maintainer" });
+  /** A 28-day season needing one maintainer, chosen how, with maintainer shifts on the given days (Nov n to n+len). */
+  const setup = (need: Season["maintainerNeed"], shifts: [number, number][] = []) => {
+    const data = base();
+    data.people.push(maint("m1"));
+    data.seasons[0] = { ...data.seasons[0], maintainersNeeded: 1, maintainerNeed: need };
+    data.shifts = shifts.map(([a, b], i) => ({ id: `ms${i}`, seasonId: "m1", personId: "m1", start: d(a), end: d(b) }));
+    return missionCoverage(data, data.seasons[0]).maintainerGaps;
+  };
+
+  it("all the time: every day without one is a gap", () => {
+    expect(setup(undefined)).toEqual([{ a: new Date(d(1)).getTime(), b: new Date(d(29)).getTime(), short: 1 }]);
+    expect(setup({ mode: "always", days: 2 }, [[1, 15]])).toHaveLength(1);
+  });
+
+  it("on call: never a gap", () => {
+    expect(setup({ mode: "oncall", days: 2 })).toEqual([]);
+  });
+
+  it("start and end: only the first and last days count", () => {
+    const gaps = setup({ mode: "ends", days: 3 });
+    expect(gaps.map((g) => [new Date(g.a).getDate(), new Date(g.b).getDate()])).toEqual([[1, 4], [26, 29]]);
+    expect(setup({ mode: "ends", days: 3 }, [[1, 4], [26, 29]])).toEqual([]);
+  });
+
+  it("days a week: a week with too few days booked is a gap, saying how many more", () => {
+    // Four weeks; the first has 2 days booked, the second 1, the rest none.
+    const gaps = setup({ mode: "weekly", days: 2 }, [[1, 3], [8, 9]]);
+    expect(gaps.map((g) => [new Date(g.a).getDate(), g.days])).toEqual([[9, 1], [15, 2], [22, 2]]);
+  });
+});
+
+describe("filling maintainers who are needed only some days", () => {
+  it("books just the start and end for set-up and tear-down", async () => {
+    const { fillSeason } = await import("./fill");
+    const data = base();
+    data.people.push({ ...pilot("m1", "Mo", ["Bell 412"]), role: "Maintainer" });
+    data.seasons[0] = { ...data.seasons[0], maintainersNeeded: 1, maintainerNeed: { mode: "ends", days: 2 } };
+    const added = fillSeason(data, data.seasons[0], "Maintainer", { on: 14, off: 0 }, { maxDaysOn: 21, minDaysOff: 0 });
+    expect(added.map((s) => [new Date(s.start).getDate(), new Date(s.end).getDate()])).toEqual([[1, 3], [27, 29]]);
   });
 });

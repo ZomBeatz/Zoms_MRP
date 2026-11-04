@@ -55,7 +55,7 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
   // either covered or have nobody who could take them.
   let skipUntil = from;
   for (let guard = 0; guard < 20000; guard++) {
-    const gaps = role === "Pilot" ? missionCoverage(current, season).pilotGaps : missionCoverage(current, season).maintainerGaps;
+    const gaps: { a: number; b: number; days?: number }[] = role === "Pilot" ? missionCoverage(current, season).pilotGaps : missionCoverage(current, season).maintainerGaps;
     // The earliest open day that someone could still take (skip days already tried and found impossible).
     const gap = gaps.find((g) => g.b > skipUntil);
     if (!gap) break;
@@ -69,7 +69,10 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
       continue;
     }
     let end = d;
-    const last = Math.min(to, dayAt(d, on));
+    let last = Math.min(to, dayAt(d, on));
+    // Maintainers needed only some days: book just the days that count (the start or end, or the days a week still open).
+    if (role === "Maintainer" && (season.maintainerNeed?.mode ?? "always") !== "always")
+      last = Math.min(last, gap.b, gap.days ? dayAt(d, gap.days) : Infinity);
     while (end < last && canWork(pick, end)) end = dayAt(end, 1);
     const shift: Shift = { id: uid(), seasonId: season.id, personId: pick.id, start: toWhen(d), end: toWhen(end) };
     added.push(shift);
