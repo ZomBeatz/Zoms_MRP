@@ -61,3 +61,21 @@ export function trim(data: AppData, shiftId: string, edge: Edge, by: number, sol
     : s);
   return { data: { ...data, shifts }, moved, partner };
 }
+
+/** Move a whole shift `by` days (pilots stay inside their season). Its handovers aren't moved. */
+export function move(data: AppData, shiftId: string, by: number): { data: AppData; moved: number } {
+  const shift = data.shifts.find((s) => s.id === shiftId);
+  if (!shift) return { data, moved: 0 };
+  const season = data.seasons.find((x) => x.id === shift.seasonId);
+  const pilot = data.people.find((p) => p.id === shift.personId)?.role === "Pilot";
+  const days = (a: number, b: number) => Math.round((b - a) / 86_400_000);
+  let lo = -Infinity, hi = Infinity;
+  if (pilot && season) {
+    lo = -days(ms(season.start), ms(shift.start));
+    hi = days(ms(shift.end), ms(season.end));
+  }
+  const moved = Math.max(Math.min(lo, 0), Math.min(Math.max(hi, 0), Math.round(by)));
+  if (!moved) return { data, moved: 0 };
+  const shifts = data.shifts.map((s) => (s.id === shiftId ? { ...s, start: toWhen(dayAt(ms(s.start), moved)), end: toWhen(dayAt(ms(s.end), moved)) } : s));
+  return { data: { ...data, shifts }, moved };
+}
