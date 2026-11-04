@@ -66,3 +66,13 @@ describe("trimming shifts", () => {
     expect(trim(data, "c1", "end", -3).partner?.id).toBe("d1");
   });
 });
+
+describe("moving whole shifts", () => {
+  it("moves both ends, keeping a pilot inside the season", async () => {
+    const { move } = await import("./trim");
+    const r = move(plan(), "a", 3);
+    expect([shift(r.data, "a").start, shift(r.data, "a").end]).toEqual([d(4), d(18)]);
+    expect(shift(move(plan(), "a", -5).data, "a").start).toBe(d(1));
+    expect(shift(move(plan(), "b", 9).data, "b").end).toBe(d(29));
+  });
+});

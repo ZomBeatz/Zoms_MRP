@@ -715,3 +715,8 @@ body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
 
 /* A day someone would rather not work: lighter than time off, since they can still be booked. */
 .slot.off.soft { opacity: .55; background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(127,127,127,.18) 6px 9px); }
+
+/* Dragging a whole shift: it can be moved in time, or dropped on another person's row. */
+.slot.trimmable { cursor: grab; }
+.slot.trimming { cursor: grabbing; }
+.g-lane.drop { box-shadow: inset 0 0 0 2px var(--zb-accent); background: var(--zb-accent-soft); }

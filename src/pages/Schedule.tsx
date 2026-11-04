@@ -3,14 +3,14 @@ import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } f
 import { StickyNote, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { byId, useStore } from "../store";
-import { missionCoverage, requiredTraining, trainingStatus, type Issue } from "../coverage";
+import { missionCoverage, requiredTraining, trainingStatus, whoCanCover, type Issue } from "../coverage";
 import { fmtRotation, offRotationSpans, seasonTails, seasonTypes } from "../rotation";
 import { dayAt, fmtDates, fmtRange, ms, overlaps, toWhen } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, StatusPill } from "../components/ui";
 import type { AppData, Booking, Person, Settings } from "../types";
 import { format } from "date-fns";
-import { partnerOf, trim, type Edge } from "../trim";
+import { move, partnerOf, trim, type Edge } from "../trim";
 
 /**
  * The Gantt chart: time runs left to right, one row per mission, aircraft or person.
@@ -43,6 +43,8 @@ interface Row {
   /** Clicking empty space here adds a mission with these values. */
   addDefaults?: Record<string, unknown>;
   onLabel?: () => void;
+  /** A person's row: shifts can be dropped on it to give them to this person. */
+  personId?: string;
 }
 
 type Section = { heading?: string; rows: Row[] };
@@ -80,9 +82,11 @@ export function Schedule({ issues }: { issues: Issue[] }) {
 
   // Dragging a shift's end, like trimming a clip; a handover (the next shift starting that day) moves with it.
   const change = useStore((s) => s.change);
-  const [trimming, setTrimming] = useState<{ shiftId: string; edge: Edge; x0: number; dayPx: number; by: number; solo: boolean } | null>(null);
+  const [trimming, setTrimming] = useState<{ shiftId: string; edge: Edge | "move"; x0: number; y0: number; dayPx: number; by: number; solo: boolean; engaged: boolean; target?: string } | null>(null);
   const trimmed = useRef(false);
-  const preview = trimming ? trim(data, trimming.shiftId, trimming.edge, trimming.by, trimming.solo) : null;
+  const preview = trimming
+    ? trimming.edge === "move" ? { ...move(data, trimming.shiftId, trimming.by), partner: undefined } : trim(data, trimming.shiftId, trimming.edge, trimming.by, trimming.solo)
+    : null;
   const previewOf = (id?: string) => (preview && id ? preview.data.shifts.find((s) => s.id === id && (s.id === trimming!.shiftId || s.id === preview.partner?.id)) : undefined);
   // Shifts handing over to someone at their end (or from someone at their start): a seam to show.
   const seams = useMemo(() => {
@@ -97,17 +101,54 @@ export function Schedule({ issues }: { issues: Issue[] }) {
     e.preventDefault();
     const lane = (e.currentTarget as HTMLElement).closest(".g-lane")!.getBoundingClientRect();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setTrimming({ shiftId, edge, x0: e.clientX, dayPx: lane.width / span, by: 0, solo: e.altKey });
+    setTrimming({ shiftId, edge, x0: e.clientX, y0: e.clientY, dayPx: lane.width / span, by: 0, solo: e.altKey, engaged: true });
+  };
+  /** Pressing the middle of a shift: once it moves a few pixels, it's being dragged (else it's a tap). */
+  const startMove = (e: React.PointerEvent, shiftId: string) => {
+    // With a finger, dragging the middle of a bar scrolls the page; only a mouse or pen moves the shift.
+    if (e.button !== 0 || e.pointerType === "touch" || (e.target as HTMLElement).closest(".slot-edge")) return;
+    e.stopPropagation();
+    const lane = (e.currentTarget as HTMLElement).closest(".g-lane")!.getBoundingClientRect();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setTrimming({ shiftId, edge: "move", x0: e.clientX, y0: e.clientY, dayPx: lane.width / span, by: 0, solo: false, engaged: false });
   };
   const moveTrim = (e: React.PointerEvent) => {
     if (!trimming) return;
+    if (!trimming.engaged && Math.abs(e.clientX - trimming.x0) < 6 && Math.abs(e.clientY - trimming.y0) < 6) return;
     const by = Math.round((e.clientX - trimming.x0) / trimming.dayPx);
-    if (by !== trimming.by || e.altKey !== trimming.solo) setTrimming({ ...trimming, by, solo: e.altKey });
+    // Over another person's row: dropping gives them the shift.
+    const target = trimming.edge === "move" ? (document.elementFromPoint(e.clientX, e.clientY)?.closest(".g-lane") as HTMLElement | null)?.dataset.person : undefined;
+    if (!trimming.engaged || by !== trimming.by || e.altKey !== trimming.solo || target !== trimming.target) setTrimming({ ...trimming, by, solo: e.altKey, engaged: true, target });
+  };
+  const endMove = (t: NonNullable<typeof trimming>) => {
+    trimmed.current = true;
+    setTimeout(() => (trimmed.current = false), 0);
+    const r = move(data, t.shiftId, t.by);
+    const s = r.data.shifts.find((x) => x.id === t.shiftId)!;
+    const who = (id: string) => data.people.find((p) => p.id === id)?.name ?? "Someone";
+    if (t.target && t.target !== s.personId) {
+      // Only to someone who can legally take it on those days.
+      const b = bookings(data).find((x) => x.id === s.seasonId)!;
+      const m = data.missions.find((x) => x.id === b.missionId);
+      const role = data.people.find((p) => p.id === s.personId)?.role ?? "Pilot";
+      const c = whoCanCover(r.data, role, ms(s.start), ms(s.end), seasonTypes(data, b), [s.id], m ? requiredTraining(data, m, role) : [], b.missionId).find((x) => x.person.id === t.target);
+      if (!c || !c.ok) {
+        const why = !c ? `isn't a ${role.toLowerCase()}` : !c.qualified ? "isn't rated on the aircraft" : !c.trained ? "isn't current on the training" : !c.current ? "hasn't flown the type lately" : c.off ? "has time off then" : !c.onRotation ? "is off rotation then" : "is booked elsewhere then";
+        useStore.getState().showToast(`${who(t.target)} can't take it: ${who(t.target).split(" ")[0]} ${why}.`);
+        return;
+      }
+      change(() => ({ ...r.data, shifts: r.data.shifts.map((x) => (x.id === s.id ? { ...x, personId: t.target!, after: undefined } : x)) }), `${who(t.target)} takes ${fmtDates(s.start, s.end)} on ${b.name}`);
+      return;
+    }
+    if (!r.moved) return;
+    change(() => r.data, `${who(s.personId)}'s shift moved to ${fmtDates(s.start, s.end)}`);
   };
   const endTrim = () => {
     if (!trimming) return;
     const t = trimming;
     setTrimming(null);
+    if (!t.engaged) return; // a tap: the bar's click opens the season
+    if (t.edge === "move") return endMove(t);
     const r = trim(data, t.shiftId, t.edge, t.by, t.solo);
     if (!r.moved) return;
     trimmed.current = true;
@@ -126,7 +167,8 @@ export function Schedule({ issues }: { issues: Issue[] }) {
     const height = Math.max(minH, tracks * trackH + 10);
     return (
       <div
-        className={`g-lane ${r.sub ? "sub" : ""}`}
+        data-person={r.personId}
+        className={`g-lane ${r.sub ? "sub" : ""} ${trimming?.edge === "move" && trimming.engaged && trimming.target && trimming.target === r.personId ? "drop" : ""}`}
         style={{ height }}
         title={r.addDefaults ? "Drag to move through time. Tap empty space to add a mission here." : "Drag to move through time."}
         onClick={(e) => {
@@ -148,6 +190,10 @@ export function Schedule({ issues }: { issues: Issue[] }) {
             className={`slot ${bar.className ?? ""} ${bar.shiftId ? "trimmable" : ""} ${live ? "trimming" : ""}`}
             title={bar.shiftId ? `${bar.tip}\nDrag either end to change the dates.` : bar.tip}
             onClick={() => !trimmed.current && bar.onClick()}
+            onPointerDown={bar.shiftId ? (e) => startMove(e, bar.shiftId!) : undefined}
+            onPointerMove={bar.shiftId ? moveTrim : undefined}
+            onPointerUp={bar.shiftId ? endTrim : undefined}
+            onPointerCancel={bar.shiftId ? () => setTrimming(null) : undefined}
             style={{
               ...bar.style,
               left: `${pct(a)}%`,
@@ -163,9 +209,10 @@ export function Schedule({ issues }: { issues: Issue[] }) {
                 onClick={(e) => e.stopPropagation()} />
             ))}
             {bar.shiftId && seams.has(bar.shiftId) && <span className="slot-seam" aria-hidden="true" title="Handover: dragging this end moves the next person's start too (hold Alt or Option to move just this one)">⇄</span>}
-            {live && trimming && (pv!.id === trimming.shiftId) && (
-              <span className={`trim-tip ${trimming.edge}`}>
-                {trimming.edge === "end" ? `Last day ${format(b - 1, "MMM d")}` : `First day ${format(a, "MMM d")}`}
+            {live && trimming && trimming.engaged && (pv!.id === trimming.shiftId) && (
+              <span className={`trim-tip ${trimming.edge === "move" ? "start" : trimming.edge}`}>
+                {trimming.edge === "move" ? `${format(a, "MMM d")} to ${format(b - 1, "MMM d")}${trimming.target && trimming.target !== pv!.personId ? ` → ${data.people.find((x) => x.id === trimming.target)?.name ?? ""}` : ""}`
+                  : trimming.edge === "end" ? `Last day ${format(b - 1, "MMM d")}` : `First day ${format(a, "MMM d")}`}
                 {preview?.partner ? ` ⇄ ${data.people.find((p) => p.id === preview.partner!.personId)?.name ?? ""}` : ""}
               </span>
             )}
@@ -398,6 +445,7 @@ function buildRows(
         </>
       ),
       onLabel: () => open("person", p.id),
+      personId: p.id,
       shade: off.filter((t) => !t.soft).map((t) => [ms(t.start), ms(t.end)] as [number, number]),
       rotationOff: offRotationSpans(p, from, to),
       bars: [
