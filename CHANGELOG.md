@@ -2,6 +2,9 @@
 
 ## Not released yet
 
+**The app opens empty**
+- The app (desktop, web and server) opens straight to an empty plan, with the setup steps on the Overview: aircraft, training, pilots, maintainers, missions. Demo data, the Guide and the lessons are only in the online demo for now, and any demo kept on the device is removed.
+
 **Learn it step by step**
 - Six hands-on lessons in the Guide: add a training course, add an aircraft, add a pilot, a customer calls with dates, a pilot calls in sick, and a job needs another aircraft. Each step says what to tap and moves on once it's done; **Do it for me** does it instead.
 - Finished lessons and tours are ticked off, and each lesson ends with **Take a break** or the next one.

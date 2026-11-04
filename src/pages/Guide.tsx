@@ -302,7 +302,7 @@ function TourCards({ tours, onStart, numbered }: { tours: Tour[]; onStart: (id: 
 }
 
 /** The order to add things in, with a button for each. */
-function Setup() {
+export function Setup() {
   const { data, demo, open, setDemo } = useStore();
   const steps: { done: boolean; text: ReactNode; action: string; run: () => void }[] = [
     { done: data.aircraft.length > 0, text: <><b>Add your aircraft</b> by tail number, with their type and pilot seats.</>, action: "Add aircraft…", run: () => open("aircraft", "new") },

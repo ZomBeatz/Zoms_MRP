@@ -9,6 +9,8 @@ import { missionLook, slotStyle } from "../look";
 import { StatusPill } from "../components/ui";
 import { fleetUse } from "../fleet";
 import { seasonTails } from "../rotation";
+import { showLearning } from "../platform";
+import { Setup } from "./Guide";
 
 /** Open whatever an issue is about, so it can be fixed in one click. */
 export function useOpenIssue() {
@@ -77,7 +79,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
         <h1>Overview</h1>
         <button className="btn" onClick={() => go("schedule")}>Open schedule</button>
       </div>
-      {!data.aircraft.length && !data.missions.length && <GettingStarted />}
+      {!data.missions.length && (!showLearning || !data.aircraft.length) && <GettingStarted />}
       <div className="tiles">
         <button className="tile" onClick={() => go("missions")}>
           <div className="label"><Plane size={14} /> Missions now or in the next 30 days</div>
@@ -175,6 +177,13 @@ function FleetNow() {
 /** With nothing set up yet, say where to begin instead of showing empty numbers. */
 function GettingStarted() {
   const { go, demo, setDemo } = useStore();
+  if (!showLearning)
+    return (
+      <section className="panel getting-started">
+        <h3><BookOpen size={16} /> Getting started</h3>
+        <Setup />
+      </section>
+    );
   const toSetup = () => {
     go("guide");
     setTimeout(() => document.getElementById("guide-setup")?.scrollIntoView({ block: "start" }), 300);
