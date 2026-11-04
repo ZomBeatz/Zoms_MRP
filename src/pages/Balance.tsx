@@ -6,7 +6,7 @@ import { missionCoverage } from "../coverage";
 import { dayAt, fmtDates, plural, toWhen, today } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { seasonTails } from "../rotation";
-import { Avatar, Empty, Stepper } from "../components/ui";
+import { Avatar, Empty, Stepper, usePref } from "../components/ui";
 import type { AppData, Role } from "../types";
 
 /**
@@ -27,7 +27,7 @@ const TONE_WORDS = { over: "Very busy", good: "Busy", light: "Light", idle: "Har
 
 export function Balance() {
   const { data, change, open } = useStore();
-  const [period, setPeriod] = useState<string>("90");
+  const [period, setPeriod] = usePref<string>("balance-period", "90");
   const days = PERIODS.find((p) => p.id === period)!.days;
   const from = dayAt(today(), 0), to = dayAt(today(), days);
 
@@ -36,7 +36,7 @@ export function Balance() {
   const [proposal, setProposal] = useState<AppData | null>(null);
   const [lockedJobs, setLockedJobs] = useState<Set<string>>(new Set());
   const [lockedPeople, setLockedPeople] = useState<Set<string>>(new Set());
-  const [role, setRole] = useState<Role>("Pilot");
+  const [role, setRole] = usePref<Role>("balance-role", "Pilot");
   const [everything, setEverything] = useState(false);
 
   /** The plan with the what-if sizes, before rebalancing. */

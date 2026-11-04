@@ -668,3 +668,14 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 .hours-entry { display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
 .hours-entry > input { width: 110px; }
 .hours-entry .date-single { margin: 0; }
+
+/* ---------- Quick find (Ctrl/⌘ K) ---------- */
+.quickfind-back { align-items: flex-start; padding-top: 10vh; }
+.quickfind { width: min(560px, calc(100vw - 24px)); background: var(--zb-surface); border-radius: var(--zb-radius); box-shadow: var(--zb-shadow-lg, var(--zb-shadow)); overflow: hidden; }
+.quickfind-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--zb-border); }
+.quickfind-bar input { flex: 1; border: none; box-shadow: none; background: transparent; font-size: 16px; }
+.quickfind-list { max-height: 60vh; overflow-y: auto; }
+.quickfind-hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 10px 14px; text-align: left; }
+.quickfind-hit.on, .quickfind-hit:hover { background: var(--zb-surface-2); }
+.find-item { margin-top: 4px; }
+@media (max-width: 700px), (max-height: 500px) { .quickfind-back { padding-top: 12px; } }

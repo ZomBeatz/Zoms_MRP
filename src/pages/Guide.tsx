@@ -15,7 +15,8 @@ export const SHORTCUTS: [string, string][] = [
   [`${mod} Shift Z`, "Redo"],
   ["[", "Fold the sidebar"],
   ["?", "This guide"],
-  ["Esc", "Close a form"],
+  [`${mod} K`, "Find anything by name"],
+  ["Esc", "Close a form (it asks first if you've changed something)"],
 ];
 
 /** Everyday jobs, as short step lists. Keep the names of buttons and tabs exactly as they are in the app. */

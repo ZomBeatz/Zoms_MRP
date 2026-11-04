@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen, FlaskConical,
-  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale, ClipboardCheck
+  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale, ClipboardCheck, Search
 } from "lucide-react";
 import { useStore } from "./store";
 import { RELEASES_URL, isDesktopApp, isOnlineDemo } from "./platform";
@@ -24,6 +24,7 @@ import { Dialogs } from "./dialogs";
 import { Welcome } from "./pages/Welcome";
 import { Guide } from "./pages/Guide";
 import { TourOverlay } from "./tour";
+import { QuickFind } from "./components/QuickFind";
 
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
@@ -44,6 +45,7 @@ const typing = (e: KeyboardEvent) => {
 };
 
 export default function App() {
+  const [finding, setFinding] = useState(false);
   const { data, started, demo, canEdit, page, go, open, editing, toast, saveError, updateSettings, undo, redo, resetDemo, setDemo } = useStore();
   const [drawer, setDrawer] = useState(false);
   const collapsed = data.settings.sidebarCollapsed;
@@ -66,6 +68,11 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setFinding(true);
+        return;
+      }
       if (mod && e.key.toLowerCase() === "z" && !typing(e)) {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -110,6 +117,9 @@ export default function App() {
           <LogoMark size={32} />
           <b>Zom's MRP</b>
         </button>
+        <button className="icon-btn" aria-label="Find" onClick={() => setFinding(true)}>
+          <Search size={20} />
+        </button>
         <button className="icon-btn" aria-label="New mission" onClick={() => open("mission", "new")}>
           <Plus size={20} />
         </button>
@@ -130,6 +140,10 @@ export default function App() {
         <button className="btn primary big" onClick={() => open("mission", "new")} title="New mission (N)">
           <Plus size={16} />
           {(!collapsed || drawer) && "New mission"}
+        </button>
+        <button className="nav-item find-item" onClick={() => setFinding(true)} title={collapsed ? "Find (Ctrl K)" : "Find anything (Ctrl or ⌘ K)"}>
+          <Search size={16} />
+          {(!collapsed || drawer) && <>Find<span className="kbd-hint muted small" style={{ marginLeft: "auto" }}>{navigator.platform.includes("Mac") ? "⌘K" : "Ctrl K"}</span></>}
         </button>
         {NAV.filter((n) => n.page !== "inspections" || data.settings.maintenance.enabled).map(({ page: p, label, icon: Icon }) => (
           <button key={p} className={`nav-item ${page === p ? "active" : ""}`} onClick={() => navTo(p)} title={collapsed ? label : undefined}>
@@ -194,6 +208,7 @@ export default function App() {
 
       {editing && <Dialogs />}
       <TourOverlay />
+      {finding && <QuickFind onClose={() => setFinding(false)} />}
       {toast && (
         <div className="toast" key={toast.id} role="status">
           {toast.text}

@@ -9,7 +9,7 @@ import { report, reportName } from "../report";
 import { DAY, dateToEnd, dateToStart, dayAt, fmtDates, fmtDays, ms, toWhen, today } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { seasonTails } from "../rotation";
-import { Avatar } from "../components/ui";
+import { Avatar, usePref } from "../components/ui";
 
 /**
  * How the business and its resources are used over a period: days per mission (customer),
@@ -31,7 +31,7 @@ const MAX_DAYS = 3 * 366;
 
 export function Reports() {
   const { data, open } = useStore();
-  const [period, setPeriod] = useState<string>("next30");
+  const [period, setPeriod] = usePref<string>("reports-period", "next30");
   // Your own dates: the first and last day, as "2026-11-01".
   const [first, setFirst] = useState(() => ymd(today().getTime()));
   const [last, setLast] = useState(() => ymd(addDays(today(), 89).getTime()));

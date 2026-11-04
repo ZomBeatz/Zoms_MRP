@@ -4,7 +4,7 @@ import { ClipboardCheck, Plus, Trash2 } from "lucide-react";
 import { useStore } from "../store";
 import { dueList, flightHours, hoursPerDay, planFor, type Due } from "../program";
 import { dayAt, ms, toWhen, today, uid } from "../time";
-import { Empty, NumberInput } from "../components/ui";
+import { Empty, NumberInput, usePref } from "../components/ui";
 import { DateInput } from "../components/dates";
 import type { ProgramItem } from "../types";
 
@@ -24,7 +24,7 @@ const STATE = {
 
 export function Inspections() {
   const data = useStore((s) => s.data);
-  const [tab, setTab] = useState<"due" | "programs" | "hours">("due");
+  const [tab, setTab] = usePref<"due" | "programs" | "hours">("inspections-tab", "due");
   const due = dueList(data);
   const types = [...new Set(data.aircraft.filter((a) => a.status !== "Retired").map((a) => a.type))].sort();
 

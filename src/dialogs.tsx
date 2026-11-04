@@ -8,7 +8,7 @@ import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
 import { SWATCHES, missionLook, slotStyle } from "./look";
-import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useSpot } from "./components/ui";
+import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useDirty, useGuardedClose, useSpot } from "./components/ui";
 import { bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
 import { rulesFor, seasonRules, stricter } from "./limits";
@@ -63,7 +63,7 @@ function DateFields({ start, end, onChange, labels = ["First day", "Last day"], 
  * going grey, so nobody is left wondering why nothing happens.
  */
 function Foot({ isNew, onDelete, onSave, label, problem }: { isNew: boolean; onDelete: () => void; onSave: () => void; label: string; problem?: string | false | null }) {
-  const close = useStore((s) => s.close);
+  const close = useGuardedClose() ?? useStore.getState().close;
   const showToast = useStore((s) => s.showToast);
   const [sure, setSure] = useState(false);
   return (
@@ -114,6 +114,7 @@ function MissionDialog({ id, defaults }: Props) {
     ...(defaults as Partial<Season>),
   }));
   const [pool, setPool] = useState<Set<string>>(() => kept.pool ?? new Set(data.people.filter((p) => p.missionIds.includes(id)).map((p) => p.id)));
+  const dirty = useDirty({ m, first, pool });
   useKeep({ tab, m, pool });
   const set = (patch: Partial<Mission>) => setM((x) => ({ ...x, ...patch }));
   const setF = (patch: Partial<Season>) => setFirst((x) => ({ ...x, ...patch }));
@@ -197,7 +198,7 @@ function MissionDialog({ id, defaults }: Props) {
   };
 
   return (
-    <Dialog wide title={isNew ? m.name || "New mission" : m.name || "Mission"} onClose={close}
+    <Dialog wide title={isNew ? m.name || "New mission" : m.name || "Mission"} onClose={close} dirty={dirty}
       icon={<span className="swatch" style={slotStyle(missionLook(m))} />}
       meta={isNew ? <span>A mission is one customer's work. Its dates are its seasons.</span> : (
         <>
@@ -486,6 +487,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   const [tab, setTab] = useState(() => kept.tab ?? fix.tab ?? (isNew ? "details" : existing!.pilotsNeeded > 0 ? "pilots" : existing!.maintainersNeeded > 0 ? "maintainers" : "details"));
   const [shifts, setShifts] = useState<Shift[]>(() => kept.shifts ?? data.shifts.filter((s) => s.seasonId === id));
   useKeep({ tab, season, shifts });
+  const dirty = useDirty({ season, shifts });
   // A problem about a shift opens that shift, ready to swap someone in or fix its dates.
   const shiftSpot = (spot?: string) => (spot?.startsWith("shift:") ? spot.slice(6) : null);
   const [editingShift, setEditingShift] = useState<string | null>(() => (kept.tab ? null : shiftSpot(fix.spot)));
@@ -672,7 +674,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   );
 
   return (
-    <Dialog wide title={isNew ? `New season${mission ? `: ${mission.name}` : ""}` : mission?.name ?? "Season"} onClose={close}
+    <Dialog wide title={isNew ? `New season${mission ? `: ${mission.name}` : ""}` : mission?.name ?? "Season"} onClose={close} dirty={dirty}
       icon={mission && <span className="swatch" style={slotStyle(missionLook(mission))} />}
       meta={<>
         <StatusPill status={season.status} />
@@ -805,6 +807,7 @@ function AircraftDialog({ id, fix = {} }: Props) {
   // Who's rated on this type, changed right here: a tap instead of opening each person.
   const type = a.type.trim();
   const [ratings, setRatings] = useState<Record<string, boolean>>({});
+  const dirty = useDirty({ a, ratings });
   const isRated = (p: Person) => ratings[p.id] ?? p.quals.includes(type);
   const save = () => {
     change((d) => ({
@@ -820,7 +823,7 @@ function AircraftDialog({ id, fix = {} }: Props) {
     close();
   };
   return (
-    <Dialog title={existing ? <span style={{ fontFamily: "var(--zb-font-mono)" }}>{a.tail}</span> : "Add aircraft"} onClose={close}
+    <Dialog title={existing ? <span style={{ fontFamily: "var(--zb-font-mono)" }}>{a.tail}</span> : "Add aircraft"} onClose={close} dirty={dirty}
       meta={existing && <><StatusPill status={a.status} /><span>{a.type}</span>{a.base && <>·<span>{a.base}</span></>}</>}
       foot={<Foot isNew={!existing} label="aircraft" problem={!tail ? "Type the tail number first." : !a.type.trim() ? "Type the aircraft type, like Bell 412." : taken && `${tail} is already in your fleet.`}
         onSave={save}
@@ -894,6 +897,7 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
   const [p, setP] = useState<Person>(() => kept.p ?? existing ?? { id: uid(), name: "", role: "Pilot", quals: [], training: [], missionIds: [], rotation: null, base: "", phone: "", notes: "", ...(defaults as Partial<Person>) });
   const set = (patch: Partial<Person>) => setP((x) => ({ ...x, ...patch }));
   useKeep({ tab, p });
+  const dirty = useDirty(p);
   const [newQual, setNewQual] = useState("");
   const types = [...new Set([...typesOf(data), ...p.quals])].sort();
   const word = p.role === "Pilot" ? "pilot" : "maintainer";
@@ -903,7 +907,7 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
   const off = data.timeOff.filter((t) => t.personId === p.id && ms(t.end) > now).sort((a, b) => ms(a.start) - ms(b.start));
 
   return (
-    <Dialog title={p.name || `Add ${word}`} onClose={close}
+    <Dialog title={p.name || `Add ${word}`} onClose={close} dirty={dirty}
       icon={<span className={`avatar ${p.role.toLowerCase()}`} style={{ width: 30, height: 30, fontSize: 12 }}>{initials(p.name) || "?"}</span>}
       meta={<>
         <span>{p.role}</span>
@@ -1011,6 +1015,7 @@ function JobDialog({ id, defaults, fix = {} }: Props) {
     ...(defaults as Partial<MaintenanceJob>),
   });
   const set = (patch: Partial<MaintenanceJob>) => setJ((x) => ({ ...x, ...patch }));
+  const dirty = useDirty(j);
   const ac = data.aircraft.find((a) => a.id === j.aircraftId);
   const timeError = !(ms(j.end) > ms(j.start));
   const crew = whoCanCover(data, "Maintainer", ms(j.start), ms(j.end), ac?.type ?? null, []);
@@ -1018,7 +1023,7 @@ function JobDialog({ id, defaults, fix = {} }: Props) {
   /** Fill in a template: its name, kind, length (from the first day) and whether it grounds the aircraft. */
   const applyTemplate = (t: JobTemplate) => set({ title: t.title, kind: t.kind, grounds: t.grounds, end: toWhen(dayAt(ms(j.start), t.days)) });
   return (
-    <Dialog title={existing ? j.title : "New maintenance job"} onClose={close}
+    <Dialog title={existing ? j.title : "New maintenance job"} onClose={close} dirty={dirty}
       meta={existing && <>{ac && <b style={{ fontFamily: "var(--zb-font-mono)" }}>{ac.tail}</b>}<span>{j.kind}</span>·<span>{timeError ? "Check the dates" : fmtDates(j.start, j.end)}</span>{j.done && <span className="pill ok">Finished</span>}</>}
       foot={<Foot isNew={!existing} label="job" problem={!j.title.trim() ? "Name the job first, like 100 hour inspection." : !j.aircraftId ? "Pick the aircraft." : timeError && "The last day is before the first day."}
         onSave={() => { upsert("jobs", j); if (!existing) showToast(`Added “${j.title}”`); close(); }}
@@ -1134,11 +1139,12 @@ function TimeOffDialog({ id, defaults, fix = {} }: Props) {
   const [t, setT] = useState<TimeOff>(() => existing ?? {
     id: uid(), personId: data.people[0]?.id ?? "", start: toWhen(addDays(d0, 1)), end: toWhen(addDays(d0, 2)), reason: "", ...(defaults as Partial<TimeOff>),
   });
+  const dirty = useDirty(t);
   const set = (patch: Partial<TimeOff>) => setT((x) => ({ ...x, ...patch }));
   const timeError = !(ms(t.end) > ms(t.start));
   const person = data.people.find((p) => p.id === t.personId);
   return (
-    <Dialog title={existing ? "Time off" : "Add time off"} onClose={close}
+    <Dialog title={existing ? "Time off" : "Add time off"} onClose={close} dirty={dirty}
       meta={person && <><span>{person.name}</span>{!timeError && <>·<span>{fmtDates(t.start, t.end)}</span></>}</>}
       foot={<Foot isNew={!existing} label="time off" problem={!t.personId ? "Pick who's off." : timeError && "The last day is before the first day."}
         onSave={() => { upsert("timeOff", t); if (!existing) showToast("Added time off"); close(); }}
@@ -1323,11 +1329,12 @@ function TrainingDialog({ id }: Props) {
   const { data, upsert, remove, close, showToast } = useStore();
   const existing = data.trainings.find((t) => t.id === id);
   const [t, setT] = useState<Training>(() => existing ?? { id: uid(), name: "", validMonths: 12, appliesTo: "Pilot", notes: "" });
+  const dirty = useDirty(t);
   const set = (patch: Partial<Training>) => setT((x) => ({ ...x, ...patch }));
   const holders = data.people.filter((p) => p.training.some((r) => r.trainingId === id)).length;
   const missions = data.missions.filter((m) => m.requiredTrainingIds.includes(id)).length;
   return (
-    <Dialog title={existing ? t.name || "Training" : "Add training"} onClose={close}
+    <Dialog title={existing ? t.name || "Training" : "Add training"} onClose={close} dirty={dirty}
       meta={existing && <><span>{plural(holders, "person", "people")} on record</span>·<span>Needed by {plural(missions, "mission")}</span></>}
       foot={<Foot isNew={!existing} label="training" problem={!t.name.trim() && "Name the course first."}
         onSave={() => { upsert("trainings", t); if (!existing) showToast(`Added “${t.name}”`); close(); }}
