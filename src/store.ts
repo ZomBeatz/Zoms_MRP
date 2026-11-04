@@ -3,7 +3,7 @@ import type { AppData, Page, Settings } from "./types";
 import { emptyData, sampleData } from "./sample";
 import { migrate } from "./migrate";
 import { isOnlineDemo } from "./platform";
-import { demoBackend, ownBackend, type Backend } from "./backends";
+import { DEMO_KEY, demoBackend, ownBackend, type Backend } from "./backends";
 import { browserBackend } from "./backends/browser";
 
 /**
@@ -100,6 +100,8 @@ interface State {
   setDemo: (on: boolean) => Promise<void>;
   /** Put the demo back the way it started. `quiet` skips the message (when a lesson starts). */
   resetDemo: (quiet?: boolean) => void;
+  /** Leave the demo and take it off this device. Turning it on again starts a fresh copy. */
+  removeDemo: () => Promise<void>;
   /** Replace everything with an empty start (own data only). */
   clearAll: () => void;
   showToast: (text: string, action?: Toast["action"]) => void;
@@ -306,6 +308,15 @@ export const useStore = create<State>((set, get) => ({
     save(data);
     set({ data, past: [], future: [] });
     if (!quiet) get().showToast("Demo reset");
+  },
+
+  removeDemo: async () => {
+    if (demo) await get().setDemo(false);
+    await settled();
+    try {
+      localStorage.removeItem(DEMO_KEY);
+    } catch { /* nothing to remove */ }
+    get().showToast("Demo data removed. Turn it on again any time for a fresh copy.");
   },
 
   clearAll: () => get().change((d) => ({ ...emptyData(), settings: d.settings }), "Cleared all data"),

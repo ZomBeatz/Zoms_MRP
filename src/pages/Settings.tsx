@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Download, FileSpreadsheet, FlaskConical, Keyboard, Palette, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { useRef, useState } from "react";
+import { Download, FileSpreadsheet, FlaskConical, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { Field, NumberInput } from "../components/ui";
@@ -8,14 +8,23 @@ import { downloadWorkbook } from "../excel";
 import { saveFile, showInFolder } from "../files";
 import { isDesktopApp, isOnlineDemo, isServerBuild } from "../platform";
 import { serverUser } from "../backends/server";
+import { DEMO_KEY } from "../backends";
 import { ServerSettings } from "./ServerSettings";
 import { ExcelCopySettings } from "./ExcelCopySettings";
 import { SHORTCUTS } from "./Guide";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
-  const { data, demo, updateSettings, setDemo, resetDemo, change, clearAll, showToast } = useStore();
+  const { data, demo, updateSettings, setDemo, resetDemo, removeDemo, change, clearAll, showToast } = useStore();
   const { theme, rules } = data.settings;
   const fileRef = useRef<HTMLInputElement>(null);
+  const [sureDemo, setSureDemo] = useState(false);
+  const hasDemo = demo || (() => {
+    try {
+      return !!localStorage.getItem(DEMO_KEY);
+    } catch {
+      return false;
+    }
+  })();
 
   const backup = async () => {
     const where = await saveFile(`zoms-mrp-backup-${format(new Date(), "yyyy-MM-dd")}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -57,9 +66,16 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               Show demo data
             </label>
             <p className="small muted" style={{ margin: "6px 0 0" }}>
-              Fills Zom's MRP with made-up aircraft, crew, training and missions so you can see how it works. Your own data is kept apart and comes back when you turn this off.
+              Fills Zom's MRP with made-up aircraft, crew, training and missions so you can see how it works. Your own data is kept apart and comes back when you turn this off. <b>Remove demo data</b> takes the demo off this device without touching your own.
             </p>
-            {demo && <button className="btn sm" style={{ marginTop: 10 }} onClick={() => resetDemo()}>Reset demo</button>}
+            {hasDemo && (
+              <div className="row gap wrap" style={{ marginTop: 10 }}>
+                {demo && <button className="btn sm" onClick={() => resetDemo()}>Reset demo</button>}
+                {sureDemo
+                  ? <button className="btn sm danger" autoFocus onBlur={() => setSureDemo(false)} onClick={() => { setSureDemo(false); void removeDemo(); }}><Trash2 size={14} /> Remove demo for good?</button>
+                  : <button className="btn sm" onClick={() => setSureDemo(true)}><Trash2 size={14} /> Remove demo data</button>}
+              </div>
+            )}
           </section>
         )}
 

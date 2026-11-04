@@ -5,7 +5,8 @@ import { isDesktopApp, isServerBuild } from "../platform";
 export type { Backend };
 
 /** The demo's own place, always in this browser. */
-export const demoBackend = () => browserBackend("zoms-mrp:demo");
+export const DEMO_KEY = "zoms-mrp:demo";
+export const demoBackend = () => browserBackend(DEMO_KEY);
 
 /**
  * Where the person's own data lives in this build. The desktop app and the server each bring their

@@ -274,7 +274,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
           {isServerBuild ? "On the server, everyone signs in to the same plan. Admins add people as Admin, Scheduler (changes the plan) or Viewer (looks only). If two people save at once, the second is told and nothing is overwritten. The server keeps a copy every day."
             : "The desktop app keeps the plan in a file on this computer and a copy every day for a month. Settings › Your data makes a backup file you can restore anywhere."}
         </p>
-        <p>The demo data is kept apart from your own. Switch it on or off in Settings › Demo data. To start fresh with real data, use <b>Settings › Your data › Clear all data</b>.</p>
+        <p>The demo data is kept apart from your own. Switch it on or off in Settings › Demo data, where <b>Remove demo data</b> takes it off this device. To start fresh with real data, use <b>Settings › Your data › Clear all data</b>.</p>
       </>
     ),
   },
