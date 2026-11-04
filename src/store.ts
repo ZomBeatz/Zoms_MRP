@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { AppData, Page, Settings } from "./types";
 import { emptyData, sampleData } from "./sample";
 import { migrate } from "./migrate";
-import { isOnlineDemo } from "./platform";
+import { isOnlineDemo, showLearning } from "./platform";
 import { DEMO_KEY, demoBackend, ownBackend, type Backend } from "./backends";
 import { browserBackend } from "./backends/browser";
 
@@ -26,7 +26,7 @@ const read = (k: string) => {
   }
 };
 // The online demo is always the demo.
-let demo = isOnlineDemo || read(MODE_KEY) === "demo";
+let demo = isOnlineDemo || (showLearning && read(MODE_KEY) === "demo");
 
 // Where data goes right now (the demo or the person's own), set up by `boot`.
 let own: Backend = browserBackend("zoms-mrp:data");
@@ -110,7 +110,8 @@ interface State {
 const LAST_PAGE = "zoms-mrp:page";
 const lastPage = (() => {
   try {
-    return (localStorage.getItem(LAST_PAGE) as Page) || "overview";
+    const page = localStorage.getItem(LAST_PAGE) as Page | null;
+    return page && (showLearning || page !== "guide") ? page : "overview";
   } catch {
     return "overview";
   }
@@ -346,8 +347,15 @@ export async function boot() {
       useStore.getState().showToast(by ? `Updated with ${by}'s changes.` : "Updated with the latest changes.");
     });
   }
+  // Without the demo, there's nothing to choose on a first start, and no demo kept from before.
+  if (!showLearning) {
+    try {
+      localStorage.removeItem(DEMO_KEY);
+      localStorage.removeItem(MODE_KEY);
+    } catch { /* nothing to remove */ }
+  }
   const loaded = await loadFrom(current());
   const data = loaded ?? (demo ? sampleData() : null);
-  const started = !!loaded || isOnlineDemo || (demo && !!(await own.load().catch(() => null)));
+  const started = !showLearning || !!loaded || isOnlineDemo || (demo && !!(await own.load().catch(() => null)));
   useStore.setState({ data: data ?? emptyData(), started, demo, canEdit: current().canEdit });
 }

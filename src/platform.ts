@@ -4,6 +4,9 @@
  */
 export const isOnlineDemo = import.meta.env.VITE_DEMO === "1";
 
+/** The Guide, lessons and demo data. For now only the online demo has them; the app itself opens empty. */
+export const showLearning = isOnlineDemo;
+
 /** Where people get the real thing: installers and the server, from the latest release. */
 export const RELEASES_URL = "https://github.com/ZomBeatz/Zoms_MRP/releases/latest";
 
