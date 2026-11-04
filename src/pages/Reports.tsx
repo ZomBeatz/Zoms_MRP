@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
-import { FileSpreadsheet, Printer } from "lucide-react";
-import { downloadWorkbook } from "../excel";
-import { showInFolder } from "../files";
-import { bookings } from "../bookings";
+import { addDays, format } from "date-fns";
+import { FileSpreadsheet, FileText } from "lucide-react";
+import { saveFile, showInFolder } from "../files";
 import { useStore } from "../store";
-import { dutyOf, missionCoverage } from "../coverage";
-import { DAY, dayAt, fmtDates, fmtDays, ms, toWhen, today } from "../time";
+import { missionCoverage } from "../coverage";
+import { report, reportName } from "../report";
+import { DAY, dateToEnd, dateToStart, dayAt, fmtDates, fmtDays, ms, toWhen, today } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { seasonTails } from "../rotation";
 import { Avatar } from "../components/ui";
-import type { AppData, Booking } from "../types";
 
 /**
  * How the business and its resources are used over a period: days per mission (customer),
@@ -25,66 +24,44 @@ const PERIODS = [
 ] as const;
 
 const clip = (a: number, b: number, from: number, to: number) => Math.max(0, Math.min(b, to) - Math.max(a, from));
-
-export function report(data: AppData, from: number, to: number) {
-  const days = (to - from) / DAY;
-  const missions = bookings(data).filter((m) => m.status !== "Cancelled" && clip(ms(m.start), ms(m.end), from, to) > 0);
-  const mDays = (m: Booking) => clip(ms(m.start), ms(m.end), from, to) / DAY;
-
-  const fleet = data.aircraft.filter((a) => a.status !== "Retired").map((a) => {
-    const flying = missions.filter((m) => m.aircraftIds.includes(a.id)).reduce((t, m) => t + mDays(m), 0);
-    const maint = data.jobs.filter((j) => j.aircraftId === a.id).reduce((t, j) => t + clip(ms(j.start), ms(j.end), from, to) / DAY, 0);
-    return { a, flying, maint, idle: Math.max(0, days - flying - maint) };
-  });
-
-  const crew = data.people.map((p) => {
-    const on = dutyOf(data, p.id).reduce((t, d) => t + clip(d.a, d.b, from, to), 0) / DAY;
-    const off = data.timeOff.filter((t) => t.personId === p.id).reduce((t, o) => t + clip(ms(o.start), ms(o.end), from, to), 0) / DAY;
-    return { p, on, off };
-  });
-
-  let total = 0, covered = 0;
-  for (const m of missions) {
-    const n = mDays(m);
-    total += n;
-    covered += n * missionCoverage(data, m).covered;
-  }
-
-  return {
-    days, missions, total, crewedShare: total ? covered / total : 1,
-    // One bar per kind of mission (every season of a customer's work together).
-    // One bar per mission (all its seasons in the period together).
-    byMission: data.missions
-      .map((m) => ({ m, days: missions.filter((x) => x.missionId === m.id).reduce((t, x) => t + mDays(x), 0) }))
-      .filter((x) => x.days > 0)
-      .sort((x, y) => y.days - x.days),
-    fleet: fleet.sort((x, y) => y.flying - x.flying),
-    crew: crew.sort((x, y) => y.on - x.on),
-  };
-}
+const ymd = (t: number) => format(t, "yyyy-MM-dd");
+/** Longest period a report covers. */
+const MAX_DAYS = 3 * 366;
 
 export function Reports() {
   const { data, open } = useStore();
   const [period, setPeriod] = useState<string>("next30");
-  const p = PERIODS.find((x) => x.id === period)!;
-  const from = dayAt(today(), p.from);
-  const to = dayAt(today(), p.to);
+  // Your own dates: the first and last day, as "2026-11-01".
+  const [first, setFirst] = useState(() => ymd(today().getTime()));
+  const [last, setLast] = useState(() => ymd(addDays(today(), 89).getTime()));
+  const p = PERIODS.find((x) => x.id === period);
+  const custom = !p;
+  const ownFrom = ms(dateToStart(first)), ownTo = ms(dateToEnd(last));
+  const datesWrong = custom && (!first || !last || !(ownTo > ownFrom) || (ownTo - ownFrom) / DAY > MAX_DAYS);
+  const from = p ? dayAt(today(), p.from) : datesWrong ? dayAt(today(), 0) : ownFrom;
+  const to = p ? dayAt(today(), p.to) : datesWrong ? dayAt(today(), 30) : ownTo;
   const r = useMemo(() => report(data, from, to), [data, from, to]);
   const fleetUse = r.fleet.length ? r.fleet.reduce((t, f) => t + f.flying, 0) / (r.fleet.length * r.days) : 0;
   const crewDays = r.crew.reduce((t, c) => t + c.on, 0);
   const crewShare = r.crew.length ? crewDays / (r.crew.length * r.days) : 0;
   const maxMission = Math.max(1, ...r.byMission.map((x) => x.days));
 
-  const [exporting, setExporting] = useState(false);
-  const exportExcel = async () => {
-    setExporting(true);
+  const [making, setMaking] = useState<"pdf" | "xlsx" | null>(null);
+  /** Build the report for this period and hand it over (the desktop app puts it in Downloads). */
+  const make = async (kind: "pdf" | "xlsx") => {
+    const { showToast } = useStore.getState();
+    if (datesWrong) return showToast(`Pick a first and last day, at most ${MAX_DAYS / 366} years apart.`);
+    setMaking(kind);
     try {
-      const where = await downloadWorkbook(data);
-      useStore.getState().showToast("Saved to Downloads. Post it in a Teams channel to share it.", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
+      const blob = kind === "pdf"
+        ? await (await import("../reportPdf")).buildPdf(data, from, to)
+        : await (await import("../reportExcel")).buildReportWorkbook(data, from, to);
+      const where = await saveFile(reportName(from, to, kind), blob);
+      showToast(where ? "Saved to Downloads." : "Report made. Look in your downloads.", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
     } catch {
-      useStore.getState().showToast("Couldn't make the Excel file. Try again.");
+      showToast(`Couldn't make the ${kind === "pdf" ? "PDF" : "Excel file"}. Try again.`);
     } finally {
-      setExporting(false);
+      setMaking(null);
     }
   };
 
@@ -92,16 +69,27 @@ export function Reports() {
     <>
       <div className="page-head">
         <h1>Reports</h1>
-        <button className="btn" onClick={exportExcel} disabled={exporting} title="The fleet board, seasons, crew roster, training, maintenance and problems, one sheet each">
-          <FileSpreadsheet size={16} /> {exporting ? "Making the file…" : "Export to Excel"}
-        </button>
-        <button className="btn" onClick={() => window.print()}><Printer size={16} /> Print</button>
+        <div className="row gap-sm">
+          <button className="btn" onClick={() => make("pdf")} disabled={!!making} title="A PDF of this period: the numbers, the fleet and crew boards, missions, workload, training, maintenance and problems">
+            <FileText size={16} /> {making === "pdf" ? "Making the PDF…" : "PDF report"}
+          </button>
+          <button className="btn" onClick={() => make("xlsx")} disabled={!!making} title="An Excel workbook of this period, colored like the app, one sheet per part">
+            <FileSpreadsheet size={16} /> {making === "xlsx" ? "Making the file…" : "Excel report"}
+          </button>
+        </div>
       </div>
       <div className="row gap wrap" style={{ marginBottom: 16 }}>
         <div className="seg">
           {PERIODS.map((x) => <button key={x.id} className={period === x.id ? "active" : ""} onClick={() => setPeriod(x.id)}>{x.label}</button>)}
+          <button className={custom ? "active" : ""} onClick={() => setPeriod("custom")}>Pick dates</button>
         </div>
-        <span className="muted small">{fmtDates(toWhen(from), toWhen(to))}</span>
+        {custom ? (
+          <div className="row gap-sm wrap report-dates">
+            <label className="field-inline"><span className="small muted">First day</span><input type="date" value={first} onChange={(e) => setFirst(e.target.value)} /></label>
+            <label className="field-inline"><span className="small muted">Last day</span><input type="date" value={last} min={first} onChange={(e) => setLast(e.target.value)} /></label>
+            {datesWrong && <span className="small danger-text">Pick a last day after the first, at most {MAX_DAYS / 366} years later.</span>}
+          </div>
+        ) : <span className="muted small">{fmtDates(toWhen(from), toWhen(to))}</span>}
       </div>
 
       <div className="tiles">

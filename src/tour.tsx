@@ -131,7 +131,7 @@ export const TOURS: Tour[] = [
       { page: "schedule", target: ".page-head .seg", title: "The schedule", body: "The same plan as a Gantt chart, with rows by aircraft, by mission (with its crew under it) or by person. Pick one mission from the list to see only its work." },
       { page: "missions", target: ".page tbody tr, .page .list-card", title: "Missions are customers", body: "Each mission is one customer's kind of work, with its color, the training it needs and its regular crew. Its seasons are the stretches of dates it flies." },
       { page: "people", target: ".page tbody tr, .page .list-card", title: "Crew", body: "Pilots and maintainers, what they're rated on, the missions they work, their own rotation if they have one, their training and time off." },
-      { page: "reports", target: ".page .tiles", title: "Reports", body: "Fleet use, days per mission, how busy each person is and how much of the flying was fully crewed. Export to Excel makes one workbook to post in Teams." },
+      { page: "reports", target: ".page .tiles", title: "Reports", body: "Fleet use, days per mission, how busy each person is and how much of the flying was fully crewed, for any dates. PDF report and Excel report turn it into pages with charts and boards to share." },
       { title: "That's the tour", body: "Next, try the lessons in the Guide. They start with adding a training course and build up to a customer calling and a pilot calling in sick, with you doing each step. The Guide's How do I… section answers everyday questions." },
     ],
   },

@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } from "../components/timeline";
-import { Printer, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { byId, useStore } from "../store";
 import { missionCoverage, requiredTraining, trainingStatus, type Issue } from "../coverage";
@@ -132,7 +132,6 @@ export function Schedule({ issues }: { issues: Issue[] }) {
           <option value="">All missions</option>
           {[...data.missions].sort((a, b) => a.name.localeCompare(b.name)).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
-        <button className="btn sm" onClick={() => window.print()}><Printer size={14} /> Print</button>
       </div>
 
       <div className="gantt" ref={tl.ref} {...tl.handlers}>

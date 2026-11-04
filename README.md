@@ -52,7 +52,7 @@ Like a fleet board, a crew roster and a Gantt chart in one, with the checks buil
 | **Rotations** | Set a rotation like 21 on, 14 off, and **Fill the schedule** rotates free, rated, current people through it. |
 | **Crew and training** | Pilots and maintainers, their type ratings, time off and training. People only need the training of the missions they work. |
 | **Checks** | The Overview lists every open seat, double booking, missing rating, expired course and too-long hitch. Tap one to fix it. |
-| **Reports** | Days per mission, aircraft use and how busy each person is. **Export to Excel** to share it in Teams. |
+| **Reports** | Days per mission, aircraft use and how busy each person is, for any dates. A **PDF report** or **Excel report** with charts and color-coded boards. |
 | **Privacy** | No ads, no tracking and no cloud account. The plan stays on your computer or your own server. |
 
 <table>
@@ -76,8 +76,8 @@ Like a fleet board, a crew roster and a Gantt chart in one, with the checks buil
 - **Training**: courses with how often they're renewed, set per mission, a **Who's current** view, and warnings before training runs out
 - **Maintenance**: jobs on an aircraft with the maintainers on them, which can ground it
 - **Checks**: open seats, double bookings, bookings during time off or maintenance, missing ratings, expired training, too many pilots for the seats, and hitches longer than the limit
-- **Schedule**: by aircraft, mission or person, narrowed to one mission, with drag, pinch and Ctrl + scroll to zoom, and print
-- **Reports**: fleet use, days per mission, crew load and how much flying was fully crewed, and **Export to Excel**
+- **Schedule**: by aircraft, mission or person, narrowed to one mission, with drag, pinch and Ctrl + scroll to zoom
+- **Reports**: fleet use, days per mission, crew load and how much flying was fully crewed, for any period, as a **PDF report** or **Excel report** with charts and boards colored like the app
 - **Phone-friendly**: card lists, full-screen forms and the back button stepping back through what you opened
 - **Guide**: how each part works, step-by-step answers for everyday jobs and a key to the colors
 - **Data safety**: a copy every day for a month in the desktop app, backups you can save and restore, and undo
@@ -120,7 +120,7 @@ In the desktop app, in a file in the app's data folder on that computer, with a 
 <details>
 <summary><b>How do I share the plan in Teams?</b></summary>
 
-**Export to Excel** (Reports or Settings) makes a workbook to post in a channel. In the desktop app, **Settings > Excel copy for Teams** keeps one up to date in a folder: pick a Teams channel's folder that OneDrive syncs, and the team always has the latest.
+**Reports > Excel report** (or **PDF report**) makes one for any dates, and **Settings > Your data > Export to Excel** makes a workbook of the whole plan, to post in a channel. In the desktop app, **Settings > Excel copy for Teams** keeps one up to date in a folder: pick a Teams channel's folder that OneDrive syncs, and the team always has the latest.
 </details>
 
 <details>
@@ -167,7 +167,7 @@ npm run build:server && cargo test --manifest-path server/Cargo.toml   # the ser
 - `src/dialogs.tsx`: the forms for each kind of item.
 - `src/tokens.css`: the ZomBeatz design tokens.
 - `src/backends/`: where the data is kept: this browser, this computer (desktop app) or the server.
-- `src/excel.ts`: **Export to Excel**.
+- `src/excel.ts`: **Export to Excel**. `src/report.ts`, `src/reportPdf.ts` and `src/reportExcel.ts`: the PDF and Excel reports.
 - `server/`: the server (Rust: axum and SQLite), with the web app built in. `Dockerfile` and `docker-compose.yml` package it with Caddy.
 - `src-tauri/`: the desktop app (Tauri 2). `npm run app` runs it; `npm run bundle` makes the installer.
 </details>
