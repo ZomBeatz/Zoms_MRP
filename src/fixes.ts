@@ -79,6 +79,7 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
     case "rest": return booking("Move this booking", i.seasonId, i.shiftId, i.jobId);
     case "train": return [...who("Record the training", "training", `training:${i.trainingId}`), ...shift("Swap them out"), ...extendIt()];
     case "lapsed": return [...who("Record the training", "training", `training:${i.trainingId}`), ...extendIt()];
+    case "curr": return [...shift("Swap them out"), ...who("Record when they last flew", "work", "flew")];
     case "mxdue": {
       const due = dueList(data).find((d) => `mxdue-${d.aircraft.id}-${d.item.id}` === i.id);
       return [

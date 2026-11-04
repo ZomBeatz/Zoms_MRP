@@ -4,6 +4,7 @@ import { bookings } from "./bookings";
 import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
 import { rulesFor } from "./limits";
 import { dueList } from "./program";
+import { currencyDays, staleOn } from "./currency";
 import { DAY, dayAt, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
@@ -283,6 +284,21 @@ export function findIssues(data: AppData): Issue[] {
       });
     }
   }
+  // Currency: a pilot booked on a type they haven't flown in too long (only when there's a record to go on).
+  if (currencyDays(data))
+    for (const s of data.shifts) {
+      const m = missionById.get(s.seasonId);
+      const p = people.get(s.personId);
+      if (!m || !p || !active(m) || ms(s.end) <= Date.now()) continue;
+      const stale = staleOn(data, p, seasonTypes(data, m), ms(s.start));
+      if (stale)
+        issues.push({
+          id: `curr-${s.id}`, severity: "warn", at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id,
+          title: `${p.name} hasn't flown the ${stale.type} in ${stale.days} days`,
+          detail: `Before “${m.name}”, ${fmtRange(s.start, s.end)}. Current means within ${currencyDays(data)} days (Settings). Swap them out, plan a refresher flight, or record when they last flew it.`,
+        });
+    }
+
   // Training people need for the missions they work: run out (and no renewal booked), or running out soon.
   const now = Date.now();
   for (const p of data.people) {
@@ -343,7 +359,9 @@ export function whoCanCover(data: AppData, role: Person["role"], a: number, b: n
         return !t || (t.appliesTo !== "Both" && t.appliesTo !== role) || trainingStatus(p, id, a, b).state === "ok";
       });
       const regular = !!missionId && p.missionIds.includes(missionId);
-      return { person: p, busy, off, qualified, trained, regular, onRotation: onRot, ok: !busy && !off && qualified && trained && onRot };
+      // Flown the type recently enough (or no record to say otherwise).
+      const current = !staleOn(data, p, anyOf, a);
+      return { person: p, busy, off, qualified, trained, current, regular, onRotation: onRot, ok: !busy && !off && qualified && trained && current && onRot };
     })
     .sort((x, y) => Number(y.ok) - Number(x.ok) || Number(y.regular) - Number(x.regular) || Number(y.qualified && y.trained) - Number(x.qualified && x.trained) || x.person.name.localeCompare(y.person.name));
 }

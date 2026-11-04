@@ -13,6 +13,7 @@ import { bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
 import { rulesFor, seasonRules, stricter } from "./limits";
 import { flightHours } from "./program";
+import { daysSince } from "./currency";
 import { ConfirmButton, IssueList } from "./pages/Overview";
 import type { Fix } from "./fixes";
 import { validUntil } from "./types";
@@ -572,7 +573,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
     return showAll ? all : all.filter((c) => c.ok || c.person.id === shift.personId);
   };
   const why = (c: ReturnType<typeof whoCanCover>[number]) =>
-    !c.qualified ? " (not rated on this aircraft)" : !c.trained ? " (training not current)" : c.off ? " (time off)" : !c.onRotation ? " (off rotation)" : c.busy ? " (booked elsewhere)" : c.regular ? "" : " (not on this mission's crew)";
+    !c.qualified ? " (not rated on this aircraft)" : !c.trained ? " (training not current)" : !c.current ? " (not flown the type lately)" : c.off ? " (time off)" : !c.onRotation ? " (off rotation)" : c.busy ? " (booked elsewhere)" : c.regular ? "" : " (not on this mission's crew)";
   // Shifts with a problem: named in the issue, or the issue is about that person during the shift.
   const flagged = new Set(shifts.filter((s) => issues.some((i) => i.id.includes(s.id) || (i.personId === s.personId && i.at >= ms(s.start) && i.at < ms(s.end)))).map((s) => s.id));
   const covered = (role: Person["role"]) => {
@@ -742,7 +743,7 @@ function WhyNobody({ data, role, gap, types, required, missionId }: { data: AppD
       </div>
     );
   // Fewest things in the way first.
-  const blockers = (c: (typeof people)[number]) => [!c.qualified, !c.trained, !c.onRotation, c.off, c.busy].filter(Boolean).length;
+  const blockers = (c: (typeof people)[number]) => [!c.qualified, !c.trained, !c.current, !c.onRotation, c.off, c.busy].filter(Boolean).length;
   const rows = [...people].sort((x, y) => blockers(x) - blockers(y)).slice(0, 5);
   return (
     <div className="fix-callout why-nobody" data-spot="why">
@@ -756,11 +757,13 @@ function WhyNobody({ data, role, gap, types, required, missionId }: { data: AppD
           const reasons: string[] = [];
           if (!c.qualified) reasons.push(`not rated on the ${types.join(" or ")}`);
           if (!c.trained && course) reasons.push(`${course.name} isn't current`);
+          if (!c.current) reasons.push(`hasn't flown the ${types.join(" or ")} in over ${data.settings.currencyDays} days`);
           if (!c.onRotation) reasons.push("off rotation then");
           if (c.off) reasons.push("has time off then");
           if (c.busy) reasons.push("booked elsewhere then");
           const fix = !c.qualified ? { label: "Add the rating", tab: "work", spot: "quals" }
             : !c.trained && course ? { label: `Record ${course.name}`, tab: "training", spot: `training:${course.id}` }
+            : !c.current ? { label: "Record when they last flew", tab: "work", spot: "flew" }
             : !c.onRotation ? { label: "Change rotation", tab: "details", spot: "rotation" } : null;
           return (
             <div key={c.person.id} className="why-row">
@@ -964,6 +967,24 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
               onKeyDown={(e) => { if (e.key === "Enter" && newQual.trim()) { e.preventDefault(); set({ quals: [...new Set([...p.quals, newQual.trim()])] }); setNewQual(""); } }} />
           </div>
           <p className="form-note">Aircraft types this person can fly or work on. They're only offered for jobs on these.</p>
+          {p.role === "Pilot" && p.quals.length > 0 && data.settings.currencyDays > 0 && (
+            <div className="field" data-spot="flew">
+              <h4 className="form-section">Last flew</h4>
+              {p.quals.map((type) => {
+                const since = daysSince({ ...data, people: data.people.map((x) => (x.id === p.id ? p : x)) }, p, type, Date.now());
+                return (
+                  <div key={type} className="flew-row">
+                    <span className="grow"><b>{type}</b> <span className={`small ${since !== null && since > data.settings.currencyDays ? "danger-text" : "muted"}`}>
+                      {since === null ? "No record" : since <= 0 ? "Flying it now" : `${since} days ago`}
+                    </span></span>
+                    <DateInput ariaLabel={`Last flew the ${type} outside this plan`} today clearable="Clear" value={p.flew?.[type] ?? ""}
+                      onChange={(v) => { const flew = { ...p.flew }; if (v) flew[type] = v; else delete flew[type]; set({ flew }); }} />
+                  </div>
+                );
+              })}
+              <span className="hint">From the schedule, or a date typed here for flying done elsewhere (whichever is later). Current means within {data.settings.currencyDays} days (Settings).</span>
+            </div>
+          )}
           <h4 className="form-section">Works on</h4>
           <div className="picker-row">
             {data.missions.map((m) => (

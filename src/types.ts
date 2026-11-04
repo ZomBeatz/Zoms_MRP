@@ -76,6 +76,8 @@ export interface Person {
   rotation: PersonRotation | null;
   /** Their own work limits, if stricter than the rules. */
   limits?: Limits;
+  /** The last day they flew each type outside this plan ("Bell 412" → "2026-10-02"), for currency. */
+  flew?: Record<string, string>;
   base: string;
   phone: string;
   notes: string;
@@ -233,6 +235,8 @@ export interface Settings {
   scheduleGroup: "missions" | "aircraft" | "people";
   /** Warn this many days before training expires. */
   expiryWarningDays: number;
+  /** A pilot is current on a type if they flew it within this many days. 0 = don't check. */
+  currencyDays: number;
   /** Maintenance programs and flight hours (off for anyone who tracks them in another system). */
   maintenance: {
     enabled: boolean;

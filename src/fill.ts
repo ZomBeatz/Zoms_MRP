@@ -2,6 +2,7 @@ import type { AppData, Person, Role, Rotation, Season, Shift } from "./types";
 import { dutyOf, missionCoverage, requiredTraining, trainingStatus } from "./coverage";
 import { onRotation, seasonTypes } from "./rotation";
 import { seasonRules, stricter } from "./limits";
+import { staleOn } from "./currency";
 import { DAY, dayAt, ms, overlaps, toWhen, uid } from "./time";
 
 /**
@@ -95,7 +96,8 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     const d = dayAt(Math.max(gap.a, skipUntil));
     if (d >= to) break;
     const pick = pool
-      .filter((p) => canWork(p, d) && rested(p, d) && fits(p, d, dayAt(d, 1)))
+      // Not current on the type (Settings) counts like training that's run out: Fill won't book them.
+      .filter((p) => canWork(p, d) && rested(p, d) && fits(p, d, dayAt(d, 1)) && !staleOn(current, p, types, d))
       .sort((a, b) => Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)) || (worked.get(a.id) ?? 0) - (worked.get(b.id) ?? 0) || a.name.localeCompare(b.name))[0];
     if (!pick) {
       skipUntil = dayAt(d, 1); // nobody for this day: leave it open
