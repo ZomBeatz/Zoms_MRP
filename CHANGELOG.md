@@ -12,6 +12,9 @@
 - The Excel report has the same parts as sheets: tiles and in-cell bars on the summary, the boards colored day by day (week by week for long periods), and every sheet printing landscape, one page wide.
 - The old **Print** buttons on Reports and the Schedule are gone; the reports replace them.
 
+**Moving a plan**
+- **Restore a backup** brings the plan's hitch limits and training warning days with it, so a plan moved from the desktop app to a server (or back) keeps its rules. Theme and layout stay each device's own.
+
 **Mac**
 - One Mac app for Apple silicon and Intel, macOS 10.15 or later. It's ad-hoc signed, so it opens after **Privacy & Security > Open Anyway** once; the README explains how, and how to sign and notarize it with an Apple Developer account.
 
