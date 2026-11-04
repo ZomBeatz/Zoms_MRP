@@ -160,6 +160,12 @@ export function findIssues(data: AppData): Issue[] {
       }
     }
 
+    // Duty days longer than allowed (Settings), when the season says how long they are.
+    const maxDuty = data.settings.maxDutyHours ?? 0;
+    if (maxDuty && m.dutyHours && m.dutyHours > maxDuty)
+      issues.push({ id: `dutyh-${m.id}`, severity: "danger", at: from, seasonId: m.id, title: `Duty days on “${m.name}” are ${m.dutyHours} hours`,
+        detail: `The most is ${maxDuty} hours (Settings). Shorten the duty day or add crew to split it.` });
+
     const cov = missionCoverage(data, m);
     for (const g of cov.pilotGaps)
       issues.push({

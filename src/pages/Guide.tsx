@@ -32,6 +32,29 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
     ],
   },
   {
+    q: "Trade or hand over a shift",
+    steps: [
+      <>Open the person (Crew, or <b>Find</b>) and, under <b>Booked next</b>, press <b>Trade…</b> beside the shift.</>,
+      <><b>Hand it to someone</b> lists who can legally take it (the mission's crew first); <b>Trade with someone</b> lists two-way trades where each can take the other's shift.</>,
+      <>Tap one. Undo is in the message, and the problem list shows anything left to look at.</>,
+    ],
+  },
+  {
+    q: "Crew a mission from its own people, and sub in others",
+    steps: [
+      <>Open the mission. On <b>Crew</b>, tick the pilots and maintainers who work it.</>,
+      <>On <b>Rotations</b>, press <b>Fill from the crew</b> for a season. It uses only those people.</>,
+      <>Where an open seat is left, press <b>Sub in someone else…</b>: it proposes people from outside the crew who can legally cover it, and books them in one tap, marked <b>Sub</b>.</>,
+    ],
+  },
+  {
+    q: "Post this week's crew",
+    steps: [
+      <>Go to <b>Reports</b>, pick <b>This week</b> or <b>Next week</b>, and press <b>Week sheet</b>.</>,
+      <>It's one page: each job's crew day by day, » where someone takes over, open seats in red, and time off and maintenance that week. Print it or post it in Teams.</>,
+    ],
+  },
+  {
     q: "Move a shift's first or last day",
     steps: [
       <>On the <b>Schedule</b>, find the shift (the <b>Crew</b> view is handiest) and grab either end: the cursor turns into ↔.</>,
@@ -311,6 +334,20 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
   {
     id: "inspections", title: "Inspections",
     body: <p>Each aircraft type's maintenance program: its inspections every so many flight hours and/or months, whichever comes first. A job on the tail with the same name counts as doing it. <b>Due</b> lists every tail's inspections with when they were last done and when they're due; <b>Plan it…</b> books one in the latest free days before it's due. <b>Flight hours</b> takes readings, and between them counts mission days × hours per flying day. Overdue and due-soon inspections show under Needs attention. Turn it all off, or have it plan by itself, in <b>Settings › Maintenance programs</b>.</p>,
+  },
+  {
+    id: "currency", title: "Currency, preferences and notes",
+    body: (
+      <>
+        <p><b>Currency:</b> a pilot is current on a type if they've flown it within the days set in Settings (90 to start). It comes from their shifts, or a <b>Last flew</b> date on their Ratings tab for flying done elsewhere. Booking someone who isn't current is a warning, Fill won't do it, and the Training page's <b>Needs training</b> list shows them.</p>
+        <p><b>Rather not:</b> time off can be <b>only a preference</b>. They can still be booked, it's never a problem, but Fill and Rebalance pick someone else when they can. It shows lighter on the Schedule.</p>
+        <p><b>Notes:</b> a shift can have a note, shown on its bar on the Schedule and in the season.</p>
+      </>
+    ),
+  },
+  {
+    id: "cost", title: "Cost per mission and duty days",
+    body: <p>Give people a <b>Day rate</b>, aircraft a <b>Cost per flight hour</b> and missions a <b>Charge per day</b> (all optional), and Reports shows each mission's crew and flying cost, the total, what's charged and the margin, in the Excel report too. A season can set its <b>Hours on duty in a day</b>; longer than the most in Settings (14 to start) is flagged.</p>,
   },
   {
     id: "limits", title: "Work limits",

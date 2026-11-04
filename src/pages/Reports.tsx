@@ -3,6 +3,7 @@ import { addDays, format } from "date-fns";
 import { CalendarDays, FileSpreadsheet, FileText } from "lucide-react";
 import { saveFile, showInFolder } from "../files";
 import { DateRange } from "../components/dates";
+import { hasRates, money, seasonCost } from "../cost";
 import { useStore } from "../store";
 import { missionCoverage } from "../coverage";
 import { report, reportName } from "../report";
@@ -42,6 +43,8 @@ export function Reports() {
   const from = p ? dayAt(today(), p.from) : datesWrong ? dayAt(today(), 0) : ownFrom;
   const to = p ? dayAt(today(), p.to) : datesWrong ? dayAt(today(), 30) : ownTo;
   const r = useMemo(() => report(data, from, to), [data, from, to]);
+  // Cost columns only once some rate is set (day rates, cost per flight hour, charge per day).
+  const costs = hasRates(data);
   const fleetUse = r.fleet.length ? r.fleet.reduce((t, f) => t + f.flying, 0) / (r.fleet.length * r.days) : 0;
   const crewDays = r.crew.reduce((t, c) => t + c.on, 0);
   const crewShare = r.crew.length ? crewDays / (r.crew.length * r.days) : 0;
@@ -183,7 +186,8 @@ export function Reports() {
       {r.missions.length === 0 ? <div className="panel muted">No missions in this period.</div> : (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Mission</th><th>Aircraft</th><th>When</th><th className="r">Days in period</th><th className="r">Crewed</th></tr></thead>
+            <thead><tr><th>Mission</th><th>Aircraft</th><th>When</th><th className="r">Days in period</th><th className="r">Crewed</th>
+              {costs && <><th className="r" title="Crew days × day rates">Crew</th><th className="r" title="Mission days × hours a flying day × cost per hour">Flying</th><th className="r">Cost</th><th className="r">Charged</th><th className="r">Margin</th></>}</tr></thead>
             <tbody>
               {[...r.missions].sort((a, b) => ms(a.start) - ms(b.start)).map((m) => {
                 const pct = Math.round(missionCoverage(data, m).covered * 100);
@@ -194,6 +198,14 @@ export function Reports() {
                     <td>{fmtDates(m.start, m.end)}</td>
                     <td className="r">{Math.round(clip(ms(m.start), ms(m.end), from, to) / DAY)}</td>
                     <td className="r"><span className={`pill ${pct === 100 ? "ok" : "danger"}`}>{pct}%</span></td>
+                    {costs && (() => {
+                      const c = seasonCost(data, m, from, to);
+                      return <>
+                        <td className="r">{money(c.crew)}</td><td className="r">{money(c.flying)}</td><td className="r"><b>{money(c.total)}</b></td>
+                        <td className="r">{c.charged === null ? "—" : money(c.charged)}</td>
+                        <td className="r">{c.margin === null ? "—" : <span className={c.margin < 0 ? "danger-text" : "ok-text"}>{money(c.margin)}</span>}</td>
+                      </>;
+                    })()}
                   </tr>
                 );
               })}

@@ -43,6 +43,7 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
 
   switch (type) {
     case "time": return season("Fix the dates", "details", "dates");
+    case "dutyh": return season("Change the duty day", "details", "duty");
     case "noac": return season("Pick an aircraft", "details", "aircraft");
     case "acstat": return [
       ...season("Pick another aircraft", "details", "aircraft"),

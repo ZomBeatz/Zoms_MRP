@@ -5,6 +5,7 @@ import { fullReport, REPORT_COLORS, TRAINING_WORDS, type Span } from "./report";
 import { missionCoverage } from "./coverage";
 import { seasonTails } from "./rotation";
 import { textOn } from "./look";
+import { hasRates, seasonCost } from "./cost";
 import { DAY, ms, today } from "./time";
 
 /**
@@ -287,13 +288,16 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
       { header: "Mission", key: "name", width: 32 }, { header: "Aircraft", key: "tail", width: 14 }, { header: "First day", key: "start", width: 13, date: true },
       { header: "Last day", key: "end", width: 13, date: true }, { header: "Status", key: "status", width: 12 }, { header: "Days in period", key: "days", width: 14 },
       { header: "Crewed", key: "crewed", width: 16, pct: true }, { header: "Contact", key: "contact", width: 30 },
+      ...(hasRates(data) ? [{ header: "Crew cost", key: "crewCost", width: 12 }, { header: "Flying cost", key: "flyCost", width: 12 }, { header: "Cost", key: "cost", width: 12 }, { header: "Charged", key: "charged", width: 12 }, { header: "Margin", key: "margin", width: 12 }] : []),
     ]);
     const list = [...r.missions].sort((a, b) => ms(a.start) - ms(b.start));
     for (const b of list) {
       const row = ws.addRow({
         name: b.name, tail: seasonTails(data, b, ""), start: day(ms(b.start)), end: lastDay(ms(b.end)), status: b.status,
         days: Math.round(Math.max(0, Math.min(ms(b.end), to) - Math.max(ms(b.start), from)) / DAY), crewed: missionCoverage(data, b).covered, contact: b.contact,
+        ...(hasRates(data) ? (() => { const c = seasonCost(data, b, from, to); return { crewCost: c.crew, flyCost: c.flying, cost: c.total, charged: c.charged, margin: c.margin }; })() : {}),
       });
+      if (hasRates(data)) for (const k of [9, 10, 11, 12, 13]) row.getCell(k).numFmt = "$#,##0";
       row.getCell(1).fill = fill(b.color);
       row.getCell(1).font = { bold: true, color: { argb: argb(textOn(b.color)) } };
     }

@@ -226,6 +226,9 @@ function MissionDialog({ id, defaults }: Props) {
           <Field label="Contact"><input value={m.contact} placeholder="Who to call" onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="Location"><input value={m.location} onChange={(e) => set({ location: e.target.value })} /></Field>
           <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this mission" applies={stricter(data.settings.rules, m.limits)} />
+          <Field label="Charge per day" hint="What the customer pays for a day, for the margin in Reports. Optional.">
+            <input type="number" inputMode="decimal" min={0} value={m.dayCharge ?? ""} placeholder="0" onChange={(e) => set({ dayCharge: e.target.value === "" ? null : Number(e.target.value) })} />
+          </Field>
           <div className="full">
             <h4 className="form-section">Look on the schedule</h4>
             <LookPicker color={m.color} pattern={m.pattern} onChange={(color, pattern) => set({ color, pattern })} />
@@ -834,6 +837,11 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           <RotationField label="Pilot rotation" value={season.pilotRotation} onChange={(pilotRotation) => set({ pilotRotation })} />
           <RotationField label="Maintainer rotation" value={season.maintainerRotation} onChange={(maintainerRotation) => set({ maintainerRotation })} />
           <LimitsField value={season.limits} onChange={(limits) => set({ limits })} who="this season" canOverride applies={seasonRules(data, season)} />
+          {data.settings.maxDutyHours > 0 && (
+            <Field label="Hours on duty in a day" spot="duty" hint={`The most is ${data.settings.maxDutyHours} (Settings). Empty if you don't track it.`}>
+              <input type="number" inputMode="decimal" min={0} max={24} value={season.dutyHours ?? ""} placeholder="—" onChange={(e) => set({ dutyHours: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
+          )}
           <Field label="Notes" full><textarea rows={2} value={season.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
           {mission && (
             <p className="form-note full" style={{ margin: 0 }}>
@@ -983,6 +991,9 @@ function AircraftDialog({ id, fix = {} }: Props) {
               </Field>
               <DateInput label="As of" today value={a.hours?.on ?? format(today(), "yyyy-MM-dd")} onChange={(on) => set({ hours: { hours: a.hours?.hours ?? 0, on } })} />
             </div>
+            <Field label="Cost per flight hour" hint="For cost per mission. Optional.">
+              <input type="number" inputMode="decimal" min={0} value={a.hourCost ?? ""} placeholder="0" onChange={(e) => set({ hourCost: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
             <Field label="Hours on a mission day" hint={`Empty: ${data.settings.maintenance.hoursPerDay} from Settings.`}>
               <input type="number" inputMode="decimal" step="0.1" min={0} value={a.hoursPerDay ?? ""} placeholder={String(data.settings.maintenance.hoursPerDay)}
                 onChange={(e) => set({ hoursPerDay: e.target.value === "" ? null : Number(e.target.value) })} />
@@ -1062,6 +1073,9 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
           </Field>
           <Field label="Base"><input value={p.base} onChange={(e) => set({ base: e.target.value })} /></Field>
           <Field label="Phone"><input type="tel" value={p.phone} onChange={(e) => set({ phone: e.target.value })} /></Field>
+          <Field label="Day rate" hint="Pay and per diem for a day on duty, for cost per mission. Optional.">
+            <input type="number" inputMode="decimal" min={0} value={p.dayRate ?? ""} placeholder="0" onChange={(e) => set({ dayRate: e.target.value === "" ? null : Number(e.target.value) })} />
+          </Field>
           <PersonRotationField value={p.rotation} onChange={(rotation) => set({ rotation })} />
           <LimitsField value={p.limits} onChange={(limits) => set({ limits })} who="them" applies={rulesFor(data, p)} />
           <Field label="Notes" full><textarea rows={2} value={p.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
