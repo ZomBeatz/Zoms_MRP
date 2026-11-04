@@ -99,6 +99,9 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <Field label="Fewest days off between hitches">
               <NumberInput min={0} max={90} value={rules.minDaysOff} onChange={(minDaysOff) => updateSettings({ rules: { ...rules, minDaysOff } })} />
             </Field>
+            <Field label="Current on a type" hint="Pilots must have flown it within this many days. 0 = don't check.">
+              <NumberInput min={0} max={730} value={data.settings.currencyDays} onChange={(currencyDays) => updateSettings({ currencyDays })} />
+            </Field>
             <Field label="Warn before training runs out" hint="Days ahead.">
               <NumberInput min={0} max={365} value={data.settings.expiryWarningDays} onChange={(expiryWarningDays) => updateSettings({ expiryWarningDays })} />
             </Field>

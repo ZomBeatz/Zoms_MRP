@@ -3,6 +3,7 @@ import { GraduationCap, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { neededTraining } from "../coverage";
+import { daysSince } from "../currency";
 import { DAY } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, Empty } from "../components/ui";
@@ -73,6 +74,7 @@ export function TrainingPage() {
             action={<button className="btn primary" onClick={() => (mission ? open("mission", mission.id) : open("training", "new"))}>{mission ? "Open the mission…" : "Add training…"}</button>} />
         ) : (
           <>
+            <NeedsTraining rows={rows} warn={warn} />
             <p className="small muted" style={{ marginTop: 0 }}>
               {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their missions need. "}
               People need only the training their missions ask for. Tap a person to record training or change what they work on.
@@ -174,5 +176,58 @@ export function TrainingPage() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Only the people with something to sort out: training they need that's missing, run out or running out
+ * soon. Each course opens right where it's recorded or extended. Not shown when everyone's fine.
+ */
+function NeedsTraining({ rows, warn }: { rows: { p: Person; needs: Map<string, { name: string }[]> }[]; warn: number }) {
+  const { data, open } = useStore();
+  const limit = data.settings.currencyDays;
+  const now = Date.now();
+  const list = rows
+    .map(({ p, needs }) => ({
+      p,
+      items: [...needs.entries()].flatMap(([id, missions]) => {
+        const t = data.trainings.find((x) => x.id === id);
+        if (!t) return [];
+        const st = standing(p, t, warn);
+        return st.tone === "ok" ? [] : [{ t, st, for: missions.map((m) => m.name).join(", ") }];
+      }),
+    }))
+    .map((x) => ({
+      ...x,
+      // Pilots who haven't flown a type they're rated on within the currency limit (when there's a record).
+      stale: limit && x.p.role === "Pilot" ? x.p.quals.map((type) => ({ type, days: daysSince(data, x.p, type, now) })).filter((t): t is { type: string; days: number } => t.days !== null && t.days > limit) : [],
+    }))
+    .filter((x) => x.items.length || x.stale.length)
+    .sort((a, b) => b.items.filter((i) => i.st.tone === "danger").length - a.items.filter((i) => i.st.tone === "danger").length || a.p.name.localeCompare(b.p.name));
+
+  if (!list.length) return null;
+  return (
+    <section className="panel needs-training">
+      <h3>Needs training <span className="chip">{list.length}</span></h3>
+      <div className="needs-list">
+        {list.map(({ p, items, stale }) => (
+          <div key={p.id} className="needs-person">
+            <button className="row gap-sm needs-name" onClick={() => open("person", p.id, undefined, { tab: "training" })}><Avatar person={p} /><b>{p.name}</b></button>
+            <div className="picker-row">
+              {items.map(({ t, st, for: f }) => (
+                <button key={t.id} className={`chip pick needs-${st.tone}`} title={`Needed for ${f}`} onClick={() => open("person", p.id, undefined, { tab: "training", spot: `training:${t.id}` })}>
+                  {t.name}<span className={`pill ${st.tone}`}>{st.label}{st.date ? ` ${st.date}` : ""}</span>
+                </button>
+              ))}
+              {stale.map(({ type, days }) => (
+                <button key={type} className="chip pick needs-warn" title={`Current means flown within ${limit} days`} onClick={() => open("person", p.id, undefined, { tab: "work", spot: "flew" })}>
+                  {type}<span className="pill warn">Not flown in {days} days</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

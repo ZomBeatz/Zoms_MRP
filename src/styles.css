@@ -696,3 +696,13 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
 /* Bigger handles for fingers. */
 @media (pointer: coarse) { .slot-edge { width: 16px; } .slot.trimmable { padding-left: 14px; padding-right: 14px; } }
+
+/* Training page: only the people who need something done. */
+.needs-training { margin-bottom: 14px; box-shadow: var(--zb-shadow), inset 3px 0 0 var(--zb-warn); }
+.needs-list { display: flex; flex-direction: column; gap: 10px; }
+.needs-person { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.needs-name { min-width: 170px; text-align: left; }
+.needs-name .avatar { width: 26px; height: 26px; font-size: 10.5px; }
+.chip.pick .pill { margin-left: 4px; }
+
+.flew-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--zb-border); }

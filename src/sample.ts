@@ -11,6 +11,7 @@ export const defaultSettings = (): Settings => ({
   scheduleSpan: 30,
   scheduleGroup: "aircraft",
   expiryWarningDays: 30,
+  currencyDays: 90,
   maintenance: { enabled: true, autoPlan: false, hoursPerDay: 3, dueSoonDays: 30 },
 });
 
