@@ -1,5 +1,15 @@
 # Changelog
 
+## Not released yet
+
+**Balance**
+- A **Balance** page shows how busy everyone is over the next 30 days, 90 days or 6 months: each person's share of the days they can work (time off doesn't count), colored from hardly used to very busy.
+- Try other crew sizes for any job (say 2 pilots down to 1) and **Rebalance**: it keeps the shifts that are there, fills open seats and starts over for the jobs you changed, or for every job. Before and after: open seat-days, conflicts and the busiest person, with a line on each bar where they are now. Nothing changes until **Apply**, which has Undo.
+- Lock jobs or people to keep them as they are.
+
+**Fill the schedule follows the rules more closely**
+- It never books a stretch longer than the most days on in a row, counting bookings either side; it leaves the minimum days off before and after; and it stops at the open days instead of putting more people on than there are seats.
+
 ## 0.2.2
 
 **Fixing problems**

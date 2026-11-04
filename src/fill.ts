@@ -1,7 +1,7 @@
 import type { AppData, Person, Role, Rotation, Season, Shift } from "./types";
 import { dutyOf, missionCoverage, requiredTraining, trainingStatus } from "./coverage";
 import { onRotation, seasonTypes } from "./rotation";
-import { dayAt, ms, overlaps, toWhen, uid } from "./time";
+import { DAY, dayAt, ms, overlaps, toWhen, uid } from "./time";
 
 /**
  * Fill a season's open seats by rotating crew through it on the job's pattern (say 21 on, 14 off).
@@ -13,11 +13,14 @@ import { dayAt, ms, overlaps, toWhen, uid } from "./time";
  * booking), whichever comes first. The mission's regular crew go first, then whoever has worked least.
  * Days nobody can cover stay open, so the gaps show.
  */
-export function fillSeason(data: AppData, season: Season, role: Role, rotation: Rotation | null, opts: { maxDaysOn: number; minDaysOff: number }): Shift[] {
+export function fillSeason(data: AppData, season: Season, role: Role, rotation: Rotation | null,
+  opts: { maxDaysOn: number; minDaysOff: number; window?: [number, number]; skip?: Set<string> }): Shift[] {
   const need = role === "Pilot" ? season.pilotsNeeded : season.maintainersNeeded;
-  const from = ms(season.start), to = ms(season.end);
+  // Only open days inside `window` (the Balance page's period) are filled, and shifts stop at its end.
+  const from = Math.max(ms(season.start), opts.window?.[0] ?? -Infinity), to = Math.min(ms(season.end), opts.window?.[1] ?? Infinity);
   if (need <= 0 || !(to > from)) return [];
-  const on = Math.max(1, rotation?.on ?? opts.maxDaysOn);
+  // The job's rotation, but never longer than the most days on in a row allowed (Settings).
+  const on = Math.max(1, Math.min(rotation?.on ?? opts.maxDaysOn, opts.maxDaysOn));
   const off = Math.max(0, rotation?.off ?? opts.minDaysOff);
   const mission = data.missions.find((m) => m.id === season.missionId);
   const types = seasonTypes(data, season);
@@ -26,7 +29,9 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
   let current = data;
   const added: Shift[] = [];
   const worked = new Map<string, number>();
-  for (const s of data.shifts) worked.set(s.personId, (worked.get(s.personId) ?? 0) + (ms(s.end) - ms(s.start)));
+  // Who has worked least goes first: within the period when there is one, so the work evens out there.
+  const [wa, wb] = opts.window ?? [-Infinity, Infinity];
+  for (const s of data.shifts) worked.set(s.personId, (worked.get(s.personId) ?? 0) + Math.max(0, Math.min(ms(s.end), wb) - Math.max(ms(s.start), wa)));
 
   // Busy spans per person, kept up to date as shifts are added.
   const busy = new Map<string, [number, number][]>();
@@ -46,9 +51,33 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
   };
   /** Rested: no work in the `off` days before `d`. */
   const rested = (p: Person, d: number) => !busyOf(p).some(([a, b]) => overlaps(dayAt(d, -off), d, a, b));
+  /**
+   * Days on in a row if they also worked [a, b): bookings with fewer than the minimum days off between
+   * them count as one stretch, before and after, like the hitch check does.
+   */
+  const stretch = (p: Person, a: number, b: number) => {
+    const spans = [...busyOf(p), [a, b] as [number, number]].sort((x, y) => x[0] - y[0]);
+    let lo = -1, hi = -1, found = 0;
+    for (const [x, y] of spans) {
+      if (lo >= 0 && Math.round(((x - hi) / DAY) * 10) / 10 < opts.minDaysOff) hi = Math.max(hi, y);
+      else {
+        if (lo <= a && a < hi) found = hi - lo;
+        lo = x;
+        hi = y;
+      }
+    }
+    if (lo <= a && a < hi) found = hi - lo;
+    return Math.round((found / DAY) * 10) / 10;
+  };
+  /** Some days off but fewer than the minimum, between [a, b) and their other bookings. */
+  const shortRest = (p: Person, a: number, b: number) => busyOf(p).some(([x, y]) => {
+    const gap = Math.round(((x >= b ? x - b : a - y) / DAY) * 10) / 10;
+    return (x >= b || y <= a) && gap > 0 && gap < opts.minDaysOff;
+  });
+  const fits = (p: Person, a: number, b: number) => stretch(p, a, b) <= opts.maxDaysOn && !shortRest(p, a, b);
 
   const pool = data.people
-    .filter((p) => p.role === role && (!types.length || types.some((t) => p.quals.includes(t))))
+    .filter((p) => p.role === role && !opts.skip?.has(p.id) && (!types.length || types.some((t) => p.quals.includes(t))))
     .sort((a, b) => Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)));
 
   // Walk the open stretches day by day, filling one seat at a time. Days before `skipUntil` are
@@ -62,18 +91,19 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     const d = dayAt(Math.max(gap.a, skipUntil));
     if (d >= to) break;
     const pick = pool
-      .filter((p) => canWork(p, d) && rested(p, d))
+      .filter((p) => canWork(p, d) && rested(p, d) && fits(p, d, dayAt(d, 1)))
       .sort((a, b) => Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)) || (worked.get(a.id) ?? 0) - (worked.get(b.id) ?? 0) || a.name.localeCompare(b.name))[0];
     if (!pick) {
       skipUntil = dayAt(d, 1); // nobody for this day: leave it open
       continue;
     }
     let end = d;
-    let last = Math.min(to, dayAt(d, on));
+    // Up to the job's "on" days, but not past the open days (that would put more people on than seats).
+    let last = Math.min(to, dayAt(d, on), gap.b);
     // Maintainers needed only some days: book just the days that count (the start or end, or the days a week still open).
     if (role === "Maintainer" && (season.maintainerNeed?.mode ?? "always") !== "always")
-      last = Math.min(last, gap.b, gap.days ? dayAt(d, gap.days) : Infinity);
-    while (end < last && canWork(pick, end)) end = dayAt(end, 1);
+      last = Math.min(last, gap.days ? dayAt(d, gap.days) : Infinity);
+    while (end < last && canWork(pick, end) && fits(pick, d, dayAt(end, 1))) end = dayAt(end, 1);
     const shift: Shift = { id: uid(), seasonId: season.id, personId: pick.id, start: toWhen(d), end: toWhen(end) };
     added.push(shift);
     current = { ...current, shifts: [...current.shifts, shift] };
