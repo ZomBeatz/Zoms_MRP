@@ -145,7 +145,7 @@ export default function App() {
           <Search size={16} />
           {(!collapsed || drawer) && <>Find<span className="kbd-hint muted small" style={{ marginLeft: "auto" }}>{navigator.platform.includes("Mac") ? "⌘K" : "Ctrl K"}</span></>}
         </button>
-        {NAV.filter((n) => n.page !== "inspections" || data.settings.maintenance.enabled).map(({ page: p, label, icon: Icon }) => (
+        {NAV.filter((n) => (n.page !== "inspections" || data.settings.maintenance.enabled) && !(data.settings.hiddenPages ?? []).includes(n.page)).map(({ page: p, label, icon: Icon }) => (
           <button key={p} className={`nav-item ${page === p ? "active" : ""}`} onClick={() => navTo(p)} title={collapsed ? label : undefined}>
             <Icon size={16} />
             {(!collapsed || drawer) && label}

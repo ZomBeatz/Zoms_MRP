@@ -113,11 +113,25 @@ function MissionDialog({ id, defaults }: Props) {
   // A new mission starts with its first season (dates and aircraft), so it shows up right away.
   const [first, setFirst] = useState<Season>(() => ({
     id: uid(), missionId: m.id, start: toWhen(tomorrow()), end: toWhen(dayAt(tomorrow(), 30)), aircraftIds: [],
-    pilotsNeeded: 1, maintainersNeeded: 0, pilotRotation: null, maintainerRotation: null, status: "Planned", notes: "",
+    // What new seasons start with (Settings).
+    pilotsNeeded: data.settings.seasonDefaults?.pilots ?? 1, maintainersNeeded: data.settings.seasonDefaults?.maintainers ?? 0, pilotRotation: data.settings.seasonDefaults?.pilotRotation ?? null,
+    maintainerRotation: null, dutyHours: data.settings.seasonDefaults?.dutyHours ?? null, status: "Planned", notes: "",
     ...(defaults as Partial<Season>),
   }));
   const [pool, setPool] = useState<Set<string>>(() => kept.pool ?? new Set(data.people.filter((p) => p.missionIds.includes(id)).map((p) => p.id)));
   const dirty = useDirty({ m, first, pool });
+  // Several seasons at once: confirm, cancel or delete the ticked ones (saved straight away, with Undo).
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [sureBulk, setSureBulk] = useState(false);
+  const bulk = (what: Season["status"] | "delete") => {
+    const ids = picked;
+    change((d) => what === "delete"
+      ? { ...d, seasons: d.seasons.filter((x) => !ids.has(x.id)), shifts: d.shifts.filter((x) => !ids.has(x.seasonId)) }
+      : { ...d, seasons: d.seasons.map((x) => (ids.has(x.id) ? { ...x, status: what } : x)) },
+      what === "delete" ? `Deleted ${plural(ids.size, "season")}` : `${what === "Confirmed" ? "Confirmed" : "Cancelled"} ${plural(ids.size, "season")}`);
+    setPicked(new Set());
+    setSureBulk(false);
+  };
   useKeep({ tab, m, pool });
   const set = (patch: Partial<Mission>) => setM((x) => ({ ...x, ...patch }));
   const setF = (patch: Partial<Season>) => setFirst((x) => ({ ...x, ...patch }));
@@ -255,6 +269,18 @@ function MissionDialog({ id, defaults }: Props) {
             <button className="btn sm primary" onClick={() => open("season", "new", { missionId: m.id })}><Plus size={14} /> Add season…</button>
             {seasons.length > 0 && <button className="btn sm" onClick={copyToNext}><CopyPlus size={14} /> Copy to next season</button>}
           </div>
+          {picked.size > 0 && (
+            <div className="bulk-bar">
+              <b>{plural(picked.size, "season")} selected</b>
+              <span className="grow" />
+              <button className="btn sm confirm" onClick={() => bulk("Confirmed")}><Check size={13} /> Confirm</button>
+              <button className="btn sm" onClick={() => bulk("Cancelled")}>Cancel them</button>
+              {sureBulk
+                ? <button className="btn sm danger solid" onBlur={() => setSureBulk(false)} onClick={() => bulk("delete")} autoFocus>Delete {picked.size} for good?</button>
+                : <button className="btn sm danger" onClick={() => setSureBulk(true)}><Trash2 size={13} /> Delete</button>}
+              <button className="btn sm ghost" onClick={() => setPicked(new Set())}>Clear</button>
+            </div>
+          )}
           {seasons.length > 0 ? (
             <div className="lines">
               {[...seasons].reverse().map((x) => {
@@ -262,6 +288,8 @@ function MissionDialog({ id, defaults }: Props) {
                 const live = x.status !== "Done" && x.status !== "Cancelled";
                 return (
                   <div key={x.id} className="line with-action" style={ms(x.end) <= now ? { opacity: 0.65 } : undefined}>
+                    <input type="checkbox" className="pick-season" aria-label={`Select ${fmtSpan(x.start, x.end)}`} checked={picked.has(x.id)}
+                      onChange={() => setPicked((s) => { const n = new Set(s); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n; })} />
                     <button className="line-main" onClick={() => open("season", x.id)}>
                       <span className="grow">
                         <span className="name" style={{ display: "block" }}>{fmtSpan(x.start, x.end)}</span>
@@ -603,12 +631,13 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
     if (kept.season) return kept.season;
     if (existing) return existing;
     const missionId = (defaults.missionId as string) ?? data.missions[0]?.id ?? "";
+    const sd = data.settings.seasonDefaults ?? { pilots: 1, maintainers: 0, pilotRotation: null, dutyHours: null };
     // A new season starts from the mission's latest one: same aircraft, crew numbers and rotations.
     const last = seasonsOf(data, missionId).at(-1);
     return {
       id: uid(), missionId, start: toWhen(tomorrow()), end: toWhen(dayAt(tomorrow(), 30)),
-      aircraftIds: last?.aircraftIds ?? [], pilotsNeeded: last?.pilotsNeeded ?? 1, maintainersNeeded: last?.maintainersNeeded ?? 0, maintainerNeed: last?.maintainerNeed,
-      pilotRotation: last?.pilotRotation ?? null, maintainerRotation: last?.maintainerRotation ?? null,
+      aircraftIds: last?.aircraftIds ?? [], pilotsNeeded: last?.pilotsNeeded ?? sd.pilots, maintainersNeeded: last?.maintainersNeeded ?? sd.maintainers, maintainerNeed: last?.maintainerNeed,
+      pilotRotation: last?.pilotRotation ?? sd.pilotRotation, maintainerRotation: last?.maintainerRotation ?? null, dutyHours: last?.dutyHours ?? sd.dutyHours,
       status: "Planned", notes: "", ...(defaults as Partial<Season>),
     };
   });

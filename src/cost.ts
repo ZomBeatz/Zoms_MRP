@@ -34,4 +34,4 @@ export function seasonCost(data: AppData, b: Booking, from: number, to: number):
 export const hasRates = (data: AppData) => data.people.some((p) => p.dayRate) || data.aircraft.some((a) => a.hourCost) || data.missions.some((m) => m.dayCharge);
 
 /** "$12,400" */
-export const money = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US")}`;
+export const money = (n: number, symbol = "$") => `${n < 0 ? "−" : ""}${symbol}${Math.abs(n).toLocaleString("en-US")}`;

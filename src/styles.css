@@ -720,3 +720,7 @@ body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
 .slot.trimmable { cursor: grab; }
 .slot.trimming { cursor: grabbing; }
 .g-lane.drop { box-shadow: inset 0 0 0 2px var(--zb-accent); background: var(--zb-accent-soft); }
+
+/* Several seasons at once. */
+.pick-season { margin-left: 12px; width: 18px; height: 18px; flex: none; }
+.bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; margin-bottom: 8px; border-radius: var(--zb-radius); background: var(--zb-accent-soft); }

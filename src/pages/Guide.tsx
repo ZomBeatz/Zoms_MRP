@@ -16,6 +16,9 @@ export const SHORTCUTS: [string, string][] = [
   ["[", "Fold the sidebar"],
   ["?", "This guide"],
   [`${mod} K`, "Find anything by name"],
+  ["← →", "Move a chart through time (Schedule)"],
+  ["T", "Today on the Schedule"],
+  ["+ −", "Zoom the Schedule in or out"],
   ["Esc", "Close a form (it asks first if you've changed something)"],
 ];
 
@@ -29,6 +32,21 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
       <>On <b>Details</b>, change the <b>Last day</b> (or First day).</>,
       <>Go to <b>Pilots</b> and press <b>Fill the schedule</b> to crew the new days. Do the same on <b>Maintainers</b>.</>,
       <>Press <b>Save</b>.</>,
+    ],
+  },
+  {
+    q: "Bring in our existing lists",
+    steps: [
+      <>Go to <b>Settings › Your data</b> and press <b>Download the import template</b>.</>,
+      <>Fill in its People, Aircraft, Courses and Training sheets (any of them), keeping the headings. Hover a heading for what goes in it; the Read me sheet has examples.</>,
+      <>Press <b>Import from Excel or CSV…</b> and pick the file. You'll see what's added, updated and skipped; press <b>Import</b> to keep it (Undo works right after).</>,
+    ],
+  },
+  {
+    q: "Record a class several people attended",
+    steps: [
+      <>On <b>Training</b>, press <b>Record for several people…</b> (or open the course and press <b>Record it for several people…</b>).</>,
+      <>Pick the course and the day, then tick who attended. <b>Tick everyone who needs it</b> does it in one go.</>,
     ],
   },
   {
