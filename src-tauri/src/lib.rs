@@ -163,4 +163,20 @@ mod tests {
         assert_eq!(fs::read_to_string(&p).unwrap(), "two");
         assert!(!dir.join("plan.saving").exists());
     }
+
+    /// A command the window isn't allowed to call fails only in the installed app (saving to Downloads
+    /// did, from 0.1.0 to 0.2.1), so every command in build.rs must be allowed in the capabilities.
+    #[test]
+    fn every_command_is_allowed() {
+        let build = include_str!("../build.rs");
+        let caps = include_str!("../capabilities/default.json");
+        let list = &build[build.find("commands(&[").expect("command list in build.rs")..];
+        let list = &list[..list.find("])").unwrap()];
+        let commands: Vec<&str> = list.split('"').skip(1).step_by(2).collect();
+        assert!(commands.len() >= 5);
+        for c in commands {
+            let allow = format!("\"allow-{}\"", c.replace('_', "-"));
+            assert!(caps.contains(&allow), "{c} isn't in capabilities/default.json as {allow}");
+        }
+    }
 }

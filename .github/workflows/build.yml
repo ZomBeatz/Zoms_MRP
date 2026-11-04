@@ -53,6 +53,11 @@ jobs:
       - run: npm ci
       - run: npm test
 
+      # The desktop app's own tests, including that the window may call every command it has.
+      - name: Desktop app tests
+        if: matrix.name == 'linux'
+        run: npm run build && cargo test --manifest-path src-tauri/Cargo.toml
+
       # Signs with the Apple secrets when they are set (an empty APPLE_CERTIFICATE would make the build
       # try to import nothing), and ad-hoc ("-") otherwise, which a downloaded Mac app needs to open at all.
       - name: Mac signing and notarizing

@@ -12,6 +12,7 @@
     "allow-load-plan",
     "allow-save-plan",
     "allow-write-excel",
+    "allow-save-download",
     "allow-data-folder"
   ]
 }
