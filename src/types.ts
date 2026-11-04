@@ -16,6 +16,10 @@ export interface Aircraft {
   status: AircraftStatus;
   seats: number;         // pilot seats in the cockpit (1 or 2)
   notes: string;
+  /** The last flight-hours reading: total hours on the airframe as of a day ("2026-11-04"). */
+  hours?: { hours: number; on: string } | null;
+  /** Average flight hours on a day it flies a mission; empty = the Settings default. */
+  hoursPerDay?: number | null;
 }
 
 export type Role = "Pilot" | "Maintainer";
@@ -60,6 +64,8 @@ export interface Person {
   missionIds: ID[];
   /** A fixed rotation: they're only available on their on days. null = available any day. */
   rotation: PersonRotation | null;
+  /** Their own work limits, if stricter than the rules. */
+  limits?: Limits;
   base: string;
   phone: string;
   notes: string;
@@ -86,6 +92,8 @@ export interface Mission {
   color: string;
   pattern: Pattern;
   notes: string;
+  /** Work limits for this customer's jobs, if stricter than the rules. */
+  limits?: Limits;
 }
 
 /**
@@ -104,6 +112,8 @@ export interface Season {
   maintainersNeeded: number;
   /** When maintainers are needed (missing = all the time). */
   maintainerNeed?: MaintainerNeed;
+  /** Work limits for this season; with `override`, these replace the mission's and Settings'. */
+  limits?: Limits;
   /** How pilots and maintainers rotate through the job (they can differ). null = no set pattern. */
   pilotRotation: Rotation | null;
   maintainerRotation: Rotation | null;
@@ -159,6 +169,32 @@ export interface TimeOff {
   reason: string;
 }
 
+/**
+ * Work limits that can be stricter than Settings for one person, one mission or one season. Empty fields
+ * follow the level above. The safest wins: the fewest days on, the most days off.
+ */
+export interface Limits {
+  maxDaysOn?: number | null;
+  minDaysOff?: number | null;
+  /** On a season only: use these instead of the mission's and Settings' (a person's own still apply). */
+  override?: boolean;
+}
+
+/**
+ * One inspection in an aircraft type's maintenance program: every so many flight hours and/or months,
+ * whichever comes first. It takes `days` and usually grounds the aircraft.
+ */
+export interface ProgramItem {
+  id: ID;
+  /** The aircraft type it's for ("Bell 412"). */
+  type: string;
+  title: string;
+  everyHours: number | null;
+  everyMonths: number | null;
+  days: number;
+  grounds: boolean;
+}
+
 export interface Rules {
   /** Most days in a row someone can be on assignment (a hitch). */
   maxDaysOn: number;
@@ -175,6 +211,16 @@ export interface Settings {
   scheduleGroup: "missions" | "aircraft" | "people";
   /** Warn this many days before training expires. */
   expiryWarningDays: number;
+  /** Maintenance programs and flight hours (off for anyone who tracks them in another system). */
+  maintenance: {
+    enabled: boolean;
+    /** Plan due inspections into free days on their own. */
+    autoPlan: boolean;
+    /** Flight hours on a day an aircraft flies a mission, unless the aircraft has its own. */
+    hoursPerDay: number;
+    /** "Due soon" this many days ahead. */
+    dueSoonDays: number;
+  };
 }
 
 export interface AppData {
@@ -187,6 +233,8 @@ export interface AppData {
   shifts: Shift[];
   jobs: MaintenanceJob[];
   timeOff: TimeOff[];
+  /** Maintenance programs, item by item for each aircraft type. */
+  programs: ProgramItem[];
   settings: Settings;
 }
 

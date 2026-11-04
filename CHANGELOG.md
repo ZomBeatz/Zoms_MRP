@@ -7,6 +7,9 @@
 - Try other crew sizes for any job (say 2 pilots down to 1) and **Rebalance**: it keeps the shifts that are there, fills open seats and starts over for the jobs you changed, or for every job. Before and after: open seat-days, conflicts and the busiest person, with a line on each bar where they are now. Nothing changes until **Apply**, which has Undo.
 - Lock jobs or people to keep them as they are.
 
+**Work limits**
+- A person, a mission and a season can each have their own most days on in a row and fewest days off. The safest wins; a season can **Override** the mission and Settings, but a person's own limits always apply. The checks, Fill the schedule and Rebalance all follow them.
+
 **Fill the schedule follows the rules more closely**
 - It never books a stretch longer than the most days on in a row, counting bookings either side; it leaves the minimum days off before and after; and it stops at the open days instead of putting more people on than there are seats.
 

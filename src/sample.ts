@@ -1,5 +1,5 @@
 import { addMonths, format } from "date-fns";
-import type { Aircraft, AppData, Booking, MaintenanceJob, Mission, Pattern, Person, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
+import type { Aircraft, AppData, Booking, MaintenanceJob, Mission, Pattern, Person, ProgramItem, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
 import { booking } from "./bookings";
 import { onRotationFor } from "./rotation";
 import { DAY, dayAt, overlaps, toWhen, today } from "./time";
@@ -11,6 +11,7 @@ export const defaultSettings = (): Settings => ({
   scheduleSpan: 30,
   scheduleGroup: "aircraft",
   expiryWarningDays: 30,
+  maintenance: { enabled: true, autoPlan: false, hoursPerDay: 3, dueSoonDays: 30 },
 });
 
 export const emptyData = (): AppData => ({
@@ -22,6 +23,7 @@ export const emptyData = (): AppData => ({
   seasons: [],
   shifts: [],
   jobs: [],
+  programs: [],
   timeOff: [],
   settings: defaultSettings(),
 });
@@ -337,5 +339,14 @@ export function sampleData(settings = defaultSettings()): AppData {
     }
   }
 
-  return { version: 1, aircraft, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, settings };
+  // Maintenance programs for the demo's types, and an hour-meter reading on each tail from a few weeks ago.
+  const programs: ProgramItem[] = [...new Set(aircraft.map((a) => a.type))].flatMap((type, i) => [
+    { id: `pg-${i}-100`, type, title: "100 hour inspection", everyHours: 100, everyMonths: null, days: 2, grounds: true },
+    { id: `pg-${i}-ann`, type, title: "Annual inspection", everyHours: null, everyMonths: 12, days: 7, grounds: true },
+    ...(type === "AW139" ? [{ id: `pg-${i}-ph`, type, title: "Phase inspection", everyHours: 300, everyMonths: 24, days: 4, grounds: true }] : []),
+  ]);
+  const read = format(dayAt(t0, -20), "yyyy-MM-dd");
+  for (const a of aircraft) a.hours = { hours: Math.round(1800 + rnd() * 4000), on: read };
+
+  return { version: 1, aircraft, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, settings };
 }
