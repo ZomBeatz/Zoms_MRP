@@ -81,14 +81,15 @@ interface State {
   canEdit: boolean;
   page: Page;
   /** What's open in a dialog: a kind and an id ("new" for a new one), plus defaults for new items. */
-  editing: { kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "support"; id: string; defaults?: Record<string, unknown> } | null;
+  /** The open form. `fix` opens it on a tab and points at what needs fixing (see src/fixes.ts). */
+  editing: { kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "support"; id: string; defaults?: Record<string, unknown>; fix?: { tab?: string; spot?: string } } | null;
   past: AppData[];
   future: AppData[];
   toast: Toast | null;
   saveError: string | null;
 
   go: (page: Page) => void;
-  open: (kind: NonNullable<State["editing"]>["kind"], id: string, defaults?: Record<string, unknown>) => void;
+  open: (kind: NonNullable<State["editing"]>["kind"], id: string, defaults?: Record<string, unknown>, fix?: { tab?: string; spot?: string }) => void;
   close: () => void;
   change: (fn: (d: AppData) => AppData, message?: string) => void;
   upsert: <C extends Collection>(c: C, item: Item<C>) => void;
@@ -187,9 +188,9 @@ export const useStore = create<State>((set, get) => ({
     if (page !== get().page) pushHistory({ page, editing: null });
     set({ page });
   },
-  open: (kind, id, defaults) => {
-    if (afterStep(() => get().open(kind, id, defaults))) return;
-    const editing = { kind, id, defaults };
+  open: (kind, id, defaults, fix) => {
+    if (afterStep(() => get().open(kind, id, defaults, fix))) return;
+    const editing = { kind, id, defaults, fix };
     if (get().editing && keeper) {
       try {
         history.replaceState({ ...history.state, kept: keeper() }, "");

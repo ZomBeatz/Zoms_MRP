@@ -6,6 +6,7 @@ import { seasonsOf } from "../bookings";
 import { fmtDates, ms, plural } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { Empty, StatusPill, useSort } from "../components/ui";
+import { ConfirmButton } from "./Overview";
 
 /**
  * Every mission (one customer's work), with the season running now or the next one coming,
@@ -67,6 +68,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
                           <span className="row gap-sm wrap">
                             <button className="link" onClick={(e) => { e.stopPropagation(); open("season", current.id); }}>{fmtDates(current.start, current.end)}</button>
                             <StatusPill status={current.status} />
+                            <ConfirmButton season={{ ...current, name: m.name }} />
                           </span>
                         ) : <span className="muted">No seasons yet</span>}
                       </td>
@@ -86,11 +88,14 @@ export function Missions({ issues }: { issues: Issue[] }) {
           </div>
           <div className="cards-list">
             {list.map(({ m, seasons, current, active, cov }) => (
-              <button key={m.id} className="list-card" onClick={() => open("mission", m.id)}>
+              // A card you tap to open, with Confirm inside it (so it's a div acting as a button).
+              <div key={m.id} className="list-card" role="button" tabIndex={0} onClick={() => open("mission", m.id)}
+                onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open("mission", m.id); } }}>
                 <span className="row gap-sm"><span className="swatch" style={slotStyle(missionLook(m))} /><b>{m.name}</b></span>
                 <span className="small muted">{current ? `${active ? "" : "Last: "}${fmtDates(current.start, current.end)}` : "No seasons yet"} · {plural(seasons.length, "season")}</span>
                 {active && <span className="row gap-sm wrap small"><span className={`pill ${cov === 1 ? "ok" : "danger"}`}>{Math.round(cov * 100)}% crewed</span> {current && <StatusPill status={current.status} />}</span>}
-              </button>
+                {current && <ConfirmButton season={{ ...current, name: m.name }} />}
+              </div>
             ))}
           </div>
         </>

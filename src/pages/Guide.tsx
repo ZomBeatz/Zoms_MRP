@@ -44,7 +44,7 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
     steps: [
       <>Go to <b>Crew</b> and press <b>Add time off</b>.</>,
       <>Pick who, the first and last day, and a reason. Press <b>Add time off</b>.</>,
-      <>Any shift they had on those days now shows under <b>Needs attention</b> on the <b>Overview</b>. Tap it to open the season, then swap someone in (see above).</>,
+      <>Any shift they had on those days now shows under <b>Needs attention</b> on the <b>Overview</b>. Press <b>Swap them out</b> on it: the shift opens, ready to pick someone else.</>,
     ],
   },
   {
@@ -117,7 +117,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
           <li><b>Add each customer as a mission.</b> Pick its color, the training its crew need and its regular crew.</li>
           <li><b>Give it a season</b> for each stretch of dates it flies. Add the aircraft when they're known, how many pilots and maintainers it needs at any time, and its rotation (like 14 on, 7 off).</li>
           <li><b>Fill the schedule.</b> Zom's MRP rotates rated, current, free people through the season. Fix what's left by hand.</li>
-          <li><b>Check the overview each day.</b> It lists every gap and conflict. Tap one to fix it.</li>
+          <li><b>Check the overview each day.</b> It lists every gap and conflict, each with a button that takes you to the fix.</li>
           <li><b>When a customer calls</b>, use <b>Can we take a job?</b> on the Fleet page before saying yes.</li>
         </ol>
       </>
@@ -190,7 +190,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
   },
   {
     id: "overview", title: "Overview", tour: "basics",
-    body: <p>What's flying now and in the next 30 days, the fleet at a glance, and <b>Needs attention</b>: every problem Zom's MRP finds, worst first. Tap a problem to open what needs fixing. The number beside Overview in the sidebar is how many there are.</p>,
+    body: <p>What's flying now and in the next 30 days, the fleet at a glance, and <b>Needs attention</b>: every problem Zom's MRP finds, worst first. Each has a button for the usual fix, like <b>Add a pilot</b>, <b>Record the training</b> or <b>Add the rating</b>, and sometimes another way out. It opens the right form on the right tab and outlines in red what to change. When nobody can take an open seat, the season says why for the people closest to it, with a button to fix each one. The number beside Overview in the sidebar is how many problems there are.</p>,
   },
   {
     id: "fleet", title: "Fleet", tour: "call",

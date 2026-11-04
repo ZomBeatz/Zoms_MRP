@@ -87,9 +87,34 @@ export function Stepper({ value, onChange, min = 0, max = 20, label }: { value: 
   );
 }
 
-export function Field({ label, hint, error, full, children }: { label: string; hint?: string; error?: string | null; full?: boolean; children: ReactNode }) {
+/**
+ * Scroll to what a problem points at (the element with that `data-spot`) and outline it, whenever the spot
+ * or the given things (the tab, say) change. The outline is a `data-lit` attribute React leaves alone.
+ */
+export function useSpot(spot: string | undefined, ...deps: unknown[]) {
+  useEffect(() => {
+    if (!spot) return;
+    let tries = 0;
+    let timer = 0;
+    const find = () => {
+      const el = document.querySelector(`.dialog [data-spot="${CSS.escape(spot)}"]`);
+      if (!el) {
+        if (tries++ < 12) timer = window.setTimeout(find, 50);
+        return;
+      }
+      document.querySelectorAll(".dialog [data-lit]").forEach((x) => x.removeAttribute("data-lit"));
+      el.setAttribute("data-lit", "");
+      el.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    };
+    timer = window.setTimeout(find, 40);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spot, ...deps]);
+}
+
+export function Field({ label, hint, error, full, spot, children }: { label: string; hint?: string; error?: string | null; full?: boolean; spot?: string; children: ReactNode }) {
   return (
-    <label className={`field ${full ? "full" : ""}`}>
+    <label className={`field ${full ? "full" : ""}`} data-spot={spot}>
       <span>{label}</span>
       {children}
       {error ? <span className="err">{error}</span> : hint ? <span className="hint">{hint}</span> : null}
