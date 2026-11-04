@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "build:server": "tsc --noEmit && VITE_SERVER=1 vite build --outDir dist-server --emptyOutDir",
+    "tauri": "tauri",
     "app": "tauri dev",
     "bundle": "tauri build"
   },
