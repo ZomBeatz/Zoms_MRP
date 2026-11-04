@@ -1,26 +1,44 @@
 <p align="center">
-  <img src="branding/mrp-icon.svg" width="120" alt="Zom's MRP by ZomBeatz Media">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/mrp-logo-dark.png">
+    <img src="branding/mrp-logo.png" alt="Zom's MRP by ZomBeatz Media" width="460">
+  </picture>
 </p>
 
-<h1 align="center">Zom's MRP</h1>
+<p align="center">
+  <b>Every mission crewed, every aircraft planned.</b><br>
+  A free helicopter mission planner: fleet board, crew roster and Gantt chart in one, with the checks built in.<br>
+  Runs on Windows, macOS and Linux, or on your own server with Docker for the whole team.
+</p>
 
 <p align="center">
-  Zom's MRP (Mission Ready Planner) schedules helicopter missions, crews and maintenance in one place.<br>
-  Put aircraft on missions by tail number, rotate pilots through hitches, and keep training current.<br>
-  Zom's MRP shows every gap and conflict before it becomes a problem.
+  <a href="https://github.com/ZomBeatz/Zoms_MRP/releases/latest"><img alt="Download for Windows" src="https://img.shields.io/badge/Windows-Download-2580c3?style=for-the-badge&logo=windows&logoColor=white"></a>
+  <a href="https://github.com/ZomBeatz/Zoms_MRP/releases/latest"><img alt="Download for macOS" src="https://img.shields.io/badge/macOS-Download-2580c3?style=for-the-badge&logo=apple&logoColor=white"></a>
+  <a href="https://github.com/ZomBeatz/Zoms_MRP/releases/latest"><img alt="Download for Linux" src="https://img.shields.io/badge/Linux-Download-2580c3?style=for-the-badge&logo=linux&logoColor=white"></a>
+  <a href="https://zombeatz.github.io/Zoms_MRP/"><img alt="Try the online demo" src="https://img.shields.io/badge/Try_it-Online_demo-22c55e?style=for-the-badge&logo=googlechrome&logoColor=white"></a>
+  <a href="#running-on-a-server"><img alt="Server with Docker" src="https://img.shields.io/badge/Server-Docker-ec6a3f?style=for-the-badge&logo=docker&logoColor=white"></a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/fleet.png" alt="The Fleet page: every tail over time, with its missions, maintenance and free windows" width="900">
 </p>
 
 ## Quick start
 
-**Just want to look around?** Try the [online demo](https://zombeatz.github.io/Zoms_MRP/). It runs in your browser with made-up data.
+**Just want to look around?** Try the [online demo](https://zombeatz.github.io/Zoms_MRP/) in your browser. It has made-up data from an operator in Alaska, hands-on lessons and tours, and your changes only stay in your own browser.
 
-1. Download Zom's MRP for your computer from the [latest release](https://github.com/ZomBeatz/Zoms_MRP/releases/latest): **Windows** (`.exe`), **Mac** (`.dmg`) or **Linux** (`.deb`, `.rpm` or `.AppImage`).
-2. Install it with a double-click and open it.
-3. It opens empty. The **Getting started** card on the Overview lists what to add, in order: aircraft, training, pilots, maintainers, then each customer as a mission.
+1. **Download** the file for your computer from the [latest release](https://github.com/ZomBeatz/Zoms_MRP/releases/latest) (under **Assets** at the bottom):
 
-The **Guide** in the sidebar (or **?**) explains every part and has step-by-step answers for everyday jobs. The online demo also has hands-on lessons and tours.
+   | Your computer | File to download | Then |
+   |---|---|---|
+   | **Windows 10/11** | `Zom’s MRP_(version)_x64-setup.exe` | Open it. If Windows says *"Windows protected your PC"*, click **More info > Run anyway**. |
+   | **Mac** (Apple silicon or Intel) | `Zom's MRP_(version)_universal.dmg` | Open it and drag **Zom's MRP** to **Applications**. If macOS says it can't check the app, see [the Mac question](#questions) below. |
+   | **Linux** | `.deb` (Ubuntu, Mint, Debian), `.rpm` (Fedora, openSUSE) or `.AppImage` (any) | Open it with your software installer. For the AppImage: right-click > Properties > allow running, then open it. |
 
-Everything stays on that computer. For a team, see [Server](#server) below.
+2. **Open Zom's MRP.** It opens empty, and the **Getting started** card on the Overview lists what to add, in order: aircraft, training, pilots, maintainers, then each customer as a mission.
+3. No account or sign-up needed. Your plan is saved on your own computer.
+
+The **Guide** in the sidebar (or **?**) explains every part, with step-by-step answers for everyday jobs. For a team sharing one plan, see [Running on a server](#running-on-a-server).
 
 ## What it does
 
@@ -28,26 +46,53 @@ Like a fleet board, a crew roster and a Gantt chart in one, with the checks buil
 
 | | |
 |---|---|
-| **Fleet** | Every tail over time, grouped by type: its missions, maintenance and free windows, how many aircraft are free each day, and **Can we take a job?** to see which tails and crew could do new work. |
-| **Schedule** | A Gantt chart by aircraft, mission or person, narrowed to one mission from a list. The crew view puts open seats on top, with who's on the job and who else is rated and current. Drag to move through time, and Ctrl + scroll (or pinch) to zoom from a week to a year. Each mission has its own color and pattern. |
-| **Missions** | One customer's work, with the training it needs and the crew who work it. Its seasons hold the dates, one or more aircraft (by tail number), and how many pilots and maintainers the job needs at any time. **Copy to next season** books next year in one click. |
-| **Rotations** | Each job has a pilot and a maintainer rotation (say 21 on, 14 off); **Fill the schedule** rotates free, rated, current people through it. People can have a fixed rotation of their own and are only offered on their on days. |
-| **Crew** | Pilots and maintainers, the aircraft types they're qualified on, time off, and their training records. |
-| **Training** | Courses that need renewing, set by each mission. People only need what their missions ask for, and "Who's current" shows where everyone stands. |
-| **Maintenance** | Jobs on an aircraft with the maintainers on them. A job can ground the aircraft. |
-| **Overview** | Every open seat, double booking, missing qualification, expired training and too-long hitch, with a click to fix it. |
-| **Reports** | Days per mission, aircraft use, how busy each person is, and how much mission time was fully crewed. Print it, or **Export to Excel** to share in Teams. |
+| **Fleet** | Every tail over time, grouped by type, with its missions, maintenance and free windows. **Can we take a job?** says which tails and crew could take new work. |
+| **Schedule** | A Gantt chart by aircraft, mission or person, from a week to a year. The crew view puts open seats on top. |
+| **Missions** | One customer's work, with the training it needs and its regular crew. Each season holds the dates, the aircraft by tail number and the crew sizes. |
+| **Rotations** | Set a rotation like 21 on, 14 off, and **Fill the schedule** rotates free, rated, current people through it. |
+| **Crew and training** | Pilots and maintainers, their type ratings, time off and training. People only need the training of the missions they work. |
+| **Checks** | The Overview lists every open seat, double booking, missing rating, expired course and too-long hitch. Tap one to fix it. |
+| **Reports** | Days per mission, aircraft use and how busy each person is. **Export to Excel** to share it in Teams. |
+| **Privacy** | No ads, no tracking and no cloud account. The plan stays on your computer or your own server. |
+
+<table>
+  <tr>
+    <td width="66%"><img src="docs/screenshots/schedule.png" alt="The Schedule's crew view, with open seats on top and each pilot's hitches"></td>
+    <td rowspan="2" width="34%"><img src="docs/screenshots/phone.png" alt="The Overview on a phone"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/season.png" alt="A season's pilots, filled on a 14 on, 7 off rotation"></td>
+  </tr>
+</table>
+
+<details>
+<summary><b>The full feature list</b></summary>
+
+- **Fleet board**: every tail grouped by type, its missions and maintenance, free windows, and a row showing how many aircraft are free each day
+- **Can we take a job?**: checks dates, type, pilots and training against the whole fleet and crew, and says when a busy tail is free next
+- **Missions and seasons**: each customer is a mission with its contact, color and pattern; each season is one stretch of dates on one or more aircraft, with **Copy to next season**
+- **Rotations**: a pilot and a maintainer rotation per season, **Fill the schedule** and **Start over**, and fixed personal rotations with days off shaded
+- **Shifts**: one line per shift, open seats in date order, and only people who are rated, current, free and on rotation offered (**Show everyone** for the rest)
+- **Training**: courses with how often they're renewed, set per mission, a **Who's current** view, and warnings before training runs out
+- **Maintenance**: jobs on an aircraft with the maintainers on them, which can ground it
+- **Checks**: open seats, double bookings, bookings during time off or maintenance, missing ratings, expired training, too many pilots for the seats, and hitches longer than the limit
+- **Schedule**: by aircraft, mission or person, narrowed to one mission, with drag, pinch and Ctrl + scroll to zoom, and print
+- **Reports**: fleet use, days per mission, crew load and how much flying was fully crewed, and **Export to Excel**
+- **Phone-friendly**: card lists, full-screen forms and the back button stepping back through what you opened
+- **Guide**: how each part works, step-by-step answers for everyday jobs and a key to the colors
+- **Data safety**: a copy every day for a month in the desktop app, backups you can save and restore, and undo
+</details>
 
 ## What people use it for
 
 | | |
 |---|---|
-| **Contracts** | Fire season standby, medevac standby, utility patrol, survey work, lifts |
-| **Crew** | 14-day hitches, seat coverage, days off, qualifications by type |
-| **Fleet** | Who's flying which tail, inspections, repairs, aircraft use |
-| **Training** | NVG, mountain flying, over water, renewals coming up |
+| **Contracts** | fire season standby, medevac standby, utility patrol, survey work, external load and lift jobs |
+| **Crew** | 14-day hitches, seat coverage, days off, type ratings, time off and sick calls |
+| **Fleet** | which tail flies which job, inspections, repairs, aircraft use, taking on new work |
+| **Training** | NVG, mountain flying, over water, recurrent training, renewals coming up |
 
-## Server
+## Running on a server
 
 For a team: everyone signs in to the same plan from their own browser. Admins decide who has access.
 
@@ -79,29 +124,17 @@ In the desktop app, in a file in the app's data folder on that computer, with a 
 </details>
 
 <details>
-<summary><b>Windows or macOS warns about the installer</b></summary>
+<summary><b>Windows or macOS warns about the app. Is it safe?</b></summary>
 
-The installers aren't signed with a paid certificate yet. On Windows choose **More info > Run anyway**.
+That warning appears for apps that aren't signed with a paid certificate yet. The installers are built by GitHub straight from the code in this repository. On Windows choose **More info > Run anyway**.
 
 On a Mac, open the `.dmg` and drag **Zom's MRP** to **Applications**. The first time you open it, macOS says it can't check it: choose **Done**, then go to **System Settings > Privacy & Security**, scroll down to the message about Zom's MRP and choose **Open Anyway**. On macOS 14 or older, right-clicking the app and choosing **Open** also works. After that it opens normally. The Mac app runs on Apple silicon and Intel Macs with macOS 10.15 or later.
-</details>
-
-<details>
-<summary><b>Where's the demo data?</b></summary>
-
-Only in the [online demo](https://zombeatz.github.io/Zoms_MRP/), which keeps it in your browser. The app itself opens empty, ready for your own operation.
 </details>
 
 <details>
 <summary><b>How does it decide someone can't fly a mission?</b></summary>
 
 They need to be qualified on the aircraft's type, free (not booked elsewhere or on time off), and current on the training the mission needs, for the whole of their hitch. Hitch length and days off come from **Settings > Hitches and days off**.
-</details>
-
-<details>
-<summary><b>Can several people use it at once?</b></summary>
-
-Yes, with the server (above). Everyone signs in to the same plan. On one computer, use the app on its own and **Export to Excel** to share it.
 </details>
 
 <details>
@@ -159,8 +192,8 @@ Without Apple secrets, the Mac app is ad-hoc signed and people open it once with
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE). Icons are [Lucide](https://lucide.dev) (ISC). The names Zom's MRP and ZomBeatz Media and their logos aren't covered by the license.
 
 ## Contact
 
-info@zombeatzmedia.com
+Made by **ZomBeatz Media** · [info@zombeatzmedia.com](mailto:info@zombeatzmedia.com)
