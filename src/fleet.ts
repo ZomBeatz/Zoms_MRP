@@ -109,7 +109,7 @@ function pilotFree(data: AppData, p: Person, type: string, day: number, training
   const end = dayAt(day, 1);
   if (!p.quals.includes(type)) return false;
   if (dutyOf(data, p.id).some((d) => overlaps(day, end, d.a, d.b))) return false;
-  if (data.timeOff.some((t) => t.personId === p.id && overlaps(day, end, ms(t.start), ms(t.end)))) return false;
+  if (data.timeOff.some((t) => t.personId === p.id && !t.soft && overlaps(day, end, ms(t.start), ms(t.end)))) return false;
   return training.every((id) => {
     const t = data.trainings.find((x) => x.id === id);
     return !t || (t.appliesTo !== "Both" && t.appliesTo !== "Pilot") || trainingStatus(p, id, day, end).state === "ok";

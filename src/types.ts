@@ -157,6 +157,8 @@ export interface Shift {
   end: When;
   /** The shift this one takes over from (a handover on the same job), so dragging one end moves the right person. */
   after?: ID;
+  /** A note for whoever's on it ("Bring the cold-weather kit"), shown on the schedule. */
+  note?: string;
 }
 
 export type JobKind = "Inspection" | "Repair" | "Pre-flight" | "Other";
@@ -181,6 +183,11 @@ export interface TimeOff {
   start: When;
   end: When;
   reason: string;
+  /**
+   * Only a preference: they'd rather not work these days but can. Fill and Rebalance book someone else
+   * when they can; it's never a problem if they're booked anyway.
+   */
+  soft?: boolean;
 }
 
 /**

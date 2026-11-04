@@ -26,7 +26,7 @@ export function report(data: AppData, from: number, to: number) {
 
   const crew = data.people.map((p) => {
     const on = dutyOf(data, p.id).reduce((t, d) => t + clip(d.a, d.b, from, to), 0) / DAY;
-    const off = data.timeOff.filter((t) => t.personId === p.id).reduce((t, o) => t + clip(ms(o.start), ms(o.end), from, to), 0) / DAY;
+    const off = data.timeOff.filter((t) => t.personId === p.id && !t.soft).reduce((t, o) => t + clip(ms(o.start), ms(o.end), from, to), 0) / DAY;
     return { p, on, off };
   });
 

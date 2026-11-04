@@ -81,7 +81,7 @@ export function balanceStats(data: AppData, from: number, to: number): BalanceSt
   const issues = findIssues(data).filter((i) => i.at >= from && i.at < to && !/^[pm]gap-/.test(i.id));
   const people = data.people.map((p): PersonLoad => {
     const on = dutyOf(data, p.id).reduce((t, x) => t + clip(x.a, x.b, from, to), 0) / DAY;
-    const off = data.timeOff.filter((t) => t.personId === p.id).reduce((t, x) => t + clip(ms(x.start), ms(x.end), from, to), 0) / DAY;
+    const off = data.timeOff.filter((t) => t.personId === p.id && !t.soft).reduce((t, x) => t + clip(ms(x.start), ms(x.end), from, to), 0) / DAY;
     const can = Math.max(1, days - off);
     return { person: p, on, off, share: on / can };
   });

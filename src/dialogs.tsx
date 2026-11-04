@@ -767,6 +767,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
                         {choices(role, s).map((c) => <option key={c.person.id} value={c.person.id}>{c.person.name}{why(c)}</option>)}
                       </select>
                     </Field>
+                    <Field label="Note"><input value={s.note ?? ""} placeholder="Bring the cold-weather kit" onChange={(e) => updateShift(s.id, { note: e.target.value || undefined })} /></Field>
                     {/* Pilots fly inside the season; maintainers may come early or stay late for pre-flight. */}
                     <DateFields start={s.start} end={s.end} onChange={(start, end) => updateShift(s.id, { start, end })}
                       min={role === "Pilot" ? season.start : undefined} max={role === "Pilot" ? season.end : undefined}
@@ -781,7 +782,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
               return (
                 <button key={s.id} className={`line ${flagged.has(s.id) ? "flag" : ""}`} data-spot={`shift:${s.id}`} onClick={() => setEditingShift(s.id)} title={flagged.has(s.id) ? "There's a problem with this shift. See Problems." : "Change or remove"}>
                   {p ? <Avatar person={p} /> : <span className="avatar">?</span>}
-                  <span className="name">{p?.name ?? "Someone deleted"}</span>
+                  <span className="name">{p?.name ?? "Someone deleted"}{s.note && <span className="small muted" style={{ display: "block", fontWeight: 400 }}>{s.note}</span>}</span>
                   <span className="when">{fmtSpan(s.start, s.end, true)}</span>
                 </button>
               );
@@ -1300,6 +1301,10 @@ function TimeOffDialog({ id, defaults, fix = {} }: Props) {
           </select>
         </Field>
         <DateFields spot="dates" start={t.start} end={t.end} onChange={(start, end) => set({ start, end })} />
+        <label className="check full">
+          <input type="checkbox" checked={!!t.soft} onChange={(e) => set({ soft: e.target.checked })} />
+          Only a preference: they'd rather not work these days, but can be booked
+        </label>
         <Field label="Reason" full><input value={t.reason} placeholder="Vacation, training, sick…" onChange={(e) => set({ reason: e.target.value })} /></Field>
       </div>
     </Dialog>
