@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { migrate } from "./migrate";
+import { migrate, restoredSettings } from "./migrate";
 
 describe("older saves", () => {
   it("turns same-named dated missions into one mission with seasons", () => {
@@ -38,5 +38,21 @@ describe("older saves", () => {
     const d = migrate({ version: 1, aircraft: [], trainings: [], people: [], missions: [], seasons: [], shifts: [], jobs: [], timeOff: [], settings: { flightLimit: { hours: 100, days: 30 } } });
     expect(d.settings.flightLimits).toEqual([{ hours: 100, days: 30 }]);
     expect("flightLimit" in d.settings).toBe(false);
+  });
+});
+
+describe("restoring a backup", () => {
+  it("brings the plan's rules and keeps this device's look", () => {
+    const here = { ...migrate({ missions: [], aircraft: [] }).settings, theme: "dark" as const, sidebarCollapsed: true };
+    const backup = {
+      ...migrate({ missions: [], aircraft: [] }).settings, theme: "light" as const, sidebarCollapsed: false,
+      flightLimits: [{ hours: 100, days: 30 }], minRestHours: 12, ruleSets: [{ id: "ems", name: "EMS", maxDaysOn: 7, minDaysOff: 7 }],
+    };
+    const s = restoredSettings(here, backup);
+    expect(s.flightLimits).toEqual([{ hours: 100, days: 30 }]);
+    expect(s.minRestHours).toBe(12);
+    expect(s.ruleSets.map((r) => r.id)).toEqual(["ems"]);
+    expect(s.theme).toBe("dark");
+    expect(s.sidebarCollapsed).toBe(true);
   });
 });

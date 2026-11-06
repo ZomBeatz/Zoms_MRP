@@ -67,3 +67,12 @@ export function migrate(raw: any): AppData {
   if (!["missions", "aircraft", "people"].includes(settings.scheduleGroup)) settings.scheduleGroup = "aircraft";
   return { ...d, settings };
 }
+
+/**
+ * Settings after restoring a backup: the plan's rules come with it (hitch, duty, rest and flight limits,
+ * kinds of contract that its missions point at, maintenance, preferences); how this device shows things stays.
+ */
+export function restoredSettings(here: AppData["settings"], backup: AppData["settings"]): AppData["settings"] {
+  const { theme, sidebarCollapsed, scheduleSpan, scheduleGroup } = here;
+  return { ...backup, theme, sidebarCollapsed, scheduleSpan, scheduleGroup };
+}
