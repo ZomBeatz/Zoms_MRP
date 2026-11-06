@@ -675,9 +675,18 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 .quickfind-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--zb-border); }
 .quickfind-bar input { flex: 1; border: none; box-shadow: none; background: transparent; font-size: 16px; }
 .quickfind-list { max-height: 60vh; overflow-y: auto; }
-.quickfind-hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 10px 14px; text-align: left; }
+.quickfind-hit { display: flex; align-items: center; gap: 8px; width: 100%; padding-right: 12px; }
 .quickfind-hit.on, .quickfind-hit:hover { background: var(--zb-surface-2); }
+.quickfind-open { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: 1; min-width: 0; padding: 10px 14px; text-align: left; }
+.quickfind-open b { display: inline-flex; align-items: center; gap: 6px; }
+.quickfind-docs { display: inline-flex; align-items: center; gap: 4px; color: var(--zb-accent); white-space: nowrap; text-decoration: none; }
+.quickfind-docs:hover { text-decoration: underline; }
 .find-item { margin-top: 4px; }
+
+/* ---------- The note on a new page: shown on the first few visits, then gone ---------- */
+.page-note { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 12px; border: 1px solid var(--zb-border); border-left: 3px solid var(--zb-accent); border-radius: var(--zb-radius); background: var(--zb-accent-soft); }
+.page-note p { margin: 2px 0 0; font-size: 13px; min-width: min(100%, 260px); flex-basis: 260px; }
+.page-note .icon-btn { margin-left: auto; }
 @media (max-width: 700px), (max-height: 500px) { .quickfind-back { padding-top: 12px; } }
 
 /* ---------- Trimming a shift: grab either end (the cursor turns into ↔), a handover moves together ---------- */

@@ -1,5 +1,24 @@
 # Changelog
 
+## Next version
+
+**Crew planner**
+- A **Crew planner** page works out how few pilots a job takes and the rotation that does it: put in the dates, each aircraft with its type, hours staffed a day and flight hours, and the rules. It shows the arithmetic in plain words, what one rule change would save, what one more pilot would buy, and the cost.
+- Each aircraft type is planned on its own, since only rated pilots can fly it, and 24-hour aircraft can ask for a night-qualified pilot (pick the course, such as NVG).
+- Start from a season (or **Work out the crew** on its Pilots tab) to pick real pilots for each line and **Book** it.
+- **Several jobs** adds up the coming jobs, type by type, against the pilots rated on each.
+
+**Work limits**
+- **Flight-hour limits** per pilot, as many as you need (100 in 30, 1,000 in 365). The checks flag a pilot who'd go over, and Fill, Rebalance and the planner keep under them. A shift can take the **Flight hours flown** from the logbook. The Overview asks once whether your pilots have one.
+- **Rest between duty days**: a season whose duty day leaves less is flagged.
+- **Kinds of contract** (Settings): named days on and off, such as EMS or fire, that a mission can pick instead of the rules for everyone.
+- **Restore a backup** now brings all of the plan's rules with it: flight-hour limits, rest, kinds of contract, maintenance and preferences.
+
+**Help**
+- **Find** also finds pages and the Guide's topics and How do I… answers, with a link to each one's page in the online guide at docs.zombeatzmedia.com.
+- New pages (Crew planner, Balance, Inspections) show a short note on where to start, with **Show me how** and the online guide. It goes away after a few visits, or when it's closed.
+- The Guide links each section to the online guide, and has answers for working out a crew, setting a flight-hour limit and kinds of contract.
+
 ## 0.2.3
 
 **Setting up and sharing**

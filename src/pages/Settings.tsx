@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
 import type { ImportPlan } from "../importer";
-import { migrate } from "../migrate";
+import { migrate, restoredSettings } from "../migrate";
 import { downloadWorkbook } from "../excel";
 import { dataFolder, openDataFolder, saveFile, showInFolder } from "../files";
 import { isDesktopApp, isOnlineDemo, isServerBuild, withDemo } from "../platform";
@@ -62,9 +62,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
       const raw = JSON.parse(await f.text());
       if (!Array.isArray(raw.missions) || !Array.isArray(raw.aircraft)) throw new Error();
       const d = migrate(raw); // backups from older versions open too
-      // The plan's rules come with it (hitch limits, training warnings); the look stays this device's.
-      const settings = { ...data.settings, rules: d.settings.rules, expiryWarningDays: d.settings.expiryWarningDays };
-      change(() => ({ ...d, settings }), `Restored “${f.name}”`);
+      change(() => ({ ...d, settings: restoredSettings(data.settings, d.settings) }), `Restored “${f.name}”`);
     } catch {
       showToast("That file isn't a Zom's MRP backup.");
     }

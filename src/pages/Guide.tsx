@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
-import { CheckCircle2, Clock, PlayCircle } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
+import { CheckCircle2, Clock, ExternalLink, PlayCircle } from "lucide-react";
 import { LESSONS, TOURS, useTour, type Tour } from "../tour";
 import { useStore } from "../store";
 import { isDesktopApp, isOnlineDemo, isServerBuild, withDemo } from "../platform";
+import { SECTION_DOCS, docsUrl, takeGuideTarget } from "../help";
 
 const mac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 const mod = mac ? "⌘" : "Ctrl";
@@ -23,7 +24,33 @@ export const SHORTCUTS: [string, string][] = [
 ];
 
 /** Everyday jobs, as short step lists. Keep the names of buttons and tabs exactly as they are in the app. */
-const RECIPES: { q: string; steps: ReactNode[] }[] = [
+export const RECIPES: { q: string; steps: ReactNode[] }[] = [
+  {
+    q: "Work out how many pilots a job needs",
+    steps: [
+      <>Go to <b>Crew planner</b> and pick <b>One job</b>. To plan a season you have, pick it under <b>Start from a season</b> (or press <b>Work out the crew</b> on its <b>Pilots</b> tab).</>,
+      <>Put in the first and last day, and each aircraft with its type, <b>Hours staffed a day</b> and <b>Flight hours a day</b>.</>,
+      <>Check the <b>Rules</b>: days in camp, days off, travel days, duty day, rest and flight-hour limits.</>,
+      <>Read <b>Pilots needed</b> and the <b>Why</b> under it. Change a rule to see what it saves.</>,
+      <>Started from a season? Pick a pilot on each line of the rotation and press <b>Book</b>.</>,
+    ],
+  },
+  {
+    q: "Set a flight-hour limit, like 100 hours in 30 days",
+    steps: [
+      <>Go to <b>Settings › Hitches and days off</b>.</>,
+      <>Under <b>Most flight hours</b>, press <b>Add a limit</b> and type the hours and the days. Add as many as you need, such as 1,000 in 365.</>,
+      <>Pilots who'd go over are flagged, and Fill the schedule, Rebalance and the Crew planner keep under it. Once a shift is flown, type its <b>Flight hours flown</b> so the real hours count.</>,
+    ],
+  },
+  {
+    q: "Give one kind of work its own days on and off",
+    steps: [
+      <>Go to <b>Settings › Kinds of contract</b> and press <b>Add a kind of contract</b>. Name it, like <b>EMS</b>, and set its days on and off.</>,
+      <>Open each mission of that kind and, on <b>Details</b>, pick it as its <b>Kind of contract</b>, then <b>Save</b>.</>,
+      <>Those missions use its days instead of the ones in Settings. A person's own limits still apply to them.</>,
+    ],
+  },
   {
     q: "A customer wants more days",
     steps: [
@@ -192,7 +219,9 @@ const RECIPES: { q: string; steps: ReactNode[] }[] = [
   },
 ];
 
-const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] = [
+export const recipeId = (q: string) => `r-${q.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+
+export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] = [
   {
     id: "flow", title: "How it's meant to be used",
     body: (
@@ -220,7 +249,7 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
         <p>The everyday jobs, step by step. Tap one to open it.</p>
         <div className="recipes">
           {RECIPES.map((r) => (
-            <details key={r.q} className="recipe">
+            <details key={r.q} id={`guide-${recipeId(r.q)}`} className="recipe">
               <summary>{r.q}</summary>
               <ol>{r.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
             </details>
@@ -462,9 +491,25 @@ export function Setup() {
 export function Guide() {
   const start = useTour((s) => s.start);
   const demo = useStore((s) => s.demo);
+  // Opened from Find or a page's note: go to that section, and open a How do I… answer.
+  useEffect(() => {
+    const show = () => {
+      const id = takeGuideTarget();
+      const el = id && document.getElementById(`guide-${id}`);
+      if (!el) return;
+      if (el instanceof HTMLDetailsElement) el.open = true;
+      el.scrollIntoView({ block: "start" });
+    };
+    show();
+    window.addEventListener("mrp-guide-target", show);
+    return () => window.removeEventListener("mrp-guide-target", show);
+  }, []);
   return (
     <div className="guide">
-      <div className="page-head"><h1>Guide</h1></div>
+      <div className="page-head">
+        <h1>Guide</h1>
+        <a className="btn sm" href={docsUrl()} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Full guide online</a>
+      </div>
 
       {withDemo ? (
         <>
@@ -494,6 +539,7 @@ export function Guide() {
           <div className="row gap-sm wrap">
             <h2 className="grow">{s.title}</h2>
             {s.tour && withDemo && <button className="btn sm" onClick={() => start(s.tour!)}><PlayCircle size={14} /> Show me</button>}
+            {SECTION_DOCS[s.id] !== undefined && <a className="btn sm ghost" href={docsUrl(SECTION_DOCS[s.id])} target="_blank" rel="noreferrer"><ExternalLink size={14} /> More online</a>}
           </div>
           {s.body}
         </section>

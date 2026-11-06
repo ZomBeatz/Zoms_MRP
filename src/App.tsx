@@ -26,6 +26,7 @@ import { Welcome } from "./pages/Welcome";
 import { Guide } from "./pages/Guide";
 import { TourOverlay } from "./tour";
 import { QuickFind } from "./components/QuickFind";
+import { PageNote } from "./components/PageNote";
 
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
@@ -193,6 +194,7 @@ export default function App() {
           </div>
         )}
         <div className="page">
+          <PageNote key={page} page={page} />
           {page === "overview" && <Overview issues={issues} />}
           {page === "schedule" && <Schedule issues={issues} />}
           {page === "missions" && <Missions issues={issues} />}
