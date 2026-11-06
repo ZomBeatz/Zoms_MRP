@@ -88,6 +88,7 @@ jobs:
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
         run: |
           if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
@@ -98,6 +99,19 @@ jobs:
             echo "::error::TAURI_SIGNING_PRIVATE_KEY is set but the TAURI_UPDATER_PUBKEY variable isn't (README, Updates)."
             exit 1
           fi
+          # Try the key before the long build: the password has to open it, and the public key in the
+          # variable has to be its other half (the same key ID), or installed apps would refuse the update.
+          printf 'zoms-mrp' > "$RUNNER_TEMP/key-check.txt"
+          if ! npx tauri signer sign "$RUNNER_TEMP/key-check.txt" < /dev/null > /dev/null; then
+            echo "::error::The updater key didn't open: check TAURI_SIGNING_PRIVATE_KEY_PASSWORD (README, Updates)."
+            exit 1
+          fi
+          node -e '
+            const id = (b64) => Buffer.from(Buffer.from(b64.trim(), "base64").toString().split("\n")[1], "base64").subarray(2, 10).toString("hex");
+            const sig = id(require("fs").readFileSync(process.argv[1], "utf8")), pub = id(process.env.PUBKEY);
+            if (sig !== pub) { console.log("::error::TAURI_UPDATER_PUBKEY is not the public half of TAURI_SIGNING_PRIVATE_KEY (README, Updates)."); process.exit(1); }
+            console.log(`::notice::Updater key works (key ID ${pub}).`);
+          ' "$RUNNER_TEMP/key-check.txt.sig"
           node -e 'require("fs").writeFileSync("src-tauri/tauri.updater.conf.json", JSON.stringify({ bundle: { createUpdaterArtifacts: true }, plugins: { updater: { pubkey: process.env.PUBKEY.trim() } } }))'
           echo "UPDATER_ARGS=--config src-tauri/tauri.updater.conf.json" >> "$GITHUB_ENV"
 
