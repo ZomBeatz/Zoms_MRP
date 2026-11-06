@@ -3,6 +3,7 @@ import { dutyOf, missionCoverage, requiredTraining, trainingStatus } from "./cov
 import { onRotation, seasonTypes } from "./rotation";
 import { seasonRules, stricter } from "./limits";
 import { staleOn } from "./currency";
+import { flightLimits, flightSpans, overLimit, pilotHoursPerDay } from "./flight";
 import { DAY, dayAt, ms, overlaps, toWhen, uid } from "./time";
 
 /**
@@ -12,7 +13,7 @@ import { DAY, dayAt, ms, overlaps, toWhen, uid } from "./time";
  * one of the job's aircraft types, current on its training, not booked, not on time off, on their own
  * rotation if they have one, and rested for the job's days off since their last stretch here. They stay
  * on for the job's "on" days, or until they stop being available (time off, their own rotation, another
- * booking), whichever comes first. The mission's regular crew go first, then whoever has worked least.
+ * booking, or the flight-hour limit in Settings), whichever comes first. The mission's regular crew go first, then whoever has worked least.
  * Days nobody can cover stay open, so the gaps show.
  */
 export function fillSeason(data: AppData, season: Season, role: Role, rotation: Rotation | null,
@@ -81,7 +82,11 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     const gap = Math.round(((x >= b ? x - b : a - y) / DAY) * 10) / 10;
     return (x >= b || y <= a) && gap > 0 && gap < limitsOf(p).minDaysOff;
   });
-  const fits = (p: Person, a: number, b: number) => stretch(p, a, b) <= limitsOf(p).maxDaysOn && !shortRest(p, a, b);
+  // Pilots: no more flight hours in any window than allowed (Settings), counting this job's flying.
+  const limited = role === "Pilot" && flightLimits(data).length > 0;
+  const perDay = limited ? pilotHoursPerDay(data, season) : 0;
+  const flies = (p: Person, a: number, b: number) => !perDay || !overLimit(data, [...flightSpans(current, p.id), { a, b, perDay }]);
+  const fits = (p: Person, a: number, b: number) => stretch(p, a, b) <= limitsOf(p).maxDaysOn && !shortRest(p, a, b) && flies(p, a, b);
 
   const pool = data.people
     .filter((p) => p.role === role && !opts.skip?.has(p.id) && (!types.length || types.some((t) => p.quals.includes(t))))

@@ -47,4 +47,14 @@ describe("work limits", () => {
     expect(added.every((s) => Math.round((new Date(s.end).getTime() - new Date(s.start).getTime()) / 86_400_000) <= 10)).toBe(true);
     expect(findIssues({ ...data, shifts: added }).some((i) => i.id.startsWith("duty-"))).toBe(false);
   });
+
+  it("uses a mission's kind of contract instead of Settings, looser or stricter", () => {
+    const data = emptyData();
+    data.settings.rules = { maxDaysOn: 14, minDaysOff: 7 };
+    data.settings.ruleSets = [{ id: "fire", name: "Fire", maxDaysOn: 21, minDaysOff: 14 }];
+    data.missions = [{ id: "m", name: "Fire", contact: "", location: "", requiredTrainingIds: [], color: "#000", pattern: "solid", notes: "", ruleSetId: "fire" }];
+    expect(seasonRules(data, { missionId: "m" })).toEqual({ maxDaysOn: 21, minDaysOff: 14 });
+    data.missions[0].limits = { maxDaysOn: 18 };
+    expect(seasonRules(data, { missionId: "m" })).toEqual({ maxDaysOn: 18, minDaysOff: 14 });
+  });
 });

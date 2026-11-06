@@ -369,11 +369,19 @@ const SECTIONS: { id: string; title: string; tour?: string; body: ReactNode }[] 
   },
   {
     id: "limits", title: "Work limits",
-    body: <p>Settings › Hitches and days off sets the rule for everyone. A person, a mission and a season can each have <b>Own limits</b> under Work limits; the safest wins (the fewest days on, the most days off). A season can tick <b>Override</b> to use its own numbers instead of the mission's and Settings', but a person's own limits always apply to them. The checks, Fill the schedule and Rebalance all follow them.</p>,
+    body: <p>Settings › Hitches and days off sets the rule for everyone, with the rest between duty days and flight-hour limits. <b>Kinds of contract</b> (Settings) are named limits such as EMS or fire; a mission that picks one uses them instead. A person, a mission and a season can each have <b>Own limits</b> under Work limits; the safest wins (the fewest days on, the most days off). A season can tick <b>Override</b> to use its own numbers instead of the mission's and Settings', but a person's own limits always apply to them. The checks, Fill the schedule and Rebalance all follow them.</p>,
   },
   {
     id: "balance", title: "Balance",
     body: <p>How busy everyone is over a period, and a way to make the most of them. Each person's bar is the share of the days they can work (time off doesn't count) that they're booked: red is very busy, green busy, blue light, grey hardly used. Try other crew sizes for a job, lock jobs or people that should stay as they are, and press <b>Rebalance</b>. It keeps the shifts that are there, fills open seats and starts over for jobs whose size you changed (or for every job, with <b>Start over for every job</b>), on the same rules as Fill the schedule. Before and after numbers show what it changes; nothing is saved until <b>Apply</b>.</p>,
+  },
+  {
+    id: "planner", title: "Crew planner",
+    body: <>
+      <p><b>One job:</b> how few pilots a job takes, and the rotation that does it. Put in the dates, each aircraft with its type, how many hours a day it's staffed and its flight hours, and the rules: most days in camp, fewest days off, travel days each way (they count as days on, not off), the longest duty day, the rest between duty days, and flight-hour limits such as 100 hours in 30 days and 1,000 in 365. A 24-hour aircraft with 14-hour duty days needs two pilots a day; tick <b>The night pilot needs to be night qualified</b> and pick the course that means it (NVG). Only pilots rated on a type can fly it, so each type (and its night seats) is planned on its own, with how many of your pilots can take those seats.</p>
+      <p>It shows the number with the arithmetic in plain words, what one rule change would save, what one more pilot would buy, and the cost: pilot pay per day away, flight hours at each aircraft's cost, and what the customer pays. Start from a season (or press <b>Work out the crew</b> on a season's Pilots tab) to pick real pilots for each line and <b>Book</b> it.</p>
+      <p><b>Several jobs:</b> the coming jobs together. Each job's pilots are counted for its whole run and added up day by day, for each type, against the pilots rated on it. Untick a job to see the year without it.</p>
+    </>,
   },
   {
     id: "reports", title: "Reports and Excel",

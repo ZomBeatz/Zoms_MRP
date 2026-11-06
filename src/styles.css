@@ -724,3 +724,58 @@ body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
 /* Several seasons at once. */
 .pick-season { margin-left: 12px; width: 18px; height: 18px; flex: none; }
 .bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; margin-bottom: 8px; border-radius: var(--zb-radius); background: var(--zb-accent-soft); }
+
+/* Crew planner */
+.planner { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+.planner-form { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.planner-form select { width: 100%; min-width: 0; }
+.planner-result { min-width: 0; }
+.planner-form .panel h3, .planner-why h3 { margin-top: 0; }
+.planner-aircraft { display: flex; flex-direction: column; gap: 8px; }
+.planner-ac { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--zb-border); }
+.planner-ac:last-child { border-bottom: 0; padding-bottom: 0; }
+.planner-ac-head { display: flex; gap: 8px; align-items: center; }
+.planner-ac-head input { flex: 1; min-width: 0; font-weight: 600; }
+.planner-ac-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.planner-ac-fields label { display: flex; flex-direction: column; gap: 2px; }
+.planner-ac-fields input { width: 64px; }
+.planner-seats { color: var(--zb-text-2); }
+.planner-tiles .planner-big { font-size: 40px; color: var(--zb-accent); line-height: 1.1; }
+.planner-tiles .planner-rot { font-size: 20px; }
+.planner-why ul { margin: 0 0 10px; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+.planner-ifs { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.planner-if { display: flex; gap: 8px; align-items: flex-start; background: var(--zb-surface-2); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+.planner-if svg { flex: none; margin-top: 2px; color: var(--zb-accent); }
+.planner-board { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.planner-row { display: grid; grid-template-columns: minmax(130px, 220px) 1fr; gap: 10px; align-items: center; min-height: 30px; }
+.planner-name { display: flex; flex-direction: column; min-width: 0; }
+.planner-name select { max-width: 100%; }
+.planner-track { position: relative; height: 22px; background: var(--zb-surface-2); border-radius: 4px; }
+.planner-marks .planner-track { background: none; height: 18px; }
+.planner-mark { position: absolute; top: 0; white-space: nowrap; border-left: 1px solid var(--zb-border); padding-left: 4px; }
+.planner-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; background: var(--zb-accent); min-width: 2px; }
+.planner-book { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+.warn-text { color: var(--zb-warn); }
+@media (max-width: 900px) {
+  .planner { grid-template-columns: minmax(0, 1fr); }
+  .planner-result { order: -1; }
+}
+@media (max-width: 560px) {
+  .planner-row { grid-template-columns: 1fr; gap: 2px; }
+  .planner-marks > span:first-child { display: none; }
+}
+.planner-group { border-top: 1px solid var(--zb-border); padding-top: 8px; margin-top: 8px; }
+.planner-group h4 { margin: 0 0 6px; font-size: 14px; }
+.planner-group-head { margin: 8px 0 2px; color: var(--zb-text-2); }
+.planner-cost { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--zb-text-2); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--zb-border); }
+.planner-limits { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.planner-ac-fields select { min-width: 110px; }
+.planner-bar.travel { background: var(--zb-text-3, var(--zb-text-2)); opacity: .45; }
+.planner-bar-swatch { background: var(--zb-accent); }
+.planner-bar-swatch.travel { background: var(--zb-text-2); opacity: .45; }
+.planner-jobs { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+.planner-job { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.planner-job:hover { background: var(--zb-surface-2); }
+.rule-set { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
+.rule-set > input { width: 140px; }
+.rule-set .rotation input { width: 64px; }

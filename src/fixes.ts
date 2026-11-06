@@ -44,6 +44,7 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
   switch (type) {
     case "time": return season("Fix the dates", "details", "dates");
     case "dutyh": return season("Change the duty day", "details", "duty");
+    case "resth": return season("Change the duty day", "details", "duty");
     case "noac": return season("Pick an aircraft", "details", "aircraft");
     case "acstat": return [
       ...season("Pick another aircraft", "details", "aircraft"),
@@ -78,6 +79,7 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
     ];
     case "duty": return booking("Rotate someone in", i.seasonId, i.shiftId, i.jobId);
     case "rest": return booking("Move this booking", i.seasonId, i.shiftId, i.jobId);
+    case "fly": return booking("Rotate someone in", i.seasonId, i.shiftId);
     case "train": return [...who("Record the training", "training", `training:${i.trainingId}`), ...shift("Swap them out"), ...extendIt()];
     case "lapsed": return [...who("Record the training", "training", `training:${i.trainingId}`), ...extendIt()];
     case "curr": return [...shift("Swap them out"), ...who("Record when they last flew", "work", "flew")];

@@ -59,6 +59,10 @@ export function migrate(raw: any): AppData {
   d.programs = d.programs ?? [];
   d.ignored = d.ignored ?? [];
   const settings = { ...defaultSettings(), ...d.settings, rules: { ...defaultSettings().rules, ...d.settings?.rules }, maintenance: { ...defaultSettings().maintenance, ...d.settings?.maintenance } };
+  // 0.2.4: several flight-hour limits (the one from before, if it was set).
+  const old = (d.settings as { flightLimit?: { hours: number; days: number } } | undefined)?.flightLimit;
+  settings.flightLimits = Array.isArray(d.settings?.flightLimits) ? d.settings.flightLimits : old && old.hours > 0 ? [{ hours: old.hours, days: old.days || 30 }] : [];
+  delete (settings as { flightLimit?: unknown }).flightLimit;
   settings.scheduleSpan = Math.min(365, Math.max(7, Math.round(Number(settings.scheduleSpan) || 30)));
   if (!["missions", "aircraft", "people"].includes(settings.scheduleGroup)) settings.scheduleGroup = "aircraft";
   return { ...d, settings };

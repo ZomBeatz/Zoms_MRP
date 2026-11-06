@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, CopyPlus, Download, Plus, Trash2, Wand2 } from "lucide-react";
+import { Calculator, Check, CopyPlus, Download, Plus, Trash2, Wand2 } from "lucide-react";
+import { planSeason } from "./pages/Planner";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
 import { keepForm, keptForm, useStore } from "./store";
@@ -11,7 +12,7 @@ import { SWATCHES, missionLook, slotStyle } from "./look";
 import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useDirty, useGuardedClose, useSpot } from "./components/ui";
 import { bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
-import { rulesFor, seasonRules, stricter } from "./limits";
+import { baseRules, rulesFor, seasonRules, stricter } from "./limits";
 import { flightHours } from "./program";
 import { daysSince } from "./currency";
 import { ConfirmButton, IssueList } from "./pages/Overview";
@@ -240,7 +241,15 @@ function MissionDialog({ id, defaults }: Props) {
           </Field>
           <Field label="Contact"><input value={m.contact} placeholder="Who to call" onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="Location"><input value={m.location} onChange={(e) => set({ location: e.target.value })} /></Field>
-          <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this mission" applies={stricter(data.settings.rules, m.limits)} />
+          {(data.settings.ruleSets ?? []).length > 0 && (
+            <Field label="Kind of contract" hint="Its days on and off replace Settings' for this mission (Settings › Kinds of contract).">
+              <select value={m.ruleSetId ?? ""} onChange={(e) => set({ ruleSetId: e.target.value || null })}>
+                <option value="">Settings' limits</option>
+                {data.settings.ruleSets.map((r) => <option key={r.id} value={r.id}>{r.name || "Unnamed"} · {r.maxDaysOn} on, {r.minDaysOff} off</option>)}
+              </select>
+            </Field>
+          )}
+          <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this mission" applies={stricter(baseRules(data, m), m.limits)} />
           <Field label="Charge per day" hint="What the customer pays for a day, for the margin in Reports. Optional.">
             <input type="number" inputMode="decimal" min={0} value={m.dayCharge ?? ""} placeholder="0" onChange={(e) => set({ dayCharge: e.target.value === "" ? null : Number(e.target.value) })} />
           </Field>
@@ -773,6 +782,12 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
             </button>
           )}
           <button className="btn sm" onClick={() => addShift(role)}><Plus size={14} /> Add a {word}</button>
+          {role === "Pilot" && !isNew && (
+            <button className="btn sm ghost" disabled={dirty} title={dirty ? "Save first" : "How few pilots this job takes, and a rotation to book"}
+              onClick={() => { planSeason(season.id); useStore.getState().close(); useStore.getState().go("planner"); }}>
+              <Calculator size={14} /> Work out the crew
+            </button>
+          )}
           {rows.some((r) => r.shift) && need > 0 && <button className="btn sm ghost" onClick={() => fill(role, true)} title={`Remove the ${word} shifts and fill again from scratch`}>Start over</button>}
           <label className="check"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show everyone</label>
         </div>
@@ -802,6 +817,11 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
                       </select>
                     </Field>
                     <Field label="Note"><input value={s.note ?? ""} placeholder="Bring the cold-weather kit" onChange={(e) => updateShift(s.id, { note: e.target.value || undefined })} /></Field>
+                    {role === "Pilot" && ms(s.start) < Date.now() && (
+                      <Field label="Flight hours flown" hint="From the logbook, once flown. Used for the flight-hour limits instead of the plan.">
+                        <input type="number" inputMode="decimal" min={0} step={0.1} value={s.flown ?? ""} placeholder="Planned" onChange={(e) => updateShift(s.id, { flown: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </Field>
+                    )}
                     {/* Pilots fly inside the season; maintainers may come early or stay late for pre-flight. */}
                     <DateFields start={s.start} end={s.end} onChange={(start, end) => updateShift(s.id, { start, end })}
                       min={role === "Pilot" ? season.start : undefined} max={role === "Pilot" ? season.end : undefined}
