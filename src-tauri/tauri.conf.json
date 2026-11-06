@@ -39,5 +39,12 @@
     "windows": {
       "nsis": { "installMode": "currentUser", "displayLanguageSelector": false }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": ["https://github.com/ZomBeatz/Zoms_MRP/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
   }
 }

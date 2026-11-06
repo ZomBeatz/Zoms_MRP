@@ -5,6 +5,7 @@ import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
 import type { ImportPlan } from "../importer";
 import { migrate, restoredSettings } from "../migrate";
+import { UpdateSettings } from "./UpdateSettings";
 import { downloadWorkbook } from "../excel";
 import { dataFolder, openDataFolder, saveFile, showInFolder } from "../files";
 import { isDesktopApp, isOnlineDemo, isServerBuild, withDemo } from "../platform";
@@ -281,6 +282,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
         <section className="panel">
           <h3><Info size={16} /> About</h3>
           <p style={{ margin: "0 0 10px" }}>Zom's MRP (Mission Ready Planner) {__APP_VERSION__}, by ZomBeatz Media. MIT license.</p>
+          {isDesktopApp && <UpdateSettings />}
           <a className="btn sm" href="mailto:info@zombeatzmedia.com?subject=Zom's%20MRP%20feedback">Send feedback</a>
         </section>
       </div>

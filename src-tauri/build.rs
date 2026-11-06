@@ -7,6 +7,8 @@ fn main() {
         "write_excel",
         "save_download",
         "data_folder",
+        "update_mode",
+        "backup_before_update",
     ])))
     .expect("failed to run the Tauri build script");
 }

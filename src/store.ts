@@ -60,7 +60,7 @@ async function flush() {
   saving = false;
 }
 /** Wait until everything sent has been saved (before switching between the demo and own data). */
-const settled = async () => {
+export const allSaved = async () => {
   while (saving) await new Promise((r) => setTimeout(r, 20));
 };
 
@@ -292,7 +292,7 @@ export const useStore = create<State>((set, get) => ({
   setDemo: async (on) => {
     const settings = get().data.settings;
     save(get().data);
-    await settled();
+    await allSaved();
     demo = on;
     try {
       localStorage.setItem(MODE_KEY, on ? "demo" : "real");
@@ -314,7 +314,7 @@ export const useStore = create<State>((set, get) => ({
 
   removeDemo: async () => {
     if (demo) await get().setDemo(false);
-    await settled();
+    await allSaved();
     try {
       localStorage.removeItem(DEMO_KEY);
     } catch { /* nothing to remove */ }

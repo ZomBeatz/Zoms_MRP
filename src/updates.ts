@@ -1,0 +1,127 @@
+import { create } from "zustand";
+import type { Update } from "@tauri-apps/plugin-updater";
+import { isDesktopApp } from "./platform";
+import { allSaved } from "./store";
+
+/**
+ * Updates for the desktop app. A release built with the updater key checks the latest published GitHub
+ * release once a day: it downloads a new version in the background (unless that's switched off) and
+ * installs it when someone presses Restart, so it never closes the app in the middle of something.
+ * Just before installing, the plan is copied to backups/before-<version>.json. A .deb or .rpm install
+ * belongs to the package manager, so those get a link to the release instead. Drafts are never offered:
+ * only a release you've published is "latest".
+ */
+
+/** "auto": downloads and installs. "download": offers the release page. "off": this build doesn't update. */
+export type UpdateMode = "auto" | "download" | "off";
+
+type Status = "idle" | "checking" | "none" | "available" | "downloading" | "ready" | "installing" | "error";
+
+interface UpdateState {
+  mode: UpdateMode;
+  status: Status;
+  /** The new version, when there is one. */
+  version: string | null;
+  /** Downloaded so far, 0 to 1, while downloading. */
+  progress: number;
+  error: string | null;
+  checkedAt: number | null;
+}
+
+export const WHATS_NEW_URL = "https://docs.zombeatzmedia.com/mrp/whats-new";
+const DAY = 86_400_000;
+const AUTO_KEY = "zoms-mrp:updates:auto";
+const LAST_KEY = "zoms-mrp:updates:last";
+const LATER_KEY = "zoms-mrp:updates:later";
+
+// Browser storage holds this device's choices; without it, updates just behave as they do by default.
+const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const write = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* only a convenience */ } };
+
+export const useUpdates = create<UpdateState>(() => ({ mode: "off", status: "idle", version: null, progress: 0, error: null, checkedAt: Number(read(LAST_KEY)) || null }));
+const set = (s: Partial<UpdateState>) => useUpdates.setState(s);
+
+/** Download new versions in the background (on unless switched off in Settings). */
+export const autoDownload = () => read(AUTO_KEY) !== "off";
+export const setAutoDownload = (on: boolean) => write(AUTO_KEY, on ? "on" : "off");
+
+/** "Later" on the note hides it for this version for a few days. */
+export const laterFor = (version: string) => {
+  const [v, at] = (read(LATER_KEY) ?? "").split("|");
+  return v === version && Date.now() - Number(at) < 3 * DAY;
+};
+export const putOff = (version: string) => { write(LATER_KEY, `${version}|${Date.now()}`); set({}); };
+
+let found: Update | null = null;
+
+async function invoke<T>(cmd: string, args?: Record<string, unknown>) {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<T>(cmd, args);
+}
+
+/** When the app opens: find out what this build can do, and check if it's been a day. */
+export async function startUpdates() {
+  if (!isDesktopApp) return;
+  const mode = await invoke<UpdateMode>("update_mode").catch((): UpdateMode => "off");
+  set({ mode });
+  const last = Number(read(LAST_KEY)) || 0;
+  if (mode !== "off" && Date.now() - last > DAY) await checkForUpdate();
+}
+
+/** Ask GitHub for the latest published release. `asked`: someone pressed Check for updates. */
+export async function checkForUpdate(asked = false) {
+  const { mode, status } = useUpdates.getState();
+  if (mode === "off" || status === "checking" || status === "downloading" || status === "installing") return;
+  if (status === "ready" && !asked) return;
+  set({ status: "checking", error: null });
+  try {
+    const { check } = await import("@tauri-apps/plugin-updater");
+    found = await check();
+    const now = Date.now();
+    write(LAST_KEY, String(now));
+    if (!found) return set({ status: "none", version: null, checkedAt: now });
+    set({ status: "available", version: found.version, checkedAt: now });
+    if (mode === "auto" && autoDownload()) await downloadUpdate();
+  } catch (e) {
+    // Offline or GitHub unreachable: say so only when someone asked, and try again tomorrow.
+    set({ status: asked ? "error" : "idle", error: message(e) });
+  }
+}
+
+/** Download the new version in the background; it's installed on Restart. */
+export async function downloadUpdate() {
+  if (!found) return;
+  set({ status: "downloading", progress: 0 });
+  let total = 0, got = 0;
+  try {
+    await found.download((e) => {
+      if (e.event === "Started") total = e.data.contentLength ?? 0;
+      else if (e.event === "Progress") { got += e.data.chunkLength; if (total) set({ progress: got / total }); }
+    });
+    set({ status: "ready", progress: 1 });
+  } catch (e) {
+    set({ status: "error", error: message(e) });
+  }
+}
+
+/**
+ * Install and start the new version: everything saved first, a copy of the plan kept, then the update.
+ * On Windows the installer closes the app itself and opens the new one.
+ */
+export async function installUpdate() {
+  if (!found) return;
+  const { status, version } = useUpdates.getState();
+  set({ status: "installing", error: null });
+  try {
+    await allSaved();
+    await invoke("backup_before_update", { version: version ?? "" });
+    if (status === "ready") await found.install();
+    else await found.downloadAndInstall();
+    const { relaunch } = await import("@tauri-apps/plugin-process");
+    await relaunch();
+  } catch (e) {
+    set({ status: "error", error: message(e) });
+  }
+}
+
+const message = (e: unknown) => (e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.");

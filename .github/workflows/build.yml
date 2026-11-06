@@ -3,6 +3,8 @@
 # Every run keeps the files under the run's "Artifacts"; a tag also makes a draft release with them.
 # The Mac app is ad-hoc signed, so it opens after Privacy & Security › Open Anyway. With the Apple
 # secrets set (see README, "Signing the Mac app"), it's signed with a Developer ID and notarized instead.
+# With the updater key set (README, "Updates"), the installers can update themselves: the release also
+# gets signed update files and latest.json, which the app checks once the release is published.
 name: Desktop app
 
 on:
@@ -79,6 +81,26 @@ jobs:
             if [ -n "${!v}" ]; then { echo "$v<<END_$v"; printf '%s\n' "${!v}"; echo "END_$v"; } >> "$GITHUB_ENV"; fi
           done
 
+      # Updates: with the updater key's secret and its public half (a repository variable), the build
+      # signs update files and the app gets the public key to check them. Without them, nothing changes
+      # and the app doesn't update itself.
+      - name: Updater key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "No updater key: this build won't update itself."
+            exit 0
+          fi
+          if [ -z "$PUBKEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is set but the TAURI_UPDATER_PUBKEY variable isn't (README, Updates)."
+            exit 1
+          fi
+          node -e 'require("fs").writeFileSync("src-tauri/tauri.updater.conf.json", JSON.stringify({ bundle: { createUpdaterArtifacts: true }, plugins: { updater: { pubkey: process.env.PUBKEY.trim() } } }))'
+          echo "UPDATER_ARGS=--config src-tauri/tauri.updater.conf.json" >> "$GITHUB_ENV"
+
       # Running again for the same tag (to sign the Mac app, say) replaces this system's files in the
       # draft release instead of failing because they're already there.
       - name: Remove this system's files from an earlier run
@@ -101,8 +123,10 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ env.UPDATER_ARGS }}
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: "Zom's MRP ${{ github.ref_name }}"
           releaseBody: "Installers for Windows, macOS (Apple silicon and Intel, macOS 10.15 or later) and Linux. The server is the Docker image ghcr.io/zombeatz/zoms-mrp-server; see the README."

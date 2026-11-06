@@ -3,6 +3,10 @@
 //! Linux ~/.local/share/com.zombeatz.zoms-mrp). Each day's first save also keeps a copy in
 //! `backups` (the last 30). It can keep an Excel copy in a folder you pick, such as a Teams
 //! channel's folder synced by OneDrive.
+//!
+//! Updates: a release built with the updater key (see the "Desktop app" workflow) carries the key's
+//! public half in its config, and then the app checks the latest published release and installs it
+//! when asked. A build without it (a local one, or before the key is set up) never checks.
 
 use std::{
     fs,
@@ -109,6 +113,46 @@ fn data_folder(app: AppHandle) -> Result<String, String> {
     Ok(data_dir(&app)?.to_string_lossy().to_string())
 }
 
+/// Whether this build can update itself: "auto" (it can download and install), "download" (a .deb or
+/// .rpm, which the package manager owns, so the page offers the release to download), or "off" (built
+/// without the updater key).
+#[tauri::command]
+fn update_mode(app: AppHandle) -> &'static str {
+    if !updates_signed(&app) {
+        "off"
+    } else if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_none() {
+        "download"
+    } else {
+        "auto"
+    }
+}
+
+/// A copy of the plan just before an update installs, kept beside the daily ones as
+/// `before-<version>.json`. Returns where it went (or nothing when there's no plan yet).
+#[tauri::command]
+fn backup_before_update(app: AppHandle, version: String) -> Result<Option<String>, String> {
+    copy_before_update(&data_dir(&app)?, &version).map(|p| p.map(|p| p.to_string_lossy().to_string()))
+}
+
+fn copy_before_update(dir: &Path, version: &str) -> Result<Option<PathBuf>, String> {
+    let plan = dir.join(PLAN_FILE);
+    if !plan.exists() {
+        return Ok(None);
+    }
+    let backups = dir.join("backups");
+    fs::create_dir_all(&backups).map_err(|e| e.to_string())?;
+    // Only what a version number holds, so the name can't point anywhere else.
+    let version: String = version.chars().filter(|c| c.is_ascii_alphanumeric() || ".-".contains(*c)).take(32).collect();
+    let path = backups.join(format!("before-{}.json", if version.is_empty() { "update" } else { &version }));
+    fs::copy(&plan, &path).map_err(|e| e.to_string())?;
+    Ok(Some(path))
+}
+
+/// The updater's public key is in this build's config (the release workflow adds it).
+fn updates_signed(app: &AppHandle) -> bool {
+    app.config().plugins.0.get("updater").and_then(|u| u.get("pubkey")).and_then(|k| k.as_str()).is_some_and(|k| !k.trim().is_empty())
+}
+
 fn header(request: &tauri::ipc::Request, name: &str) -> Result<String, String> {
     request
         .headers()
@@ -129,7 +173,15 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![load_plan, save_plan, write_excel, save_download, data_folder])
+        .plugin(tauri_plugin_process::init())
+        // Only a build that can check what it downloads gets the updater.
+        .setup(|app| {
+            if updates_signed(app.handle()) {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            }
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![load_plan, save_plan, write_excel, save_download, data_folder, update_mode, backup_before_update])
         .run(tauri::generate_context!())
         .expect("error while running Zom's MRP");
 }
@@ -151,6 +203,21 @@ mod tests {
         let n = fs::read_dir(dir.join("backups")).unwrap().count();
         assert_eq!(n, 30);
         assert!(dir.join("backups").join(format!("mrp-{}.json", today())).exists());
+    }
+
+    #[test]
+    fn a_copy_is_kept_before_an_update() {
+        let dir = std::env::temp_dir().join(format!("mrp-desktop-update-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        assert_eq!(copy_before_update(&dir, "0.2.5").unwrap(), None);
+        fs::write(dir.join(PLAN_FILE), "{\"v\":1}").unwrap();
+        let p = copy_before_update(&dir, "../../0.2.5").unwrap().unwrap();
+        assert_eq!(p, dir.join("backups").join("before-....0.2.5.json"));
+        assert_eq!(fs::read_to_string(p).unwrap(), "{\"v\":1}");
+        // Not one of the daily copies, so the month's pruning leaves it alone.
+        daily_backup(&dir);
+        assert!(dir.join("backups").join("before-....0.2.5.json").exists());
     }
 
     #[test]

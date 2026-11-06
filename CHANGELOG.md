@@ -1,5 +1,13 @@
 # Changelog
 
+## Next version
+
+**Updates**
+- The desktop app can update itself. Once a day it looks for a newer published release, downloads it in the background, and installs it when you press **Restart now** on the note at the top (or **Later** to put it off). It saves everything and keeps a copy of the plan first, in `backups/before-<version>.json`.
+- **Settings > About** has **Check for updates**, and a switch for downloading new versions by themselves.
+- On Linux, a `.deb` or `.rpm` install gets a **Download** link instead, since the package manager owns it; the AppImage updates itself.
+- Versions before this one don't update themselves: install this one by hand once.
+
 ## 0.2.4
 
 **Crew planner**
