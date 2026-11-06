@@ -3,7 +3,7 @@
 
 use crate::{db, err, now, random_hex, sha256_hex, App, ApiResult};
 use argon2::{
-    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{phc::PasswordHash, PasswordHasher, PasswordVerifier},
     Argon2,
 };
 use axum::{
@@ -24,11 +24,10 @@ const MAX_DAYS: i64 = 60;
 const MAX_FAILS: u32 = 5;
 const LOCKOUT: Duration = Duration::from_secs(5 * 60);
 
+/// A PHC string ("$argon2id$v=19$m=…"), with a random salt from the system's random source.
 pub fn hash_password(pw: &str) -> String {
-    let mut b = [0u8; 16];
-    getrandom::fill(&mut b).expect("system random source");
-    let salt = SaltString::encode_b64(&b).expect("salt");
-    Argon2::default().hash_password(pw.as_bytes(), &salt).expect("argon2").to_string()
+    let hash: PasswordHash = Argon2::default().hash_password(pw.as_bytes()).expect("argon2");
+    hash.to_string()
 }
 
 pub fn verify_password(pw: &str, hash: &str) -> bool {

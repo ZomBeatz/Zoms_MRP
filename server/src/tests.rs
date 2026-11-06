@@ -173,3 +173,15 @@ async fn cookies_and_headers_are_strict() {
     assert!(res.headers().get("content-security-policy").unwrap().to_str().unwrap().contains("frame-ancestors 'none'"));
     assert_eq!(res.headers().get("x-frame-options").unwrap(), "DENY");
 }
+
+/// Passwords saved before the update to argon2 0.6 (made with 0.5.3) still sign in, and new hashes check out.
+#[test]
+fn passwords_hashed_by_the_older_library_still_verify() {
+    let old = "$argon2id$v=19$m=19456,t=2,p=1$MDEyMzQ1Njc4OWFiY2RlZg$69I7qCjDTsQwhQqFvpQJiqEI0lGQvxC84fXE0Ktxca4";
+    assert!(crate::auth::verify_password("correct horse battery", old));
+    assert!(!crate::auth::verify_password("wrong horse battery", old));
+    let new = crate::auth::hash_password("correct horse battery");
+    assert!(new.starts_with("$argon2id$"));
+    assert_ne!(new, crate::auth::hash_password("correct horse battery"), "each hash gets its own salt");
+    assert!(crate::auth::verify_password("correct horse battery", &new));
+}
