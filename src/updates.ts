@@ -5,7 +5,7 @@ import { allSaved } from "./store";
 
 /**
  * Updates for the desktop app. A release built with the updater key checks the latest published GitHub
- * release once a day: it downloads a new version in the background (unless that's switched off) and
+ * release when it opens and every few hours while it stays open: it downloads a new version in the background (unless that's switched off) and
  * installs it when someone presses Restart, so it never closes the app in the middle of something.
  * Just before installing, the plan is copied to backups/before-<version>.json. A .deb or .rpm install
  * belongs to the package manager, so those get a link to the release instead. Drafts are never offered:
@@ -30,6 +30,8 @@ interface UpdateState {
 
 export const WHATS_NEW_URL = "https://docs.zombeatzmedia.com/mrp/whats-new";
 const DAY = 86_400_000;
+/** How often to look for a new version: on opening if it's been this long, and again while the app is open. */
+const CHECK_EVERY = 6 * 3_600_000;
 const AUTO_KEY = "zoms-mrp:updates:auto";
 const LAST_KEY = "zoms-mrp:updates:last";
 const LATER_KEY = "zoms-mrp:updates:later";
@@ -59,13 +61,22 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>) {
   return invoke<T>(cmd, args);
 }
 
-/** When the app opens: find out what this build can do, and check if it's been a day. */
+let started = false;
+
+/**
+ * When the app opens: find out what this build can do, then check now and every few hours after, so an
+ * app that's left open for days still hears about a new version.
+ */
 export async function startUpdates() {
-  if (!isDesktopApp) return;
+  if (!isDesktopApp || started) return;
+  started = true;
   const mode = await invoke<UpdateMode>("update_mode").catch((): UpdateMode => "off");
   set({ mode });
-  const last = Number(read(LAST_KEY)) || 0;
-  if (mode !== "off" && Date.now() - last > DAY) await checkForUpdate();
+  if (mode === "off") return;
+  const due = () => Date.now() - (Number(read(LAST_KEY)) || 0) > CHECK_EVERY;
+  // Looked every hour, so a computer that slept through a check catches up soon after it wakes.
+  setInterval(() => { if (due()) void checkForUpdate(); }, 3_600_000);
+  if (due()) await checkForUpdate();
 }
 
 /** Ask GitHub for the latest published release. `asked`: someone pressed Check for updates. */

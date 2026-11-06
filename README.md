@@ -209,7 +209,7 @@ Once, on your own computer:
    - **Secrets:** `TAURI_SIGNING_PRIVATE_KEY` with the contents of `~/.tauri/zoms-mrp.key`, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` with its password.
    - **Variables:** `TAURI_UPDATER_PUBKEY` with the contents of `~/.tauri/zoms-mrp.key.pub`.
 
-Never commit the key. From the next tagged release on, the draft release also holds signed update files and `latest.json`. Nothing is offered until you **publish** the release; then every installed copy built with the key finds it within a day (or straight away with **Settings > About > Check for updates**). Versions built before the key was set up don't update themselves, so people install the first one by hand.
+Never commit the key. From the next tagged release on, the draft release also holds signed update files and `latest.json`. Nothing is offered until you **publish** the release; then every installed copy built with the key finds it within a few hours (or straight away with **Settings > About > Check for updates**). Versions built before the key was set up don't update themselves, so people install the first one by hand.
 </details>
 
 ## License

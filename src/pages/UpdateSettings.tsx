@@ -26,7 +26,7 @@ export function UpdateSettings() {
           : status === "downloading" ? `Downloading ${version}…`
           : status === "installing" ? `Installing ${version}…`
           : version ? `Version ${version} is out.`
-          : "Zom's MRP looks for a new version once a day."}
+          : "Zom's MRP looks for a new version when it opens and every few hours while it's open."}
         {when && status !== "checking" ? ` Last checked ${when}.` : ""}
       </p>
       {mode === "auto" && (
