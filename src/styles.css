@@ -683,6 +683,10 @@ button.hbar:hover, div.hbar:hover { background: var(--zb-surface-2); }
 .quickfind-docs:hover { text-decoration: underline; }
 .find-item { margin-top: 4px; }
 
+/* ---------- When a page or form fails: what happened and a way out ---------- */
+.crash { max-width: 560px; margin: 24px auto; padding: 18px; border-left: 3px solid var(--zb-danger); }
+.backdrop > .crash { margin: 10vh auto 0; }
+
 /* ---------- The note on a new page: shown on the first few visits, then gone ---------- */
 .page-note { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 12px; border: 1px solid var(--zb-border); border-left: 3px solid var(--zb-accent); border-radius: var(--zb-radius); background: var(--zb-accent-soft); }
 .page-note p { margin: 2px 0 0; font-size: 13px; min-width: min(100%, 260px); flex-basis: 260px; }

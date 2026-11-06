@@ -27,6 +27,7 @@ import { Guide } from "./pages/Guide";
 import { TourOverlay } from "./tour";
 import { QuickFind } from "./components/QuickFind";
 import { PageNote } from "./components/PageNote";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
@@ -194,7 +195,8 @@ export default function App() {
           </div>
         )}
         <div className="page">
-          <PageNote key={page} page={page} />
+          <PageNote key={`note-${page}`} page={page} />
+          <ErrorBoundary key={`page-${page}`} what={page === "overview" ? "the Overview" : `this page`} onLeave={() => navTo("overview")} onUndo={() => useStore.getState().undo()}>
           {page === "overview" && <Overview issues={issues} />}
           {page === "schedule" && <Schedule issues={issues} />}
           {page === "missions" && <Missions issues={issues} />}
@@ -208,10 +210,11 @@ export default function App() {
           {page === "reports" && <Reports />}
           {page === "settings" && <SettingsPage onHelp={() => navTo("guide")} />}
           {page === "guide" && <Guide />}
+          </ErrorBoundary>
         </div>
       </main>
 
-      {editing && <Dialogs />}
+      {editing && <ErrorBoundary key={`${editing.kind}-${editing.id}`} what="this form" floating onLeave={() => { useStore.getState().close(); navTo("overview"); }} onUndo={() => useStore.getState().undo()}><Dialogs /></ErrorBoundary>}
       <TourOverlay />
       {finding && <QuickFind onClose={() => setFinding(false)} />}
       {toast && (

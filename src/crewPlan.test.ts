@@ -52,6 +52,15 @@ describe("the crew planner", () => {
     expect(r8.ok && r8.plan.pilots).toBe(5);
   });
 
+  it("stays quick on a very tight flight limit (typing 100 down to 1 hung the page)", () => {
+    const input: PlanInput = { aircraft: [{ label: "", type: "AW139", staffedHours: 24, flightHours: 1.2 }], days: 350, maxDaysOn: 21, minDaysOff: 7, maxDutyHours: 12, minRestHours: 2, travelDays: 1, flightLimits: [{ hours: 1, days: 30 }] };
+    const t = Date.now();
+    const r = planCrew(input);
+    expect(r.ok && r.plan.pilots).toBe(60);
+    if (r.ok) whatIfs(input, r.plan);
+    expect(Date.now() - t).toBeLessThan(1500);
+  });
+
   it("needs no rotation for a job shorter than a hitch", () => {
     const r = planCrew({ aircraft: [ac(12), ac(12)], days: 20, maxDaysOn: 21, minDaysOff: 10, maxDutyHours: 14, flightLimits: [] });
     expect(r.ok && r.plan.pilots).toBe(2);
