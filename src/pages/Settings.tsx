@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClipboardCheck, Download, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { ClipboardCheck, Download, Plus, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
@@ -12,6 +12,8 @@ import { serverUser } from "../backends/server";
 import { DEMO_KEY } from "../backends";
 import { ServerSettings } from "./ServerSettings";
 import { ExcelCopySettings } from "./ExcelCopySettings";
+import { FlightLimitsEditor } from "./Planner";
+import { uid } from "../time";
 import { SHORTCUTS } from "./Guide";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
@@ -103,7 +105,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           <div className="field" style={{ marginTop: 12 }}>
             <span>Pages in the menu</span>
             <div className="picker-row">
-              {([["aircraft", "Fleet"], ["schedule", "Schedule"], ["missions", "Missions"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Training"], ["balance", "Balance"], ["reports", "Reports"]] as const).map(([pg, label]) => {
+              {([["aircraft", "Fleet"], ["schedule", "Schedule"], ["missions", "Missions"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Training"], ["balance", "Balance"], ["planner", "Crew planner"], ["reports", "Reports"]] as const).map(([pg, label]) => {
                 const hidden = (data.settings.hiddenPages ?? []).includes(pg);
                 return (
                   <label key={pg} className={`chip pick ${hidden ? "" : "on"}`}>
@@ -162,6 +164,12 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <Field label="Most hours on duty in a day" hint="A season's duty day is set on it. 0 = don't check.">
               <NumberInput min={0} max={24} value={data.settings.maxDutyHours} onChange={(maxDutyHours) => updateSettings({ maxDutyHours })} />
             </Field>
+            <Field label="Rest between duty days" hint="Hours off before the next duty day. A season whose duty day leaves less is flagged. 0 = don't check.">
+              <NumberInput min={0} max={23} value={data.settings.minRestHours} onChange={(minRestHours) => updateSettings({ minRestHours })} />
+            </Field>
+            <Field label="Most flight hours" full hint="Per pilot, in any stretch of that many days, such as 100 in 30 and 1,000 in 365. A season's flying is shared by its pilots, or the hours flown typed on a shift. The checks, Fill and the Crew planner keep under all of them.">
+              <FlightLimitsEditor value={data.settings.flightLimits} onChange={(flightLimits) => updateSettings({ flightLimits })} />
+            </Field>
             <Field label="Current on a type" hint="Pilots must have flown it within this many days. 0 = don't check.">
               <NumberInput min={0} max={730} value={data.settings.currencyDays} onChange={(currencyDays) => updateSettings({ currencyDays })} />
             </Field>
@@ -169,6 +177,30 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               <NumberInput min={0} max={365} value={data.settings.expiryWarningDays} onChange={(expiryWarningDays) => updateSettings({ expiryWarningDays })} />
             </Field>
           </div>
+        </section>
+
+        <section className="panel">
+          <h3><ShieldCheck size={16} /> Kinds of contract</h3>
+          <p className="small muted" style={{ marginTop: 0 }}>Different limits for different work, such as EMS and fire. A mission that picks one uses its days on and off instead of the ones above (its own limits can still be stricter).</p>
+          {(data.settings.ruleSets ?? []).map((r) => {
+            const setRule = (patch: Partial<typeof r>) => updateSettings({ ruleSets: data.settings.ruleSets.map((x) => (x.id === r.id ? { ...x, ...patch } : x)) });
+            const used = data.missions.filter((m) => m.ruleSetId === r.id).length;
+            return (
+              <div key={r.id} className="rule-set">
+                <input aria-label="Name" value={r.name} placeholder="EMS" onChange={(e) => setRule({ name: e.target.value })} />
+                <span className="rotation">
+                  <NumberInput min={1} max={365} aria-label={`${r.name}: most days on`} value={r.maxDaysOn} onChange={(maxDaysOn) => setRule({ maxDaysOn })} /> days on,
+                  <NumberInput min={0} max={180} aria-label={`${r.name}: fewest days off`} value={r.minDaysOff} onChange={(minDaysOff) => setRule({ minDaysOff })} /> off
+                </span>
+                <span className="small muted">{used ? `${used} ${used === 1 ? "mission" : "missions"}` : "Not used"}</span>
+                <button className="icon-btn" aria-label={`Remove ${r.name || "this kind"}`} title={used ? "Its missions go back to the limits above" : undefined}
+                  onClick={() => change((d) => ({ ...d, settings: { ...d.settings, ruleSets: d.settings.ruleSets.filter((x) => x.id !== r.id) }, missions: d.missions.map((m) => (m.ruleSetId === r.id ? { ...m, ruleSetId: null } : m)) }), `Removed “${r.name}”`)}>
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            );
+          })}
+          <button className="btn sm" onClick={() => updateSettings({ ruleSets: [...(data.settings.ruleSets ?? []), { id: uid(), name: (data.settings.ruleSets ?? []).length ? "" : "EMS", ...rules }] })}><Plus size={14} /> Add a kind of contract</button>
         </section>
 
         <section className="panel">

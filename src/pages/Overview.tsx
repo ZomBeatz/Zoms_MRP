@@ -6,7 +6,7 @@ import { ignoredIssues, missionCoverage, type Issue } from "../coverage";
 import { format } from "date-fns";
 import { dayAt, fmtRange, ms, overlaps, today } from "../time";
 import { missionLook, slotStyle } from "../look";
-import { StatusPill } from "../components/ui";
+import { NumberInput, StatusPill } from "../components/ui";
 import { fleetUse } from "../fleet";
 import { seasonTails } from "../rotation";
 import { withDemo } from "../platform";
@@ -155,6 +155,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
         <h1>Overview</h1>
         <button className="btn" onClick={() => go("schedule")}>Open schedule</button>
       </div>
+      <FlightLimitQuestion />
       {!data.missions.length && (!withDemo || !data.aircraft.length) && <GettingStarted />}
       <div className="tiles">
         <button className="tile" onClick={() => go("missions")}>
@@ -261,6 +262,37 @@ function FleetNow() {
         <button className="btn sm" onClick={() => open("support", "new")}><SearchCheck size={14} /> Can we take a job?…</button>
       </div>
     </>
+  );
+}
+
+/**
+ * Asked once, at setup or after updating to the version that added it: do pilots have a flight-hour
+ * limit? The answer goes in Settings › Hitches and days off, where it can be changed later.
+ */
+function FlightLimitQuestion() {
+  const { data, demo, canEdit, updateSettings } = useStore();
+  const [hours, setHours] = useState(100);
+  const [days, setDays] = useState(30);
+  const asked = data.settings.asked ?? [];
+  if (demo || !canEdit || asked.includes("flightLimit") || data.settings.flightLimits.length > 0) return null;
+  const answer = (limit: { hours: number; days: number } | null) =>
+    updateSettings({ asked: [...asked, "flightLimit"], ...(limit ? { flightLimits: [limit] } : {}) });
+  return (
+    <section className="panel getting-started">
+      <h3><Plane size={16} /> Do your pilots have a flight-hour limit?</h3>
+      <p>Such as no more than 100 flight hours in any 30 days. With one set, the checks flag a pilot who would go over it, Fill the schedule and the Crew planner keep under it, and the planner works out how many pilots that takes.</p>
+      <div className="row gap wrap" style={{ alignItems: "center" }}>
+        <span className="row gap-sm" style={{ alignItems: "center" }}>
+          <NumberInput aria-label="Most flight hours" min={1} max={1000} value={hours} onChange={setHours} style={{ width: 72 }} />
+          <span className="small muted">hours in any</span>
+          <NumberInput aria-label="Days" min={1} max={365} value={days} onChange={setDays} style={{ width: 64 }} />
+          <span className="small muted">days</span>
+        </span>
+        <button className="btn primary" onClick={() => answer({ hours, days })}>Set this limit</button>
+        <button className="btn" onClick={() => answer(null)}>No limit</button>
+      </div>
+      <p className="small muted" style={{ margin: "10px 0 0" }}>You can change it any time in Settings › Hitches and days off.</p>
+    </section>
   );
 }
 

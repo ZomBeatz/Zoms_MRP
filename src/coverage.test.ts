@@ -172,4 +172,20 @@ describe("days someone would rather not work", () => {
     const added = fillSeason(data, data.seasons[0], "Pilot", { on: 28, off: 0 }, { maxDaysOn: 30, minDaysOff: 0 });
     expect(added.map((s) => s.personId)).toEqual(["p2"]);
   });
+
+  it("flags a pilot over the flight-hour limit, from the flying planned on their shifts", () => {
+    const data = base();
+    data.aircraft[0].hoursPerDay = 6;
+    data.shifts = [{ id: "s1", seasonId: "m1", personId: "p1", start: d(1), end: d(21) }];
+    // 20 days at 6 hours is 120 hours: fine with no limit, too many with 100 in 30.
+    expect(findIssues(data).some((i) => i.id.startsWith("fly-"))).toBe(false);
+    data.settings.flightLimits = [{ hours: 100, days: 30 }];
+    const issue = findIssues(data).find((i) => i.id.startsWith("fly-"));
+    expect(issue?.title).toBe("Alex flies about 120 hours in 30 days");
+    expect(issue?.shiftId).toBe("s1");
+    // Two pilots on at once share the flying.
+    // (A new plan object: bookings are worked out once per plan.)
+    const shared = { ...data, seasons: [{ ...data.seasons[0], pilotsNeeded: 2 }] };
+    expect(findIssues(shared).some((i) => i.id.startsWith("fly-"))).toBe(false);
+  });
 });

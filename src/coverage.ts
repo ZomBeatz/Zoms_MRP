@@ -5,6 +5,7 @@ import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
 import { rulesFor } from "./limits";
 import { dueList } from "./program";
 import { currencyDays, staleOn } from "./currency";
+import { flightSpans, overLimit } from "./flight";
 import { DAY, dayAt, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
@@ -165,6 +166,11 @@ export function findIssues(data: AppData): Issue[] {
     if (maxDuty && m.dutyHours && m.dutyHours > maxDuty)
       issues.push({ id: `dutyh-${m.id}`, severity: "danger", at: from, seasonId: m.id, title: `Duty days on “${m.name}” are ${m.dutyHours} hours`,
         detail: `The most is ${maxDuty} hours (Settings). Shorten the duty day or add crew to split it.` });
+    // Rest between duty days: a duty day this long leaves too few hours off before the next.
+    const rest = data.settings.minRestHours ?? 0;
+    if (rest && m.dutyHours && 24 - m.dutyHours < rest && !(maxDuty && m.dutyHours > maxDuty))
+      issues.push({ id: `resth-${m.id}`, severity: "danger", at: from, seasonId: m.id, title: `Only ${24 - m.dutyHours} hours off between duty days on “${m.name}”`,
+        detail: `Duty days are ${m.dutyHours} hours and the rest between should be at least ${rest} (Settings). Shorten the duty day or add crew to split it.` });
 
     const cov = missionCoverage(data, m);
     for (const g of cov.pilotGaps)
@@ -269,6 +275,15 @@ export function findIssues(data: AppData): Issue[] {
       }
     }
     flush();
+
+    // Flight hours: the most in any so-many days (Settings), from the flying planned on their shifts.
+    const flew = p.role === "Pilot" ? overLimit(data, flightSpans(data, p.id)) : null;
+    if (flew) {
+      const { limit: fl, at } = flew;
+      const shift = data.shifts.find((s) => s.personId === p.id && ms(s.end) > at && ms(s.start) < dayAt(at, fl.days));
+      issues.push({ id: `fly-${p.id}-${at}`, severity: "danger", title: `${p.name} flies about ${flew.hours} hours in ${fl.days} days`,
+        detail: `${range(at, dayAt(at, fl.days))}. The most is ${fl.hours} hours (Settings). Rotate someone in.`, at, personId: p.id, seasonId: shift?.seasonId, shiftId: shift?.id });
+    }
   }
 
   // Training: everyone on a mission needs what the mission asks for, valid for all of their shift.

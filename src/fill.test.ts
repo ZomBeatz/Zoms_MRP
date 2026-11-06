@@ -73,4 +73,16 @@ describe("filling a job on its rotation", () => {
     const booked = { ...data, shifts: [{ id: "x", seasonId: "s1", personId: "neither", start: d(0), end: d(5) }] };
     expect(findIssues(booked).some((i) => i.id.startsWith("qual-"))).toBe(true);
   });
+
+  it("keeps each pilot under the flight-hour limit", () => {
+    const data = base([pilot("a"), pilot("b"), pilot("c"), pilot("d")], 90);
+    data.aircraft[0].hoursPerDay = 6;
+    data.settings.flightLimits = [{ hours: 100, days: 30 }];
+    const shifts = fillSeason(data, data.seasons[0], "Pilot", { on: 21, off: 7 }, rules);
+    const after = { ...data, shifts };
+    expect(missionCoverage(after, data.seasons[0]).pilotGaps).toHaveLength(0);
+    expect(findIssues(after).filter((i) => i.id.startsWith("fly-"))).toEqual([]);
+    // 16 days at 6 hours is 96: nobody does a full 21-day hitch.
+    expect(Math.max(...shifts.map((s) => Math.round((new Date(s.end).getTime() - new Date(s.start).getTime()) / DAY)))).toBeLessThanOrEqual(16);
+  });
 });

@@ -25,4 +25,18 @@ describe("older saves", () => {
     expect(d.settings.scheduleSpan).toBe(7);
     expect(d.settings.scheduleGroup).toBe("aircraft");
   });
+
+  it("gives a save from before 0.2.4 no flight-hour limit, rest of 10 hours, no rule sets, and the question still to ask", () => {
+    const d = migrate({ version: 1, aircraft: [], trainings: [], people: [], missions: [], seasons: [], shifts: [], jobs: [], timeOff: [], settings: { rules: { maxDaysOn: 21, minDaysOff: 7 } } });
+    expect(d.settings.flightLimits).toEqual([]);
+    expect(d.settings.minRestHours).toBe(10);
+    expect(d.settings.ruleSets).toEqual([]);
+    expect(d.settings.asked).toEqual([]);
+  });
+
+  it("keeps a flight-hour limit set in the first 0.2.4 builds as the first of the list", () => {
+    const d = migrate({ version: 1, aircraft: [], trainings: [], people: [], missions: [], seasons: [], shifts: [], jobs: [], timeOff: [], settings: { flightLimit: { hours: 100, days: 30 } } });
+    expect(d.settings.flightLimits).toEqual([{ hours: 100, days: 30 }]);
+    expect("flightLimit" in d.settings).toBe(false);
+  });
 });

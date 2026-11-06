@@ -112,6 +112,8 @@ export interface Mission {
   limits?: Limits;
   /** What the customer is charged per day of a season, for the margin. */
   dayCharge?: number | null;
+  /** The kind of contract (a rule set in Settings), whose limits replace Settings' for this mission. */
+  ruleSetId?: ID | null;
 }
 
 /**
@@ -167,6 +169,8 @@ export interface Shift {
   after?: ID;
   /** A note for whoever's on it ("Bring the cold-weather kit"), shown on the schedule. */
   note?: string;
+  /** Flight hours actually flown on it, typed in afterwards. Used instead of the planned flying for flight-hour limits. */
+  flown?: number | null;
 }
 
 export type JobKind = "Inspection" | "Repair" | "Pre-flight" | "Other";
@@ -241,6 +245,14 @@ export interface Rules {
   minDaysOff: number;
 }
 
+export interface FlightLimit { hours: number; days: number }
+
+/** Work limits for a kind of contract, picked on a mission. */
+export interface RuleSet extends Rules {
+  id: ID;
+  name: string;
+}
+
 export interface Settings {
   theme: "system" | "light" | "dark";
   rules: Rules;
@@ -254,6 +266,14 @@ export interface Settings {
   currencyDays: number;
   /** Most hours on duty in a day; a season with longer days is flagged. 0 = don't check. */
   maxDutyHours: number;
+  /** Most flight hours a pilot can fly in any `days` days (100 in 30, 300 in 90, 1,000 in 365). Empty = don't check. */
+  flightLimits: FlightLimit[];
+  /** Fewest hours off between two duty days (10). A duty day longer than 24 minus this is flagged. 0 = don't check. */
+  minRestHours: number;
+  /** Named work limits for kinds of contract (EMS, Fire); a mission that picks one uses it instead of the rules above. */
+  ruleSets: RuleSet[];
+  /** One-time questions already answered on the Overview ("flightLimit"), asked at setup or after an update. */
+  asked: string[];
   /** The first day of the week in calendars and the week sheet: 1 Monday, 0 Sunday. */
   weekStart: 0 | 1;
   /** Pages left out of the menu (an operator that doesn't use them). */
@@ -291,4 +311,4 @@ export interface AppData {
   settings: Settings;
 }
 
-export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "inspections" | "balance" | "reports" | "settings" | "guide";
+export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "inspections" | "balance" | "planner" | "reports" | "settings" | "guide";
