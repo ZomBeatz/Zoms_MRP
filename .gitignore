@@ -14,3 +14,4 @@ server/data
 
 # Exports made while testing
 *.xlsx
+src-tauri/tauri.updater.conf.json

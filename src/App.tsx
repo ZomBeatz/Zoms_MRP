@@ -28,6 +28,8 @@ import { TourOverlay } from "./tour";
 import { QuickFind } from "./components/QuickFind";
 import { PageNote } from "./components/PageNote";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { UpdateNote } from "./components/UpdateNote";
+import { startUpdates } from "./updates";
 
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
@@ -103,6 +105,9 @@ export default function App() {
     const jobs = autoPlans(useStore.getState().data);
     if (jobs.length) useStore.getState().change((d) => ({ ...d, jobs: [...d.jobs, ...jobs] }), `Planned ${jobs.length === 1 ? "1 inspection" : `${jobs.length} inspections`} automatically`);
   }, [started, canEdit, mxOn, autoPlan]);
+
+  // The desktop app looks for a new version once a day (only a build made with the updater key).
+  useEffect(() => { if (started) void startUpdates(); }, [started]);
 
   if (!started) return <Welcome />;
 
@@ -183,6 +188,7 @@ export default function App() {
             <span className="grow"><b>View only.</b> You can look at everything but not change it. Ask an admin for scheduler access.</span>
           </div>
         )}
+        <UpdateNote />
         {demo && (
           <div className="banner demo-banner">
             <FlaskConical size={15} />

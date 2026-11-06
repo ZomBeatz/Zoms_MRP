@@ -190,6 +190,28 @@ Without Apple secrets, the Mac app is ad-hoc signed and people open it once with
 | `APPLE_TEAM_ID` | The 10-character team ID from developer.apple.com |
 </details>
 
+<details>
+<summary><b>Updates: letting the desktop app update itself</b></summary>
+
+The desktop app can download and install new versions itself (Windows, Mac and the Linux AppImage; a `.deb` or `.rpm` gets a link to the release). Updates are signed with a key of your own, so the app only installs what you built. Until the key is set up, builds work as before and just don't update.
+
+Once, on your own computer:
+
+1. Make the key (pick a password and keep both somewhere safe, like a password manager; without them no later version can update):
+
+   ```bash
+   npx @tauri-apps/cli signer generate -w ~/.tauri/zoms-mrp.key
+   ```
+
+   (Or `npx tauri signer generate …` from inside this folder.)
+
+2. In the repository's **Settings > Secrets and variables > Actions**:
+   - **Secrets:** `TAURI_SIGNING_PRIVATE_KEY` with the contents of `~/.tauri/zoms-mrp.key`, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` with its password.
+   - **Variables:** `TAURI_UPDATER_PUBKEY` with the contents of `~/.tauri/zoms-mrp.key.pub`.
+
+Never commit the key. From the next tagged release on, the draft release also holds signed update files and `latest.json`. Nothing is offered until you **publish** the release; then every installed copy built with the key finds it within a day (or straight away with **Settings > About > Check for updates**). Versions built before the key was set up don't update themselves, so people install the first one by hand.
+</details>
+
 ## License
 
 [MIT](LICENSE). Icons are [Lucide](https://lucide.dev) (ISC). The names Zom's MRP and ZomBeatz Media and their logos aren't covered by the license.

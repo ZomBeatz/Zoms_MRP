@@ -9,10 +9,14 @@
     { "identifier": "opener:allow-open-path", "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**" }] },
     "opener:allow-reveal-item-in-dir",
     "dialog:allow-open",
+    "updater:default",
+    "process:allow-restart",
     "allow-load-plan",
     "allow-save-plan",
     "allow-write-excel",
     "allow-save-download",
-    "allow-data-folder"
+    "allow-data-folder",
+    "allow-update-mode",
+    "allow-backup-before-update"
   ]
 }
