@@ -4,7 +4,8 @@ import { CalendarCheck, Plus, Trash2, UserMinus, UserPlus } from "lucide-react";
 import { useStore } from "../store";
 import { bookings } from "../bookings";
 import { planCrew, seatsFor, whatIfs, type CrewPlan, type GroupPlan, type PlanAircraft, type PlanInput } from "../crewPlan";
-import { requiredTraining, trainingStatus, whoCanCover } from "../coverage";
+import { missionCoverage, requiredTraining, trainingStatus, whoCanCover } from "../coverage";
+import { fillSeason } from "../fill";
 import { seasonRules } from "../limits";
 import { hoursPerDay } from "../program";
 import { money } from "../cost";
@@ -405,11 +406,13 @@ function Board({ plan, first, days, season, data, nightTrainingId }: { plan: Cre
     const out = new Map<string, { bad: number; why: string }>();
     if (!season) return out;
     lines.forEach(({ g, h }, i) => {
+      // Everyone's answer for each hitch at once (asking person by person repeats the work for each).
+      const answers = h.map(([a, b]) => new Map(whoCanCover(without, "Pilot", at(a - travel), at(b + travel), g.type || null, [], required, season.missionId).map((c) => [c.person.id, c])));
       for (const p of data.people.filter((x) => fits(x, g))) {
         let bad = 0, why = "";
-        for (const [a, b] of h) {
-          const c = whoCanCover(without, "Pilot", at(a - travel), at(b + travel), g.type || null, [], required, season.missionId).find((x) => x.person.id === p.id)!;
-          if (c.ok) continue;
+        for (const answer of answers) {
+          const c = answer.get(p.id);
+          if (!c || c.ok) continue;
           bad++;
           why ||= !c.trained ? "training not current" : !c.current ? "not flown the type lately" : c.off ? "time off" : !c.onRotation ? "off their rotation" : "booked elsewhere";
         }
@@ -434,26 +437,48 @@ function Board({ plan, first, days, season, data, nightTrainingId }: { plan: Cre
   const who = (i: number) => (i in picked ? picked[i] : auto[i] ?? "");
   const twice = new Set(lines.map((_, i) => who(i)).filter((id, i, all) => id && all.indexOf(id) !== i));
 
+  /**
+   * Book the lines on the season. A picked pilot only gets the hitches they can legally take; the rest are
+   * filled the way Fill the schedule does (rated, current, free, rested, inside every limit), and anything
+   * nobody can take stays open, so it shows as an open seat instead of a booking over someone's time off.
+   */
   const book = () => {
     if (!season) return;
     const shifts: Shift[] = [];
-    lines.forEach(({ h }, i) => {
+    let handed = 0;
+    lines.forEach(({ g, h }, i) => {
       const personId = who(i);
-      if (personId) for (const [a, b] of h) shifts.push({ id: uid(), seasonId: season.id, personId, start: toWhen(at(a)), end: toWhen(at(b)) });
+      if (!personId) return;
+      for (const [a, b] of h) {
+        const taken: AppData = { ...without, shifts: [...without.shifts, ...shifts] };
+        const c = whoCanCover(taken, "Pilot", at(a - travel), at(b + travel), g.type || null, [], required, season.missionId).find((x) => x.person.id === personId);
+        if (c?.ok) shifts.push({ id: uid(), seasonId: season.id, personId, start: toWhen(at(a)), end: toWhen(at(b)) });
+        else handed++;
+      }
     });
     // Handovers: a shift starting the day another ends takes over from it.
     for (const s of shifts) {
       const from = shifts.find((x) => x.end === s.start && x.personId !== s.personId && !shifts.some((y) => y.after === x.id));
       if (from) s.after = from.id;
     }
-    const people = new Set(shifts.map((s) => s.personId));
     const main = plan.groups.reduce((a, b) => (b.seats > a.seats ? b : a));
-    change((d) => ({
-      ...d,
-      seasons: d.seasons.map((s) => (s.id === season.id ? { ...s, pilotsNeeded: plan.seats, pilotRotation: { on: main.on, off: main.off + 2 * travel } } : s)),
-      shifts: [...d.shifts.filter((s) => s.seasonId !== season.id || d.people.find((p) => p.id === s.personId)?.role !== "Pilot"), ...shifts],
-      people: d.people.map((p) => (people.has(p.id) && !p.missionIds.includes(season.missionId) ? { ...p, missionIds: [...p.missionIds, season.missionId] } : p)),
-    }), `Booked ${plural(people.size, "pilot")} on “${season.name}”`);
+    const rotation = { on: main.on, off: main.off + 2 * travel };
+    const d = useStore.getState().data;
+    const seasons = d.seasons.map((s) => (s.id === season.id ? { ...s, pilotsNeeded: plan.seats, pilotRotation: rotation } : s));
+    let next: AppData = { ...d, seasons, shifts: [...d.shifts.filter((s) => s.seasonId !== season.id || d.people.find((p) => p.id === s.personId)?.role !== "Pilot"), ...shifts] };
+    let others = 0, opened = 0;
+    // What the picked pilots couldn't take: filled like Fill the schedule, or left open.
+    if (handed) {
+      const added = fillSeason(next, seasons.find((s) => s.id === season.id)!, "Pilot", rotation, { ...next.settings.rules });
+      others = new Set(added.map((s) => s.personId)).size;
+      next = { ...next, shifts: [...next.shifts, ...added] };
+      opened = missionCoverage(next, next.seasons.find((s) => s.id === season.id)!).pilotGaps.length;
+    }
+    const on = new Set(next.shifts.filter((s) => s.seasonId === season.id).map((s) => s.personId));
+    next = { ...next, people: next.people.map((p) => (p.role === "Pilot" && on.has(p.id) && !p.missionIds.includes(season.missionId) ? { ...p, missionIds: [...p.missionIds, season.missionId] } : p)) };
+    const picked_ = new Set(shifts.map((s) => s.personId)).size;
+    change(() => next, !handed ? `Booked ${plural(picked_, "pilot")} on “${season.name}”`
+      : `Booked ${plural(picked_, "pilot")}. ${plural(handed, "hitch", "hitches")} they couldn't take ${others ? `went to ${plural(others, "other pilot")}` : "had nobody free"}${opened ? `; ${plural(opened, "stretch", "stretches")} still open` : ""}`);
     open("season", season.id, undefined, { tab: "pilots" });
   };
   const matches = season && startToDate(season.start) === first && ms(season.end) === at(days);
@@ -483,7 +508,7 @@ function Board({ plan, first, days, season, data, nightTrainingId }: { plan: Cre
                     {data.people.filter((p) => fits(p, g) || p.id === pid).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 ) : <b>{label}</b>}
-                {season && f && f.bad > 0 && <span className="small warn-text">{plural(f.bad, "hitch", "hitches")}: {f.why}</span>}
+                {season && f && f.bad > 0 && <span className="small warn-text">Can't take {plural(f.bad, "hitch", "hitches")} ({f.why}): Book gives {f.bad === 1 ? "it" : "them"} to someone who can</span>}
                 {season && pid && twice.has(pid) && <span className="small warn-text">On two lines</span>}
               </span>
               <span className="planner-track">

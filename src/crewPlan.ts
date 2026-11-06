@@ -105,11 +105,12 @@ export const seatsFor = (a: PlanAircraft, maxDutyHours: number, minRestHours = 0
 /** "Bell 412 · night" */
 export const groupKey = (type: string, night: boolean) => [type, night ? "night" : ""].filter(Boolean).join(" · ");
 
-const MAX_PILOTS = 200;
+const MAX_PILOTS = 150;
 
 /** The most days on duty in any `w` days, for a pilot on `on` days of every `cycle`. */
 function mostOnIn(on: number, cycle: number, w: number) {
   if (on >= cycle) return w;
+  if (cycle === Infinity) return Math.min(on, w);
   const full = Math.floor(w / cycle);
   return full * on + Math.min(on, w - full * cycle);
 }
@@ -164,19 +165,23 @@ function tryPilots(n: number, seats: number, days: number, maxOn: number, minOff
     return { on: days, off: minOff, hitches: Array.from({ length: n }, (): [number, number][] => [[0, days]]) };
   // Longest hitches first (fewest crew changes); within that, the most rest that still works.
   for (let on = Math.min(maxOn, days); on >= 1; on--) {
+    // A hitch this long breaks a flight limit however much rest follows it.
+    if (!ok(on, Infinity)) continue;
     let best: { off: number; phase: number } | null = null;
     // At least a day off, or two hitches in a row would be one long one.
     for (let off = Math.max(1, minOff); off <= minOff + 3 * days; off++) {
       const cycle = on + off;
       // On a long job too few on average can't work; a short one is just tried.
       if (days >= 2 * cycle && n * on < seats * cycle) break;
+      // Breaking a flight limit is quick to see; more rest may fix it, so try the next.
+      if (!ok(on, off)) continue;
       // Over a job at least a cycle long every phase comes round, so only a short job tries them all.
       const phases = days >= cycle ? 1 : cycle;
       let found = -1;
       for (let phase = 0; phase < phases && found < 0; phase++)
         if (countOn(pattern(n, on, cycle, phase, days), days).every((x) => x >= seats)) found = phase;
       if (found < 0) break; // more rest only makes it worse
-      if (ok(on, off)) best = { off, phase: found };
+      best = { off, phase: found };
       if (days < cycle && best) break; // nobody comes back: more rest means nothing
     }
     if (best) return { on, off: best.off, hitches: pattern(n, on, on + best.off, best.phase, days) };
@@ -226,7 +231,17 @@ function planGroup(seats: number, flying: number, days: number, maxOn: number, m
   const floors = limits.map((l) => ({ limit: l, pilots: (flying * Math.min(l.days, days)) / l.hours }));
   const flightFloor = floors.length ? floors.reduce((a, b) => (b.pilots > a.pilots ? b : a)) : null;
 
-  for (let n = seats; n <= MAX_PILOTS; n++) {
+  // Start at what no plan can beat, so a tight limit doesn't try every smaller crew first: each pilot
+  // is on at most so many of the job's days, and flies at most each limit's hours in its window.
+  const least = Math.max(
+    seats,
+    Math.ceil((seats * days) / mostOnIn(maxOn, maxOn + Math.max(1, minOff), days) - 1e-9),
+    ...floors.map((f) => Math.ceil(f.pilots - 1e-9)),
+    // Pilots work whole days, so each is on at most the whole days a limit allows in its window.
+    ...caps.filter((c) => c.days < Infinity).map((c) => Math.ceil((seats * Math.min(c.l.days, days)) / Math.min(c.days, c.l.days, days) - 1e-9)),
+  );
+  if (least > MAX_PILOTS) return `It would take more than ${MAX_PILOTS} pilots on these rules.`;
+  for (let n = least; n <= MAX_PILOTS; n++) {
     const off1 = Math.max(1, minOff);
     const found = tryPilots(n, seats, days, maxOn, minOff, ok)
       ?? (days < 2 * (maxOn + off1) && days > maxOn && n <= 6 && ok(maxOn, off1) ? tryStarts(n, seats, days, maxOn, off1) : null);
@@ -240,7 +255,7 @@ function planGroup(seats: number, flying: number, days: number, maxOn: number, m
       restFloor, flightFloor, limitedBy, dutyDays: duty,
     };
   }
-  return `Even ${MAX_PILOTS} pilots can't cover it on these rules.`;
+  return `It would take more than ${MAX_PILOTS} pilots on these rules.`;
 }
 
 export function planCrew(input: PlanInput): PlanResult {
@@ -316,9 +331,12 @@ export interface WhatIf { text: string; pilots: number }
  * What it would take to need one pilot fewer (the smallest change to each rule that does it), and what
  * one more pilot would buy (the most days off it allows).
  */
-export function whatIfs(input: PlanInput, plan: CrewPlan): WhatIf[] {
+export function whatIfs(input: PlanInput, plan: CrewPlan, budgetMs = 250): WhatIf[] {
   const out: WhatIf[] = [];
+  // It runs as you type, so it gives up on what it hasn't tried once its time is up.
+  const until = Date.now() + budgetMs;
   const pilots = (i: PlanInput) => {
+    if (Date.now() > until) return Infinity;
     const r = planCrew(i);
     return r.ok ? r.plan.pilots : Infinity;
   };

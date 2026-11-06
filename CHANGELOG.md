@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version
+## 0.2.4
 
 **Crew planner**
 - A **Crew planner** page works out how few pilots a job takes and the rotation that does it: put in the dates, each aircraft with its type, hours staffed a day and flight hours, and the rules. It shows the arithmetic in plain words, what one rule change would save, what one more pilot would buy, and the cost.
@@ -13,6 +13,11 @@
 - **Rest between duty days**: a season whose duty day leaves less is flagged.
 - **Kinds of contract** (Settings): named days on and off, such as EMS or fire, that a mission can pick instead of the rules for everyone.
 - **Restore a backup** now brings all of the plan's rules with it: flight-hour limits, rest, kinds of contract, maintenance and preferences.
+
+**Fixes**
+- The Crew planner no longer freezes on a very tight flight-hour limit (deleting 100 to type 49 passed through 1 hour in 30 days, which took minutes to work out). It now starts from the fewest pilots that could possibly do it, and gives up on the "what would change it" ideas it hasn't tried after a moment.
+- **Book** in the Crew planner no longer books a pilot over their time off or another job. A picked pilot gets only the hitches they can take; the rest go to others the way Fill the schedule picks them (rated, current, free, rested, inside every limit), and what nobody can take stays open. The message says how it went, and each line warns which hitches will be handed on.
+- A page or form that fails now says so, with Undo and a way back to the Overview, instead of a blank window that came back on every reload.
 
 **Help**
 - **Find** also finds pages and the Guide's topics and How do I… answers, with a link to each one's page in the online guide at docs.zombeatzmedia.com.
