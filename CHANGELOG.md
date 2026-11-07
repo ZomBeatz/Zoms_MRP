@@ -1,6 +1,8 @@
 # Changelog
 
-## Next version
+## 0.2.5
+
+Install this version by hand one last time: from here on, the desktop app updates itself.
 
 **Updates**
 - The desktop app can update itself. When it opens and every few hours while it's open, it looks for a newer published release, downloads it in the background, and installs it when you press **Restart now** on the note at the top (or **Later** to put it off). It saves everything and keeps a copy of the plan first, in `backups/before-<version>.json`.
