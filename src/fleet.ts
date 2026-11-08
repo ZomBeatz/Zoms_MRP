@@ -1,5 +1,7 @@
 import type { Aircraft, AppData, Booking, MaintenanceJob, Person } from "./types";
 import { bookings } from "./bookings";
+import { downSpan, missingEquipment, statusWords } from "./aircraftTypes";
+import { tailSpan } from "./slots";
 import { dutyOf, trainingStatus } from "./coverage";
 import { dayAt, ms, overlaps } from "./time";
 
@@ -11,7 +13,7 @@ import { dayAt, ms, overlaps } from "./time";
 export type DayUse =
   | { kind: "mission"; mission: Booking }
   | { kind: "maintenance"; job: MaintenanceJob }
-  | { kind: "down" }   // grounded or retired
+  | { kind: "down"; status: Aircraft["status"] }   // in maintenance, AOG or retired (its status)
   | { kind: "free" };
 
 // A finished season still used the aircraft; only a cancelled one leaves it free.
@@ -31,11 +33,13 @@ export function dayUse(data: AppData, a: Aircraft, day: number): DayUse {
  * which keeps the fleet board quick over years of days.
  */
 export function dayUser(data: AppData, a: Aircraft): (day: number) => DayUse {
-  if (a.status === "Grounded" || a.status === "Retired") return () => ({ kind: "down" });
+  const out = downSpan(a);
+  if (out && out[0] === -Infinity && out[1] === Infinity) return () => ({ kind: "down", status: a.status });
   const jobs = data.jobs.filter((j) => j.aircraftId === a.id).map((j) => ({ j, a: ms(j.start), b: ms(j.end) }));
-  const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m)).map((m) => ({ m, a: ms(m.start), b: ms(m.end) }));
+  const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m) && m.kind !== "ground").map((m) => { const [x, y] = tailSpan(m, a.id); return { m, a: x, b: y }; });
   return (day) => {
     const end = dayAt(day, 1);
+    if (out && overlaps(day, end, out[0], out[1])) return { kind: "down", status: a.status };
     const on = jobs.filter((x) => overlaps(day, end, x.a, x.b));
     const grounding = on.find((x) => x.j.grounds);
     if (grounding) return { kind: "maintenance", job: grounding.j };
@@ -102,6 +106,8 @@ export interface Job {
   pilotsNeeded: number;
   /** Training the crew needs. */
   training: string[];
+  /** Equipment the aircraft needs (a hoist, a bucket). */
+  equipment?: string[];
 }
 
 /** Can this pilot fly that day: qualified on the type, not booked, not off, training current for the day. */
@@ -163,15 +169,19 @@ export function canSupport(data: AppData, job: Job): SupportAnswer[] {
     .map((a): SupportAnswer => {
       const reasons: string[] = [];
       if (job.type && a.type !== job.type) reasons.push(`It's a ${a.type}.`);
-      if (a.status === "Grounded") reasons.push("It's grounded.");
+      const out = downSpan(a);
+      const down = !!out && overlaps(job.start, job.end, out[0], out[1]);
+      if (down) reasons.push(`It's ${statusWords(a.status)}${a.backOn && a.status !== "Retired" ? ` until ${a.backOn}` : ""}.`);
+      const missing = missingEquipment(data, a, job.equipment);
+      if (missing.length) reasons.push(`It has no ${missing.map((e) => e.name.toLowerCase()).join(" or ")}.`);
       if (job.pilotsNeeded > a.seats) reasons.push(`It has ${a.seats} pilot seat${a.seats === 1 ? "" : "s"}.`);
       for (const m of bookings(data))
-        if (m.aircraftIds.includes(a.id) && live(m) && overlaps(job.start, job.end, ms(m.start), ms(m.end))) reasons.push(`Booked on “${m.name}”.`);
+        if (m.aircraftIds.includes(a.id) && live(m) && m.kind !== "ground" && overlaps(job.start, job.end, ...tailSpan(m, a.id))) reasons.push(`Booked on “${m.name}”.`);
       for (const j of data.jobs)
         if (j.aircraftId === a.id && j.grounds && !j.done && overlaps(job.start, job.end, ms(j.start), ms(j.end))) reasons.push(`In maintenance (“${j.title}”).`);
       const crew = crewFor(a.type);
       // Only bookings and maintenance are worth waiting out; the wrong type or too few seats never clear.
-      const wrongKind = (job.type && a.type !== job.type) || a.status === "Grounded" || job.pilotsNeeded > a.seats;
+      const wrongKind = (job.type && a.type !== job.type) || (down && (!a.backOn || a.status === "Retired")) || job.pilotsNeeded > a.seats || missing.length > 0;
       if (reasons.length)
         return { aircraft: a, verdict: "no", reasons: [...new Set(reasons)], shortDays: crew.short, fewestPilots: crew.fewest, earliest: wrongKind ? undefined : earliestFree(data, a, job.start, days.length) };
       if (crew.short) reasons.push(`Not enough free, qualified, current pilots on ${crew.short} day${crew.short === 1 ? "" : "s"}.`);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { coverageSteps, findIssues, missionCoverage, neededTraining, trainingStatus } from "./coverage";
 import { emptyData } from "./sample";
+import { withSlots } from "./slots";
 import type { AppData, Person, Season } from "./types";
 
 const DAY = 86_400_000;
@@ -10,7 +11,7 @@ const pilot = (id: string, name: string, quals: string[]): Person => ({ id, name
 
 function base(): AppData {
   const data = emptyData();
-  data.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" }];
+  data.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "" }];
   data.people = [pilot("p1", "Alex", ["Bell 412"]), pilot("p2", "Maya", ["Bell 412"]), pilot("p3", "Sam", ["AS350"])];
   data.missions = [{ id: "fire", name: "Fire season", contact: "", requiredTrainingIds: [], location: "", color: "#c2410c", pattern: "solid", notes: "" }];
   data.seasons = [{ id: "m1", missionId: "fire", start: d(1), end: d(29), aircraftIds: ["a1"], pilotRotation: null, maintainerRotation: null, pilotsNeeded: 1, maintainersNeeded: 0, status: "Confirmed", notes: "" }];
@@ -18,6 +19,86 @@ function base(): AppData {
 }
 
 describe("coverage", () => {
+  it("books a tail only for its own dates within a season", () => {
+    const data = base();
+    // A second season on the same tail, the 20th to the 29th.
+    data.missions.push({ ...data.missions[0], id: "survey", name: "Survey" });
+    data.seasons.push({ ...data.seasons[0], id: "m2", missionId: "survey", start: d(20), end: d(29) });
+    const dbl = () => findIssues({ ...data }).filter((i) => i.id.startsWith("acdbl-"));
+    expect(dbl()).toHaveLength(1);
+    // The fire season only has the tail until the 15th: no clash.
+    data.seasons[0] = withSlots(data.seasons[0], [{ id: "l1", type: "Bell 412", aircraftId: "a1", end: d(15) }]);
+    expect(dbl()).toHaveLength(0);
+  });
+
+  it("asks for the tail on a confirmed season's line that has only a type", () => {
+    const data = base();
+    data.seasons[0] = withSlots(data.seasons[0], [{ id: "l1", type: "Bell 412", aircraftId: "a1" }, { id: "l2", type: "AS350", aircraftId: null, start: d(10) }]);
+    const open = findIssues({ ...data }).filter((i) => i.id.startsWith("slot-"));
+    expect(open).toHaveLength(1);
+    expect(open[0].title).toContain("AS350");
+    expect(data.seasons[0].aircraftIds).toEqual(["a1"]);
+    // Planned seasons can wait.
+    data.seasons[0].status = "Planned";
+    expect(findIssues({ ...data }).some((i) => i.id.startsWith("slot-"))).toBe(false);
+  });
+
+  it("ground duty needs no aircraft and no type rating", () => {
+    const data = base();
+    data.missions[0] = { ...data.missions[0], kind: "ground" };
+    data.seasons[0] = { ...data.seasons[0], aircraftIds: [], pilotsNeeded: 0, maintainersNeeded: 1 };
+    data.people.push({ ...data.people[2], id: "m1", name: "Drew", role: "Maintainer", quals: [] });
+    data.shifts = [{ id: "s1", seasonId: "m1", personId: "m1", start: d(1), end: d(29) }];
+    const ids = findIssues({ ...data }).map((i) => i.id.split("-")[0]);
+    expect(ids).not.toContain("noac");
+    expect(ids).not.toContain("qual");
+    expect(ids).not.toContain("mgap");
+  });
+
+  it("keeps a tail in maintenance or AOG off missions only while it's down", () => {
+    const data = base();
+    const acstat = () => findIssues({ ...data }).filter((i) => i.id.startsWith("acstat-"));
+    expect(acstat()).toHaveLength(0);
+    // AOG from the 10th with no return date: the season (1st to 28th) is hit.
+    data.aircraft[0] = { ...data.aircraft[0], status: "AOG", statusSince: "2030-11-10", backOn: null };
+    expect(acstat()).toHaveLength(1);
+    expect(acstat()[0].title).toContain("AOG");
+    // In maintenance and back before the season starts: fine.
+    data.aircraft[0] = { ...data.aircraft[0], status: "In maintenance", statusSince: "2030-10-01", backOn: "2030-11-01" };
+    expect(acstat()).toHaveLength(0);
+    // Back a day into it: a problem again.
+    data.aircraft[0] = { ...data.aircraft[0], backOn: "2030-11-02" };
+    expect(acstat()).toHaveLength(1);
+    // Airworthy: nothing.
+    data.aircraft[0] = { ...data.aircraft[0], status: "Airworthy", statusSince: null, backOn: null };
+    expect(acstat()).toHaveLength(0);
+  });
+
+  it("asks for a status update once a tail is past the day it was expected back", () => {
+    const data = base();
+    data.aircraft[0] = { ...data.aircraft[0], status: "AOG", statusSince: "2020-01-01", backOn: "2020-02-01" };
+    expect(findIssues({ ...data }).some((i) => i.id === "acback-a1")).toBe(true);
+    data.aircraft[0] = { ...data.aircraft[0], backOn: "2099-02-01" };
+    expect(findIssues({ ...data }).some((i) => i.id === "acback-a1")).toBe(false);
+  });
+
+  it("flags a tail that lacks equipment its mission needs", () => {
+    const data = base();
+    data.equipment = [{ id: "hoist", name: "Rescue hoist", notes: "" }, { id: "bucket", name: "Fire bucket", notes: "" }];
+    data.missions[0].requiredEquipmentIds = ["bucket"];
+    // A new object each time: bookings are cached per data object.
+    const equip = () => findIssues({ ...data }).filter((i) => i.id.startsWith("equip-"));
+    expect(equip()).toHaveLength(1);
+    expect(equip()[0]).toMatchObject({ seasonId: "m1", aircraftId: "a1", severity: "warn" });
+    expect(equip()[0].title).toContain("fire bucket");
+    data.aircraft[0].equipmentIds = ["hoist", "bucket"];
+    expect(equip()).toHaveLength(0);
+    // Not on a cancelled season.
+    data.aircraft[0].equipmentIds = [];
+    data.seasons[0].status = "Cancelled";
+    expect(equip()).toHaveLength(0);
+  });
+
   it("counts overlapping spans", () => {
     expect(coverageSteps(0, 10, [[0, 5], [3, 10]])).toEqual([{ a: 0, b: 3, n: 1 }, { a: 3, b: 5, n: 2 }, { a: 5, b: 10, n: 1 }]);
   });

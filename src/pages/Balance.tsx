@@ -88,7 +88,7 @@ export function Balance() {
         </div>
       </div>
       <p className="muted" style={{ marginTop: -8 }}>
-        How busy everyone is from {fmtDates(toWhen(from), toWhen(to))}. Try other crew sizes, lock what should stay, then <b>Rebalance</b> to spread the work on the usual rules: ratings, training, time off, rotations and rest. Nothing changes until you press <b>Apply</b>.
+        How busy everyone is from {fmtDates(toWhen(from), toWhen(to))}. Try other crew sizes, lock what should stay, then <b>Rebalance</b> to spread the work on the usual rules: ratings, qualifications, time off, rotations and rest. Nothing changes until you press <b>Apply</b>.
       </p>
 
       <Compare now={now} next={next} />

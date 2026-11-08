@@ -1,6 +1,7 @@
 import type { AppData, Booking } from "./types";
 import { hoursPerDay } from "./program";
 import { DAY, ms } from "./time";
+import { tailSpan } from "./slots";
 
 /**
  * What a season costs over a period, and what it brings in: crew days × each person's day rate, flying
@@ -22,7 +23,7 @@ export function seasonCost(data: AppData, b: Booking, from: number, to: number):
   let flying = 0;
   for (const id of b.aircraftIds) {
     const a = data.aircraft.find((x) => x.id === id);
-    if (a?.hourCost) flying += days * hoursPerDay(data, a) * a.hourCost;
+    if (a?.hourCost) flying += days_(...tailSpan(b, id)) * hoursPerDay(data, a) * a.hourCost;
   }
   const rate = data.missions.find((m) => m.id === b.missionId)?.dayCharge;
   const charged = rate ? days * rate : null;
@@ -31,7 +32,7 @@ export function seasonCost(data: AppData, b: Booking, from: number, to: number):
 }
 
 /** Whether any rate is set at all (so cost columns only show when they mean something). */
-export const hasRates = (data: AppData) => data.people.some((p) => p.dayRate) || data.aircraft.some((a) => a.hourCost) || data.missions.some((m) => m.dayCharge);
+export const hasRates = (data: AppData) => !!data.settings.costs && (data.people.some((p) => p.dayRate) || data.aircraft.some((a) => a.hourCost) || data.missions.some((m) => m.dayCharge));
 
 /** "$12,400" */
 export const money = (n: number, symbol = "$") => `${n < 0 ? "−" : ""}${symbol}${Math.abs(n).toLocaleString("en-US")}`;

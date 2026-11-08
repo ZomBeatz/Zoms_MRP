@@ -165,7 +165,7 @@ export function Field({ label, hint, error, full, spot, children }: { label: str
 }
 
 const missionTone: Record<MissionStatus, string> = { Planned: "accent", Confirmed: "ok", Flying: "ok", Done: "", Cancelled: "" };
-const aircraftTone: Record<AircraftStatus, string> = { Ready: "ok", "In maintenance": "warn", Grounded: "danger", Retired: "" };
+const aircraftTone: Record<AircraftStatus, string> = { Airworthy: "ok", "In maintenance": "warn", AOG: "danger", Retired: "" };
 
 export function StatusPill({ status }: { status: MissionStatus | AircraftStatus }) {
   const tone = (missionTone as Record<string, string>)[status] ?? (aircraftTone as Record<string, string>)[status] ?? "";
@@ -194,17 +194,26 @@ export function Empty({ icon, text, action }: { icon: ReactNode; text: string; a
 }
 
 /** Color swatches plus a free color picker, and the pattern choices drawn in that color. */
-export function LookPicker({ color, pattern, onChange }: { color: string; pattern: Pattern; onChange: (color: string, pattern: Pattern) => void }) {
+/** Color and pattern for a job. `shades`: its type of work's shades, offered first. */
+export function LookPicker({ color, pattern, onChange, shades }: { color: string; pattern: Pattern; onChange: (color: string, pattern: Pattern) => void; shades?: { name: string; colors: string[] } }) {
+  const swatch = (c: string) => (
+    <button key={c} type="button" className={`swatch-btn ${color.toLowerCase() === c.toLowerCase() ? "on" : ""}`} style={{ background: c }} aria-label={`Color ${c}`} onClick={() => onChange(c, pattern)} />
+  );
   return (
     <div className="full" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div className="field">
-        <span>Color</span>
-        <div className="picker-row">
-          {SWATCHES.map((c) => (
-            <button key={c} type="button" className={`swatch-btn ${color === c ? "on" : ""}`} style={{ background: c }} aria-label={`Color ${c}`} onClick={() => onChange(c, pattern)} />
-          ))}
-          <input type="color" aria-label="Any color" value={color} onChange={(e) => onChange(e.target.value, pattern)} />
+      {shades && (
+        <div className="field">
+          <span>Shades of {shades.name}</span>
+          <div className="picker-row">{shades.colors.map(swatch)}</div>
         </div>
+      )}
+      <div className="field">
+        <span>{shades ? "Any color" : "Color"}</span>
+        <div className="swatch-grid">{SWATCHES.map(swatch)}</div>
+        <label className="row gap-sm small" style={{ marginTop: 6 }}>
+          <input type="color" aria-label="Pick your own color" value={color} onChange={(e) => onChange(e.target.value, pattern)} />
+          Your own color <span className="muted mono">{color}</span>
+        </label>
       </div>
       <div className="field">
         <span>Pattern</span>
@@ -215,7 +224,7 @@ export function LookPicker({ color, pattern, onChange }: { color: string; patter
             </button>
           ))}
         </div>
-        <span className="hint">The pattern helps tell missions apart when colors are close.</span>
+        <span className="hint">The pattern helps tell jobs apart when colors are close.</span>
       </div>
     </div>
   );

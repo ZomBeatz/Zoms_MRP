@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen, FlaskConical,
-  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale, ClipboardCheck, Search, Calculator
+  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Package, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale, ClipboardCheck, Search, Calculator
 } from "lucide-react";
 import { useStore } from "./store";
 import { RELEASES_URL, isDesktopApp, isOnlineDemo } from "./platform";
@@ -20,6 +20,7 @@ import { Balance } from "./pages/Balance";
 import { Planner } from "./pages/Planner";
 import { Inspections } from "./pages/Inspections";
 import { TrainingPage } from "./pages/Training";
+import { TypesPage } from "./pages/Types";
 import { SettingsPage } from "./pages/Settings";
 import { Dialogs } from "./dialogs";
 import { Welcome } from "./pages/Welcome";
@@ -34,11 +35,12 @@ import { startUpdates } from "./updates";
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
   { page: "aircraft", label: "Fleet", icon: Plane },
+  { page: "types", label: "Types & equipment", icon: Package },
   { page: "schedule", label: "Schedule", icon: CalendarRange },
-  { page: "missions", label: "Missions", icon: ClipboardList },
+  { page: "missions", label: "Jobs", icon: ClipboardList },
   { page: "people", label: "Crew", icon: Users },
   { page: "maintenance", label: "Maintenance", icon: Wrench },
-  { page: "training", label: "Training", icon: GraduationCap },
+  { page: "training", label: "Qualifications", icon: GraduationCap },
   { page: "inspections", label: "Inspections", icon: ClipboardCheck },
   { page: "balance", label: "Balance", icon: Scale },
   { page: "planner", label: "Crew planner", icon: Calculator },
@@ -88,7 +90,7 @@ export default function App() {
       if (mod || e.altKey || typing(e) || useStore.getState().editing) return;
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
-        const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training" } as const)[page as "aircraft"] ?? "mission";
+        const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training", types: "aircraftType" } as const)[page as "aircraft"] ?? "mission";
         open(kind, "new");
       } else if (e.key === "[") updateSettings({ sidebarCollapsed: !useStore.getState().data.settings.sidebarCollapsed });
       else if (e.key === "?") useStore.getState().go("guide");
@@ -105,6 +107,22 @@ export default function App() {
     const jobs = autoPlans(useStore.getState().data);
     if (jobs.length) useStore.getState().change((d) => ({ ...d, jobs: [...d.jobs, ...jobs] }), `Planned ${jobs.length === 1 ? "1 inspection" : `${jobs.length} inspections`} automatically`);
   }, [started, canEdit, mxOn, autoPlan]);
+
+  // Files no mission lists any more (taken off in an earlier session) are let go of when the app opens.
+  useEffect(() => {
+    if (!started) return;
+    const d = useStore.getState();
+    void import("./docs").then((m) => m.sweepFiles(d.demo, new Set(m.listedFiles(d.data)))).catch(() => {});
+    // Only once, as the app opens: switching to or from the demo swaps the plan, and a sweep then could
+    // run with one plan's list against the other's files.
+  }, [started]);
+
+  // Desktop app: a backup in the chosen folder once a day, if that's turned on (Settings › Backups).
+  useEffect(() => {
+    if (!started || !isDesktopApp) return;
+    const d = useStore.getState();
+    void import("./backup").then((m) => m.dailyBackup(d.data, d.demo)).catch((e) => d.showToast(`Today's backup couldn't be saved: ${String(e)}`));
+  }, [started]);
 
   // The desktop app looks for a new version once a day (only a build made with the updater key).
   useEffect(() => { if (started) void startUpdates(); }, [started]);
@@ -129,7 +147,7 @@ export default function App() {
         <button className="icon-btn" aria-label="Find" onClick={() => setFinding(true)}>
           <Search size={20} />
         </button>
-        <button className="icon-btn" aria-label="New mission" onClick={() => open("mission", "new")}>
+        <button className="icon-btn" aria-label="New job" onClick={() => open("mission", "new")}>
           <Plus size={20} />
         </button>
       </div>
@@ -146,9 +164,9 @@ export default function App() {
             </button>
           )}
         </div>
-        <button className="btn primary big" onClick={() => open("mission", "new")} title="New mission (N)">
+        <button className="btn primary big" onClick={() => open("mission", "new")} title="New job (N)">
           <Plus size={16} />
-          {(!collapsed || drawer) && "New mission"}
+          {(!collapsed || drawer) && "New job"}
         </button>
         <button className="nav-item find-item" onClick={() => setFinding(true)} title={collapsed ? "Find (Ctrl K)" : "Find anything (Ctrl or ⌘ K)"}>
           <Search size={16} />
@@ -207,6 +225,7 @@ export default function App() {
           {page === "schedule" && <Schedule issues={issues} />}
           {page === "missions" && <Missions issues={issues} />}
           {page === "aircraft" && <AircraftPage />}
+          {page === "types" && <TypesPage />}
           {page === "people" && <People issues={issues} />}
           {page === "maintenance" && <Maintenance />}
           {page === "training" && <TrainingPage />}

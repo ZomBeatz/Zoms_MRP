@@ -151,10 +151,10 @@ class Pdf {
     const crewShare = r.crew.length ? r.crew.reduce((t, c) => t + c.on, 0) / (r.crew.length * r.days) : 0;
     const problems = r.issues.filter((i) => i.severity === "danger").length;
     const tiles: [string, string, string][] = [
-      ["Missions", String(r.byMission.length), C.ink],
-      ["Mission days", String(Math.round(r.total)), C.ink],
+      ["Jobs", String(r.byMission.length), C.ink],
+      ["Job days", String(Math.round(r.total)), C.ink],
       ["Fully crewed", `${Math.round(r.crewedShare * 100)}%`, r.crewedShare < 1 ? C.warn : C.ok],
-      ["Fleet on missions", `${Math.round(fleetUse * 100)}%`, C.ink],
+      ["Fleet on jobs", `${Math.round(fleetUse * 100)}%`, C.ink],
       ["Crew busy", `${Math.round(crewShare * 100)}%`, C.ink],
       ["Problems", String(problems), problems ? C.danger : C.ok],
     ];
@@ -172,15 +172,15 @@ class Pdf {
     // Left: days by mission. Right: aircraft free each day, then each tail's use.
     const half = (W - 2 * M - 24) / 2, xr = M + half + 24;
     this.font(12, "bold");
-    this.text("Days by mission", M, y);
+    this.text("Days by job", M, y);
     this.text("Aircraft free each day", xr, y);
-    this.bars(M, y + 16, half, BOTTOM - y - 16, r.byMission.map(({ m, days }) => ({ label: m.name, value: days, max: r.byMission[0]?.days ?? 1, color: m.color, note: `${Math.round(days)} d` })), "No missions in this period.");
+    this.bars(M, y + 16, half, BOTTOM - y - 16, r.byMission.map(({ m, days }) => ({ label: m.name, value: days, max: r.byMission[0]?.days ?? 1, color: m.color, note: `${Math.round(days)} d` })), "No jobs in this period.");
     const chartH = 92;
     this.freeChart(xr, y + 14, half, chartH);
     const fy = y + 14 + chartH + 30;
     this.font(12, "bold");
     this.text("Aircraft use", xr, fy);
-    this.legend(xr + 96, fy, [["On missions", C.pilot], ["Maintenance", REPORT_COLORS.maintenance], ["Available", C.line]]);
+    this.legend(xr + 96, fy, [["On jobs", C.pilot], ["Maintenance", REPORT_COLORS.maintenance], ["Available", C.line]]);
     const tails = r.fleet;
     const rowH = Math.min(16, (BOTTOM - fy - 16) / Math.max(1, tails.length));
     tails.forEach(({ a, flying, maint }, i) => {
@@ -284,7 +284,7 @@ class Pdf {
         if (last && (last as { key?: string }).key === key) { last.b = day + DAY; return; }
         const s = u.kind === "mission" ? { label: u.mission.name, color: u.mission.color, kind: "mission" as const }
           : u.kind === "maintenance" ? { label: u.job.title, color: REPORT_COLORS.maintenance, kind: "maintenance" as const }
-          : u.kind === "down" ? { label: "Grounded", color: REPORT_COLORS.down, kind: "down" as const }
+          : u.kind === "down" ? { label: u.status, color: REPORT_COLORS.down, kind: "down" as const }
           : { label: "Free", color: REPORT_COLORS.free, kind: "free" as const };
         spans.push(Object.assign({ a: day, b: day + DAY, key }, s));
       });
@@ -467,8 +467,8 @@ class Pdf {
   private missions() {
     const { r, data } = this;
     const clipDays = (a: number, b: number) => Math.max(0, Math.min(b, r.to) - Math.max(a, r.from)) / DAY;
-    this.table("Missions", [
-      { title: "Mission", w: 200, get: (m) => ({ swatch: m.color, text: m.name }) },
+    this.table("Jobs", [
+      { title: "Job", w: 200, get: (m) => ({ swatch: m.color, text: m.name }) },
       { title: "Aircraft", w: 90, get: (m) => seasonTails(data, m, "None") },
       { title: "Dates", w: 160, get: (m) => `${format(ms(m.start), "MMM d, yyyy")} to ${format(ms(m.end) - DAY / 2, "MMM d, yyyy")}`, muted: true },
       { title: "Status", w: 70, get: (m) => m.status },
@@ -477,7 +477,7 @@ class Pdf {
         const c = missionCoverage(data, m).covered;
         return { bar: c, text: `${Math.round(c * 100)}%`, color: c >= 1 ? C.ok : c >= 0.8 ? C.warn : C.danger };
       } },
-    ], [...r.missions].sort((a, b) => ms(a.start) - ms(b.start)), "No missions in this period.");
+    ], [...r.missions].sort((a, b) => ms(a.start) - ms(b.start)), "No jobs in this period.");
   }
 
   private workload() {
@@ -503,17 +503,17 @@ class Pdf {
   /** People down the side, courses across: each cell says where that person stands over the period. */
   private training() {
     const rows = this.r.training;
-    const title = "Training";
+    const title = "Qualifications";
     let y = this.page(title);
     y = this.heading(title, y + 4);
-    if (!rows.length) return this.none("No training is needed for these missions.", y);
+    if (!rows.length) return this.none("No qualifications are needed for these jobs.", y);
     const courses = [...new Set(rows.map((t) => t.course))].sort();
     const people = [...new Map(rows.map((t) => [t.person.id, t.person])).values()]
       .sort((x, y) => (x.role === y.role ? x.name.localeCompare(y.name) : x.role === "Pilot" ? -1 : 1));
     const cell = new Map(rows.map((t) => [`${t.person.id}|${t.course}`, t]));
     const look = this.r.training.filter((t) => t.state !== "ok").length;
     this.font(9, "normal", C.muted);
-    this.text(look ? `${look} need a look: training that's missing, has run out, or runs out during the period.` : "Everyone is current on what their missions need for the whole period.", M, y);
+    this.text(look ? `${look} need a look: a qualification that's missing, has run out, or runs out during the period.` : "Everyone is current on what their jobs need for the whole period.", M, y);
     y += 14;
 
     const nameW = 140, cw = Math.min(96, (W - 2 * M - nameW) / courses.length), rowH = 17;
@@ -758,7 +758,7 @@ export async function buildPersonPdf(data: AppData, personId: string, days = 90)
   if (needs.length) {
     y = Math.max(y + 10, PH - 100);
     font(11, "bold");
-    doc.text("Training", M, y);
+    doc.text("Qualifications", M, y);
     font(9.5, "normal");
     needs.slice(0, 5).forEach((t, k) => {
       const st = trainingStatus(p, t.id, from, dayAt(from, 1));

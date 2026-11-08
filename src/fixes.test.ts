@@ -79,7 +79,7 @@ describe("fixes", () => {
     const pilotOn = (sid: string) => data.shifts.find((x) => x.seasonId === sid && data.people.find((p) => p.id === x.personId)?.role === "Pilot")!;
     const person = (id: string) => data.people.find((p) => p.id === id)!;
     // An aircraft that's grounded, in maintenance, and on two jobs at once.
-    ac(s1.aircraftIds[0]).status = "Grounded";
+    ac(s1.aircraftIds[0]).status = "AOG";
     data.jobs.push({ id: "jx", aircraftId: s2.aircraftIds[0], title: "Engine change", kind: "Repair", start: s2.start, end: s2.end, maintainerIds: [], grounds: true, done: false, notes: "" });
     data.seasons.push({ ...s2, id: "twin", aircraftIds: [s2.aircraftIds[0]] });
     // A confirmed job with no aircraft, and one that ends before it starts.
@@ -100,7 +100,7 @@ describe("fixes", () => {
 
     const issues = findIssues(data);
     const kinds = new Set(issues.map((i) => i.id.slice(0, i.id.indexOf("-"))));
-    for (const k of ["time", "noac", "acstat", "acjob", "acdbl", "pgap", "seats", "qual", "offrot", "outside", "stime", "jqual", "dbl", "off", "duty", "rest", "train", "lapsed", "renew"])
+    for (const k of ["time", "noac", "equip", "acstat", "acjob", "acdbl", "pgap", "seats", "qual", "offrot", "outside", "stime", "jqual", "dbl", "off", "duty", "rest", "train", "lapsed", "renew"])
       expect(kinds, k).toContain(k);
     for (const i of issues) {
       const fixes = fixesFor(data, i);

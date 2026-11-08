@@ -207,7 +207,7 @@ function OneJob() {
               <Plus size={14} /> Add an aircraft
             </button>
             {form.aircraft.some((a) => a.night) && (
-              <Field label="Night qualified means" hint="Only pilots with this course current count for night seats.">
+              <Field label="Night qualified means" hint="Only pilots with this qualification current count for night seats.">
                 <select value={form.nightTrainingId} onChange={(e) => set({ nightTrainingId: e.target.value })}>
                   <option value="">Any rated pilot</option>
                   {data.trainings.filter((t) => t.appliesTo !== "Maintainer").map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -230,13 +230,13 @@ function OneJob() {
             </div>
           </section>
 
-          <section className="panel">
+          {data.settings.costs && <section className="panel">
             <h3>Cost</h3>
             <div className="form-grid">
               <Field label="Pilot pay per day away" hint="Travel days included."><NumberInput min={0} max={100000} value={form.dayRate} onChange={(dayRate) => set({ dayRate })} /></Field>
               <Field label="Customer pays per day"><NumberInput min={0} max={1000000} value={form.dayCharge} onChange={(dayCharge) => set({ dayCharge })} /></Field>
             </div>
-          </section>
+          </section>}
         </div>
 
         <div className="planner-result">
@@ -334,7 +334,7 @@ function Answer({ plan, input, ifs, form, data }: { plan: CrewPlan; input: PlanI
             {more.map((w) => <div key={w.text} className="planner-if"><UserPlus size={15} /><span><b>{plural(w.pilots, "pilot")}</b> gives {w.text}</span></div>)}
           </div>
         )}
-        {(crew > 0 || flying > 0 || charged > 0) && (
+        {data.settings.costs && (crew > 0 || flying > 0 || charged > 0) && (
           <div className="planner-cost">
             {crew > 0 && <span>Crew: {plan.dutyDays} days away × {money(form.dayRate, sym)} = <b>{money(Math.round(crew), sym)}</b></span>}
             {flying > 0 && <span>Flying: {one(plan.flightHours)} hours = <b>{money(Math.round(flying), sym)}</b></span>}
@@ -414,7 +414,7 @@ function Board({ plan, first, days, season, data, nightTrainingId }: { plan: Cre
           const c = answer.get(p.id);
           if (!c || c.ok) continue;
           bad++;
-          why ||= !c.trained ? "training not current" : !c.current ? "not flown the type lately" : c.off ? "time off" : !c.onRotation ? "off their rotation" : "booked elsewhere";
+          why ||= !c.trained ? "qualifications not current" : !c.current ? "not flown the type lately" : c.off ? "time off" : !c.onRotation ? "off their rotation" : "booked elsewhere";
         }
         out.set(`${i}|${p.id}`, { bad, why });
       }

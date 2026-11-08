@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
+import { qualificationsDue, kindOf } from "../certificates";
+import { showDueTab } from "./Training";
 import { ignoredIssues, missionCoverage, type Issue } from "../coverage";
 import { format } from "date-fns";
 import { dayAt, fmtRange, ms, overlaps, today } from "../time";
@@ -136,7 +138,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
     const thisWeek = live.filter((m) => overlaps(ms(m.start), ms(m.end), d0, weekEnd));
     const gaps = issues.filter((i) => i.id.startsWith("pgap-")).length;
     const conflicts = issues.filter((i) => i.severity === "danger" && !i.id.startsWith("pgap-")).length;
-    const ready = data.aircraft.filter((a) => a.status === "Ready").length;
+    const ready = data.aircraft.filter((a) => a.status === "Airworthy").length;
     const onDuty = new Set(
       data.shifts.filter((s) => ms(s.start) <= now && ms(s.end) > now).map((s) => s.personId)
         .concat(data.jobs.filter((j) => !j.done && ms(j.start) <= now && ms(j.end) > now).flatMap((j) => j.maintainerIds)),
@@ -159,7 +161,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
       {!data.missions.length && (!withDemo || !data.aircraft.length) && <GettingStarted />}
       <div className="tiles">
         <button className="tile" onClick={() => go("missions")}>
-          <div className="label"><Plane size={14} /> Missions now or in the next 30 days</div>
+          <div className="label"><Plane size={14} /> Jobs now or in the next 30 days</div>
           <div className="value">{stats.thisWeek.length}</div>
         </button>
         <div className="tile">
@@ -171,7 +173,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
           <div className={`value ${stats.conflicts ? "danger" : "ok"}`}>{stats.conflicts}</div>
         </div>
         <button className="tile" onClick={() => go("aircraft")}>
-          <div className="label"><Wrench size={14} /> Aircraft ready</div>
+          <div className="label"><Wrench size={14} /> Aircraft airworthy</div>
           <div className="value">{stats.ready} <span className="muted small">of {data.aircraft.filter((a) => a.status !== "Retired").length}</span></div>
         </button>
         <button className="tile" onClick={() => go("people")}>
@@ -197,9 +199,11 @@ export function Overview({ issues }: { issues: Issue[] }) {
       <IssueList issues={issues} limit={10} />
       <IgnoredList />
 
+      <CertificatesDue />
+
       <h2>Coming up</h2>
       {upcoming.length === 0 ? (
-        <div className="panel muted">No missions coming up.</div>
+        <div className="panel muted">No jobs coming up.</div>
       ) : (
         <div className="issues">
           {upcoming.map((m) => {
@@ -247,7 +251,7 @@ function FleetNow() {
                 <b style={{ fontFamily: "var(--zb-font-mono)" }}>{t.aircraft.tail}</b> <span className="small muted">{t.aircraft.type}</span>
               </span>
               <span className="grow small">
-                {now.kind === "mission" ? <>On <b>{now.mission.name}</b></> : now.kind === "maintenance" ? <>In maintenance ({now.job.title})</> : now.kind === "down" ? "Grounded" : <b style={{ color: "var(--zb-ok)" }}>Free today</b>}
+                {now.kind === "mission" ? <>On <b>{now.mission.name}</b></> : now.kind === "maintenance" ? <>In maintenance ({now.job.title})</> : now.kind === "down" ? <b style={{ color: now.status === "AOG" ? "var(--zb-danger)" : undefined }}>{now.status}{t.aircraft.backOn && now.status !== "Retired" ? `, back ${format(new Date(`${t.aircraft.backOn}T00:00`), "MMM d")}` : ""}</b> : <b style={{ color: "var(--zb-ok)" }}>Free today</b>}
                 <span className="muted">
                   {" · "}
                   {run ? (run[0] === from ? "free now" : `free from ${format(run[0], "MMM d")}`) : "booked all 30 days"}
@@ -316,11 +320,44 @@ function GettingStarted() {
   return (
     <section className="panel getting-started">
       <h3><BookOpen size={16} /> Getting started</h3>
-      <p>Nothing is set up yet. The Guide lists what to add, in order, with a button for each step: aircraft, training, crew, then each customer as a mission.</p>
+      <p>Nothing is set up yet. The Guide lists what to add, in order, with a button for each step: aircraft, qualifications, crew, then each customer as a job.</p>
       <div className="row gap-sm wrap">
         <button className="btn primary" onClick={toSetup}>Set up step by step</button>
         {!demo && <button className="btn" onClick={() => setDemo(true)}>Look at the demo first</button>}
       </div>
     </section>
+  );
+}
+
+/**
+ * Certificates, medicals and check rides that are missing, expired or running out soon, for the people who
+ * need them: the paperwork that could ground someone, one tap from the record to renew it.
+ */
+function CertificatesDue() {
+  const { data, open, go } = useStore();
+  const days = Math.max(60, data.settings.expiryWarningDays);
+  const rows = useMemo(() => qualificationsDue(data, days).filter((r) => r.needed && r.state !== "ok" && kindOf(r.training) !== "course"), [data, days]);
+  if (!data.trainings.some((t) => kindOf(t) !== "course")) return null;
+  const day = (iso: string) => format(new Date(`${iso}T00:00`), "MMM d");
+  return (
+    <>
+      <h2>Certificates and medicals</h2>
+      {rows.length === 0 ? <div className="panel muted">Nothing missing, expired or running out in the next {days} days.</div> : (
+        <div className="issues">
+          {rows.slice(0, 8).map((r) => (
+            <button key={`${r.person.id}-${r.training.id}`} className={`issue ${r.state === "soon" ? "warn" : "danger"}`}
+              onClick={() => open("person", r.person.id, undefined, { tab: "training", spot: `training:${r.training.id}` })}>
+              <span className={`pill ${r.state === "soon" ? "warn" : "danger"}`} style={{ minWidth: 92, justifyContent: "center" }}>
+                {r.state === "missing" ? "Not on record" : r.state === "expired" ? `Expired ${day(r.until!)}` : `Runs out ${day(r.until!)}`}
+              </span>
+              <span className="grow"><b>{r.person.name}</b> · {r.training.name}{r.record?.medicalClass ? ` (${["", "first", "second", "third"][r.record.medicalClass]} class)` : ""}
+                <div className="small muted">{r.jobs.length ? `Needed for ${r.jobs.join(", ")}` : `Every ${r.person.role.toLowerCase()} needs it`}{r.record?.number ? ` · No. ${r.record.number}` : ""}</div>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {rows.length > 8 && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => { showDueTab(); go("training"); }}>See all {rows.length} on Qualifications</button>}
+    </>
   );
 }
