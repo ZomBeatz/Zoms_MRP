@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Calculator, Check, CopyPlus, Download, FileText, Plus, Trash2, Upload, Wand2 } from "lucide-react";
 import { fileSize, getFile, putFile, viewable } from "./docs";
-import { KINDS, everyoneWord, expiryFor, kindOf, withRenewals } from "./certificates";
+import { KINDS, PRIVILEGES, ageOn, everyoneWord, expiryFor, kindOf, medicalExpiry, medicalStages, refreshMedicals, withRenewals } from "./certificates";
 import { isServerBuild } from "./platform";
 import { planSeason } from "./pages/Planner";
 import { fillSeason } from "./fill";
@@ -483,7 +483,7 @@ function MissionDocuments({ docs, onChange, intro }: { docs: MissionDocument[]; 
         </div>
       )}
       {isServerBuild && <p className="form-note">Files stay on this device for now: others signed in to the server see the list, not the files.</p>}
-      <p className="form-note">Files aren't in backups yet. Keep the originals.</p>
+      <p className="form-note">Files stay on this device. Settings › Save a backup includes them.</p>
     </>
   );
 }
@@ -1570,6 +1570,11 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
           </Field>
           <Field label="Base"><input value={p.base} onChange={(e) => set({ base: e.target.value })} /></Field>
           <Field label="Phone"><input type="tel" value={p.phone} onChange={(e) => set({ phone: e.target.value })} /></Field>
+          {p.role === "Pilot" && (
+            <DateInput label="Date of birth" value={p.born ?? ""} clearable="Not given" max={format(today(), "yyyy-MM-dd")}
+              hint={p.born ? `${ageOn(p.born, format(today(), "yyyy-MM-dd"))} today. Sets how long their medical lasts.` : "Sets how long their medical lasts (it depends on age at the exam)."}
+              onChange={(v) => setP((x) => { const next = { ...x, born: v || null }; return { ...next, training: refreshMedicals(next, data.trainings) }; })} />
+          )}
           {data.settings.costs && (
             <Field label="Day rate" hint="Pay and per diem for a day on duty, for cost per job. Optional.">
               <input type="number" inputMode="decimal" min={0} value={p.dayRate ?? ""} placeholder="0" onChange={(e) => set({ dayRate: e.target.value === "" ? null : Number(e.target.value) })} />
@@ -1959,6 +1964,12 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
   const soon = format(addDays(today(), data.settings.expiryWarningDays), "yyyy-MM-dd");
   const needs = neededTraining({ ...data, people: data.people.map((p) => (p.id === person.id ? person : p)) }, person);
   const setAt = (i: number, patch: Partial<TrainingRecord>) => onChange(person.training.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+  /** A medical's fields, with its expiry worked out again from its class, the exam day and their age. */
+  const setMedical = (i: number, patch: Partial<TrainingRecord>) => {
+    const r = { ...person.training[i], ...patch };
+    const t = trainings.find((x) => x.id === r.trainingId);
+    setAt(i, { ...patch, expires: medicalExpiry({ ...r, medicalClass: r.medicalClass ?? 2 }, person.born, t?.privileges), medicalClass: r.medicalClass ?? 2 });
+  };
   // By course, newest first. Only the newest record of a course counts; older ones were renewed.
   const order = person.training.map((r, i) => ({ r, i })).sort((x, y) =>
     (trainings.find((t) => t.id === x.r.trainingId)?.name ?? "").localeCompare(trainings.find((t) => t.id === y.r.trainingId)?.name ?? "") || y.r.completed.localeCompare(x.r.completed));
@@ -1968,7 +1979,10 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
   const add = (tid?: string) => {
     const t = trainings.find((x) => x.id === tid) ?? forRole.find((x) => !person.training.some((r) => r.trainingId === x.id)) ?? forRole[0] ?? trainings[0];
     if (!t) return;
-    onChange([...person.training, ...withRenewals(data, { trainingId: t.id, completed: todayStr, expires: expiryFor(t, todayStr) })]);
+    const rec: TrainingRecord = kindOf(t) === "medical"
+      ? { trainingId: t.id, completed: todayStr, medicalClass: 2, expires: medicalExpiry({ completed: todayStr, medicalClass: 2 }, person.born, t.privileges) }
+      : { trainingId: t.id, completed: todayStr, expires: expiryFor(t, todayStr) };
+    onChange([...person.training, ...withRenewals(data, rec)]);
     setEditing(person.training.length);
   };
   // The course a problem is about: where it stands, and one tap to record the new date.
@@ -2018,11 +2032,42 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
                       {trainings.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                     </select>
                   </Field>
+                  {t && kindOf(t) === "medical" ? (() => {
+                    const stages = medicalStages({ ...r, medicalClass: r.medicalClass ?? 2 }, person.born);
+                    const needed = PRIVILEGES[t.privileges ?? "commercial"].toLowerCase();
+                    return (
+                      <>
+                        <div className="pair">
+                          <Field label="Class">
+                            <select value={r.medicalClass ?? 2} onChange={(e) => setMedical(i, { medicalClass: Number(e.target.value) as 1 | 2 | 3 })}>
+                              <option value={1}>First class</option><option value={2}>Second class</option><option value={3}>Third class</option>
+                            </select>
+                          </Field>
+                          <DateInput label="Exam date" today value={r.completed} onChange={(v) => setMedical(i, { completed: v })} />
+                        </div>
+                        <div className="small" style={{ background: "var(--zb-surface-2)", borderRadius: "var(--zb-radius-sm)", padding: "8px 10px" }}>
+                          <span>
+                            {stages.map((x) => <span key={x.privileges} style={{ display: "block" }}><b>{PRIVILEGES[x.privileges]}</b> privileges through {fmtDay(format(addDays(new Date(`${x.until}T00:00`), -1), "yyyy-MM-dd"))}</span>)}
+                            {!stages.some((x) => x.privileges === (t.privileges ?? "commercial")) && <b style={{ color: "var(--zb-danger)" }}>A {r.medicalClass === 3 ? "third" : "second"} class medical doesn't cover the {needed} privileges this work needs.</b>}
+                            {!person.born && <span className="muted" style={{ display: "block" }}>No date of birth (Details tab): the shorter, 40-or-over periods are used.</span>}
+                          </span>
+                        </div>
+                        <div className="pair">
+                          <Field label="Examiner (AME)"><input value={r.issuedBy ?? ""} placeholder="Dr. Okafor" onChange={(e) => setAt(i, { issuedBy: e.target.value })} /></Field>
+                          <Field label="Certificate number"><input value={r.number ?? ""} onChange={(e) => setAt(i, { number: e.target.value })} /></Field>
+                        </div>
+                        <Field label="Limitations"><input value={r.limitations ?? ""} placeholder="Must wear corrective lenses" onChange={(e) => setAt(i, { limitations: e.target.value })} /></Field>
+                        <DateInput label="Special issuance ends" clearable="No special issuance" value={r.specialIssuanceUntil ?? ""} min={r.completed}
+                          hint="An authorization's own end date. If it's sooner, the medical ends then." onChange={(v) => setMedical(i, { specialIssuanceUntil: v || null })} />
+                      </>
+                    );
+                  })() : <>
                   <div className="pair">
                     <DateInput label={t && kindOf(t) !== "course" ? "Issued or passed" : "Completed"} today value={r.completed} onChange={(v) => setAt(i, { completed: v, expires: t?.validMonths ? expiryFor(t, v) : r.expires })} />
                     <DateInput label="Runs out" hint={t?.endOfMonth ? "The first day it no longer counts (end of the month)." : "Empty if it never does."} value={r.expires ?? ""} min={r.completed} clearable="Never runs out" onChange={(v) => setAt(i, { expires: v || null })} />
                   </div>
-                  {t && kindOf(t) !== "course" && (
+                  </>}
+                  {t && kindOf(t) !== "course" && kindOf(t) !== "medical" && (
                     <>
                       <div className="pair">
                         <Field label="Number"><input value={r.number ?? ""} placeholder="3521847" onChange={(e) => setAt(i, { number: e.target.value })} /></Field>
@@ -2059,7 +2104,7 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
               );
             return (
               <button key={i} className={`line ${expired && needs.has(r.trainingId) && !renewed.has(i) ? "flag" : ""}`} style={renewed.has(i) ? { opacity: 0.55 } : undefined} onClick={() => setEditing(i)}>
-                <span className="name">{t?.name ?? "Deleted qualification"}{r.number ? <span className="small muted"> · No. {r.number}</span> : null}{r.documents?.length ? <span className="small muted"> · {plural(r.documents.length, "file")}</span> : null}</span>
+                <span className="name">{t?.name ?? "Deleted qualification"}{r.medicalClass ? <span className="small muted"> · {["", "First", "Second", "Third"][r.medicalClass]} class</span> : null}{r.limitations ? <span className="small muted"> · {r.limitations}</span> : null}{r.specialIssuanceUntil ? <span className="small muted"> · special issuance</span> : null}{r.number ? <span className="small muted"> · No. {r.number}</span> : null}{r.documents?.length ? <span className="small muted"> · {plural(r.documents.length, "file")}</span> : null}</span>
                 {renewed.has(i) ? <span className="when">Renewed</span>
                   : !needs.has(r.trainingId) ? <span className="small muted">Not needed</span> : null}
                 {renewed.has(i) ? null : expired ? <span className="pill danger">Ran out {fmtDay(until!)}</span>
@@ -2106,7 +2151,17 @@ function TrainingDialog({ id }: Props) {
         onDelete={() => { remove("trainings", t.id, `Deleted “${t.name}”${holders ? ` and ${plural(holders, "record")}` : ""}`); close(); }} />}>
       <div className="form-grid">
         <Field label="Name" full><input autoFocus={autoFocusBox} value={t.name} placeholder="Night vision goggles (NVG)" onChange={(e) => set({ name: e.target.value })} /></Field>
-        <div className="field"><span>Renew every (months)</span><Stepper label="months" max={120} value={t.validMonths} onChange={(validMonths) => set({ validMonths })} /><span className="hint">0 if it never runs out.</span></div>
+        {kindOf(t) === "medical" ? (
+          <Field label="Privileges the work needs" hint="How long each class lasts follows from this and the pilot's age at the exam (FAA rules), to the end of the month.">
+            <select value={t.privileges === "private" ? "private" : t.privileges ?? "commercial"} onChange={(e) => set({ privileges: e.target.value as Training["privileges"], validMonths: 12, endOfMonth: true })}>
+              <option value="commercial">Commercial: first or second class, 12 months</option>
+              <option value="private">Private: any class, 60 months under 40, 24 at 40 or over</option>
+              {t.privileges === "atp" && <option value="atp">Airline transport: first class, 12 months under 40, 6 at 40 or over</option>}
+            </select>
+          </Field>
+        ) : (
+          <div className="field"><span>Renew every (months)</span><Stepper label="months" max={120} value={t.validMonths} onChange={(validMonths) => set({ validMonths })} /><span className="hint">0 if it never runs out.</span></div>
+        )}
         <Field label="For">
           <select value={t.appliesTo} onChange={(e) => set({ appliesTo: e.target.value as Training["appliesTo"] })}>
             <option value="Pilot">Pilots</option><option value="Maintainer">Maintainers</option><option value="Both">Pilots and maintainers</option>
@@ -2120,7 +2175,7 @@ function TrainingDialog({ id }: Props) {
         <div className="field full">
           <label className="check"><input type="checkbox" checked={!!t.everyone} onChange={(e) => set({ everyone: e.target.checked })} /> {everyoneWord(t).replace(/^./, (c) => c.toUpperCase())} needs it, whatever job they're on</label>
           <span className="hint">{t.everyone ? "Like a pilot certificate or a medical: checked on every booking." : "Off: only people on jobs that ask for it need it (a job's Qualifications tab)."}</span>
-          {t.validMonths > 0 && (
+          {t.validMonths > 0 && kindOf(t) !== "medical" && (
             <label className="check" style={{ marginTop: 6 }}><input type="checkbox" checked={!!t.endOfMonth} onChange={(e) => set({ endOfMonth: e.target.checked })} /> Runs out at the end of the month it's due</label>
           )}
         </div>
@@ -2167,7 +2222,9 @@ function GroupTrainingDialog({ id, defaults }: Props) {
   const expires = course ? expiryFor(course, completed) : null;
   const save = () => {
     if (!course || !chosen.size) return;
-    change((d) => ({ ...d, people: d.people.map((p) => (chosen.has(p.id) ? { ...p, training: [...p.training, ...withRenewals(data, { trainingId: course.id, completed, expires })] } : p)) }),
+    change((d) => ({ ...d, people: d.people.map((p) => (chosen.has(p.id) ? { ...p, training: [...p.training, ...withRenewals(data, kindOf(course) === "medical"
+      ? { trainingId: course.id, completed, medicalClass: 2, expires: medicalExpiry({ completed, medicalClass: 2 }, p.born, course.privileges) }
+      : { trainingId: course.id, completed, expires })] } : p)) }),
       `Recorded ${course.name} for ${plural(chosen.size, "person", "people")}`);
     close();
   };

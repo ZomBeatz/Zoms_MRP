@@ -1,7 +1,7 @@
 /**
  * Files attached to missions (contracts, task orders, maps). The plan only lists them (`Mission.documents`);
  * the files themselves are kept in the browser's file storage (IndexedDB) on this device, apart for the demo,
- * because the plan is one small document saved on every change. Backups and the server don't carry them yet.
+ * because the plan is one small document saved on every change. A backup (Settings) carries them; the server doesn't yet.
  */
 
 const DB = (demo: boolean) => (demo ? "zoms-mrp-demo-files" : "zoms-mrp-files");
@@ -56,3 +56,34 @@ export function fileSize(n: number) {
 
 /** What the viewer can show inside the app; anything else is opened or saved. */
 export const viewable = (type: string) => type === "application/pdf" || type.startsWith("image/") || type.startsWith("text/");
+
+/** Every file the plan lists (a job's documents, the scans on qualification records). */
+export const listedFiles = (data: { missions: { documents?: { id: string }[] }[]; people: { training: { documents?: { id: string }[] }[] }[] }) => [
+  ...data.missions.flatMap((m) => m.documents ?? []),
+  ...data.people.flatMap((p) => p.training.flatMap((r) => r.documents ?? [])),
+].map((d) => d.id);
+
+const toBase64 = (b: Blob) => new Promise<string>((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ""));
+  r.onerror = () => reject(r.error);
+  r.readAsDataURL(b);
+});
+
+/** The listed files that are on this device, for a backup: id → { type, base64 }. */
+export async function packFiles(demo: boolean, ids: string[]): Promise<Record<string, { type: string; data: string }>> {
+  const out: Record<string, { type: string; data: string }> = {};
+  for (const id of ids) {
+    const b = await getFile(demo, id).catch(() => null);
+    if (b) out[id] = { type: b.type, data: await toBase64(b) };
+  }
+  return out;
+}
+
+/** Put a backup's files back in this device's file storage. */
+export async function unpackFiles(demo: boolean, files: Record<string, { type: string; data: string }>) {
+  for (const [id, f] of Object.entries(files)) {
+    const bytes = Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0));
+    await putFile(demo, id, new Blob([bytes], { type: f.type }));
+  }
+}

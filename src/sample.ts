@@ -2,7 +2,7 @@ import { addMonths, format } from "date-fns";
 import type { Aircraft, AircraftType, AppData, Booking, Equipment, MaintenanceJob, Mission, Pattern, Person, ProgramItem, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
 import { booking } from "./bookings";
 import { shadeAt } from "./look";
-import { expiryFor } from "./certificates";
+import { expiryFor, medicalExpiry } from "./certificates";
 import { onRotationFor } from "./rotation";
 import { DAY, dayAt, overlaps, toWhen, today } from "./time";
 
@@ -87,7 +87,7 @@ export function sampleData(settings = defaultSettings()): AppData {
   const cert = (name: string, kind: Training["kind"], validMonths: number, appliesTo: Training["appliesTo"], more: Partial<Training> = {}): Training =>
     ({ ...course(name, validMonths, appliesTo), kind, everyone: true, ...more });
   const cPilot = cert("Commercial pilot certificate", "certificate", 0, "Pilot");
-  const cMedical = cert("Second class medical", "medical", 12, "Pilot", { endOfMonth: true });
+  const cMedical = cert("Medical certificate", "medical", 12, "Pilot", { endOfMonth: true, privileges: "commercial" });
   const cCheck = cert("Part 135 competency check", "check", 12, "Pilot", { endOfMonth: true });
   const cMechanic = cert("Mechanic certificate (A&P)", "certificate", 0, "Maintainer");
   const cHazmat = cert("Hazmat handler card", "certificate", 24, "Maintainer", { everyone: false, renewedBy: [tFuel.id] });
@@ -327,19 +327,28 @@ export function sampleData(settings = defaultSettings()): AppData {
   const num = () => String(1_000_000 + Math.floor(rc() * 8_999_999));
   people.forEach((p, i) => {
     if (p.role === "Pilot") {
+      // Born 27 to 58 years ago, so the medical rules that depend on age have something to go on.
+      p.born = iso(dayAt(t0, -Math.floor((27 + rc() * 31) * 365.25)));
       p.training.push({ trainingId: cPilot.id, completed: iso(dayAt(t0, -400 - Math.floor(rc() * 3000))), expires: null, number: num(), issuedBy: "FAA", grade: "Commercial, rotorcraft-helicopter, instrument helicopter" });
+      // A few hold first class medicals; two have limitations, and one flies on a special issuance.
+      const medical = (completed: string): TrainingRecord => {
+        const r: TrainingRecord = { trainingId: cMedical.id, completed, medicalClass: i % 7 === 0 ? 1 : 2, expires: null, issuedBy: "Dr. Okafor, AME", number: num() };
+        if (i % 9 === 4) r.limitations = "Must wear corrective lenses";
+        if (p === P.marcus) { r.limitations = "Valid only with annual cardiac evaluation"; r.specialIssuanceUntil = iso(dayAt(new Date(`${completed}T00:00`).getTime(), 420)); }
+        return { ...r, expires: medicalExpiry(r, p.born, cMedical.privileges) };
+      };
       for (const c of [cMedical, cCheck]) {
         // Done 1 to 11 months ago; the next one booked two weeks before it runs out. On purpose, Elena's
         // check ride runs out within a few weeks with nothing booked yet.
-        const done = iso(dayAt(t0, -30 - Math.floor(rc() * 300)));
-        const rec = { trainingId: c.id, completed: done, expires: expiryFor(c, done), number: c === cMedical ? num() : "", issuedBy: c === cMedical ? "Dr. Okafor, AME" : "Check airman J. Reyes", grade: c === cMedical ? "Second class" : "" };
         const late = c === cCheck && p === P.elena;
-        if (late) { rec.completed = iso(dayAt(t0, -350)); rec.expires = expiryFor(c, rec.completed); }
+        const done = late ? iso(dayAt(t0, -350)) : iso(dayAt(t0, -30 - Math.floor(rc() * 300)));
+        const make = (completed: string): TrainingRecord => (c === cMedical ? medical(completed) : { trainingId: c.id, completed, expires: expiryFor(c, completed), issuedBy: "Check airman J. Reyes" });
+        const rec = make(done);
         // The one before it, so the past year is covered too.
         const before = format(addMonths(new Date(`${rec.completed}T00:00`), 1 - c.validMonths), "yyyy-MM-dd");
-        p.training.push({ trainingId: c.id, completed: before, expires: expiryFor(c, before) }, rec);
+        p.training.push({ ...make(before), number: rec.number }, rec);
         const next = dayAt(new Date(`${rec.expires}T00:00`).getTime(), -14);
-        if (!late && next < windowTo) p.training.push({ trainingId: c.id, completed: iso(next), expires: expiryFor(c, iso(next)) });
+        if (!late && next < windowTo) p.training.push(make(iso(next)));
       }
     } else {
       p.training.push({ trainingId: cMechanic.id, completed: iso(dayAt(t0, -500 - i * 97)), expires: null, number: num(), issuedBy: "FAA", grade: "Airframe and powerplant" });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dueList, expiryFor, withRenewals } from "./certificates";
+import { expiryFor, qualificationsDue as dueList, withRenewals } from "./certificates";
 import { findIssues, neededTraining } from "./coverage";
 import { emptyData } from "./sample";
 import type { AppData, Person } from "./types";
@@ -57,5 +57,39 @@ describe("certificates", () => {
     data.people[0].training.push({ trainingId: "chk", completed: "2030-11-10", expires: "2031-11-10" });
     rows = dueList(data, 30, now);
     expect(rows.find((r) => r.training.id === "chk")?.state).toBe("ok");
+  });
+});
+
+describe("medicals", () => {
+  it("lasts by class, privileges and age at the exam, to the end of the month", async () => {
+    const { medicalExpiry, medicalStages, ageOn } = await import("./certificates");
+    const exam = { completed: "2026-03-14" };
+    expect(ageOn("1990-03-15", "2026-03-14")).toBe(35);
+    expect(ageOn("1986-03-14", "2026-03-14")).toBe(40);
+    // Commercial: first or second class, 12 months, any age.
+    expect(medicalExpiry({ ...exam, medicalClass: 2 }, "1990-01-01", "commercial")).toBe("2027-04-01");
+    expect(medicalExpiry({ ...exam, medicalClass: 1 }, "1960-01-01", "commercial")).toBe("2027-04-01");
+    // A third class doesn't cover commercial at all.
+    expect(medicalExpiry({ ...exam, medicalClass: 3 }, "1990-01-01", "commercial")).toBe("2026-03-14");
+    // Private: 60 months under 40, 24 at 40 or over (and 24 without a date of birth).
+    expect(medicalExpiry({ ...exam, medicalClass: 3 }, "1990-01-01", "private")).toBe("2031-04-01");
+    expect(medicalExpiry({ ...exam, medicalClass: 3 }, "1980-01-01", "private")).toBe("2028-04-01");
+    expect(medicalExpiry({ ...exam, medicalClass: 3 }, null, "private")).toBe("2028-04-01");
+    // Airline transport: first class only, 12 months under 40, 6 at 40 or over.
+    expect(medicalExpiry({ ...exam, medicalClass: 1 }, "1990-01-01", "atp")).toBe("2027-04-01");
+    expect(medicalExpiry({ ...exam, medicalClass: 1 }, "1980-01-01", "atp")).toBe("2026-10-01");
+    expect(medicalExpiry({ ...exam, medicalClass: 2 }, "1990-01-01", "atp")).toBe("2026-03-14");
+    // A special issuance ending sooner ends it then.
+    expect(medicalExpiry({ ...exam, medicalClass: 2, specialIssuanceUntil: "2026-12-01" }, "1990-01-01")).toBe("2026-12-01");
+    // What it covers, step by step.
+    expect(medicalStages({ ...exam, medicalClass: 2 }, "1980-01-01")).toEqual([{ privileges: "commercial", until: "2027-04-01" }, { privileges: "private", until: "2028-04-01" }]);
+  });
+});
+
+describe("backups", () => {
+  it("leaves a backup's attached files out of the plan itself", async () => {
+    const { migrate } = await import("./migrate");
+    const d = migrate({ ...emptyData(), files: { f1: { type: "application/pdf", data: "JVBERg==" } } });
+    expect("files" in d).toBe(false);
   });
 });

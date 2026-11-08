@@ -1,5 +1,5 @@
 import { addMonths, format, startOfMonth } from "date-fns";
-import type { AppData, Person, Training, TrainingRecord } from "./types";
+import type { AppData, Person, Privileges, Training, TrainingRecord } from "./types";
 import { neededTraining } from "./coverage";
 import { validUntil } from "./types";
 
@@ -52,7 +52,7 @@ export interface DueRow {
  * Every qualification each person holds or needs, with where it stands: missing (needed, no record),
  * expired, running out within `days`, or fine. A renewal already on record (done later) counts.
  */
-export function dueList(data: AppData, days: number, now = Date.now()): DueRow[] {
+export function qualificationsDue(data: AppData, days: number, now = Date.now()): DueRow[] {
   const today = format(now, "yyyy-MM-dd");
   const soon = format(now + days * 86_400_000, "yyyy-MM-dd");
   const rows: DueRow[] = [];
@@ -75,3 +75,62 @@ export function dueList(data: AppData, days: number, now = Date.now()): DueRow[]
 
 /** "every pilot", "every maintainer", "everyone" */
 export const everyoneWord = (t: Pick<Training, "appliesTo">) => (t.appliesTo === "Pilot" ? "every pilot" : t.appliesTo === "Maintainer" ? "every maintainer" : "everyone");
+
+// ---------------------------------------------------------------- medicals
+
+/**
+ * How long a medical of a class lasts for the privileges the work needs, by age at the exam (FAA,
+ * 14 CFR 61.23), counted to the end of the month. null: that class doesn't cover those privileges.
+ *   ATP (first class): 12 months under 40, 6 months at 40 or over.
+ *   Commercial: first or second class, 12 months.
+ *   Private (any class): 60 months under 40, 24 months at 40 or over.
+ * Without a date of birth the shorter (40 or over) rule is used, so it never counts too long.
+ */
+export function medicalMonths(cls: 1 | 2 | 3, ageAtExam: number | null, privileges: Privileges): number | null {
+  const under40 = ageAtExam !== null && ageAtExam < 40;
+  if (privileges === "atp") return cls === 1 ? (under40 ? 12 : 6) : null;
+  if (privileges === "commercial") return cls <= 2 ? 12 : null;
+  return under40 ? 60 : 24;
+}
+
+/** Whole years old on a day ("1984-06-02" on "2026-11-08" → 42). */
+export function ageOn(born: string | null | undefined, day: string): number | null {
+  if (!born) return null;
+  const [by, bm, bd] = born.split("-").map(Number);
+  const [y, m, d] = day.split("-").map(Number);
+  return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0);
+}
+
+/** First day after `months` calendar months from the exam (the end-of-month rule). */
+const afterMonths = (exam: string, months: number) => format(startOfMonth(addMonths(new Date(`${exam}T00:00`), months + 1)), "yyyy-MM-dd");
+
+/**
+ * The day a medical stops covering the privileges (the first day it no longer counts). A class too low for
+ * them counts not at all (its exam day). A special issuance ending sooner ends it then.
+ */
+export function medicalExpiry(rec: Pick<TrainingRecord, "completed" | "medicalClass" | "specialIssuanceUntil">, born: string | null | undefined, privileges: Privileges = "commercial"): string {
+  const months = medicalMonths(rec.medicalClass ?? 2, ageOn(born, rec.completed), privileges);
+  const until = months === null ? rec.completed : afterMonths(rec.completed, months);
+  return rec.specialIssuanceUntil && rec.specialIssuanceUntil < until ? rec.specialIssuanceUntil : until;
+}
+
+/** What a medical covers and until when, step by step ("Commercial to Nov 30, 2027", "Private to Nov 30, 2031"). */
+export function medicalStages(rec: Pick<TrainingRecord, "completed" | "medicalClass" | "specialIssuanceUntil">, born: string | null | undefined, withAtp = false): { privileges: Privileges; until: string }[] {
+  const levels: Privileges[] = withAtp ? ["atp", "commercial", "private"] : ["commercial", "private"];
+  return levels.flatMap((privileges) => {
+    const months = medicalMonths(rec.medicalClass ?? 2, ageOn(born, rec.completed), privileges);
+    if (months === null) return [];
+    const until = afterMonths(rec.completed, months);
+    return [{ privileges, until: rec.specialIssuanceUntil && rec.specialIssuanceUntil < until ? rec.specialIssuanceUntil : until }];
+  });
+}
+
+export const PRIVILEGES: Record<Privileges, string> = { atp: "Airline transport", commercial: "Commercial", private: "Private" };
+
+/** A person's medical records with their expiry worked out again (after their date of birth or a record changes). */
+export function refreshMedicals(p: Person, trainings: Training[]): TrainingRecord[] {
+  return p.training.map((r) => {
+    const t = trainings.find((x) => x.id === r.trainingId);
+    return t && kindOf(t) === "medical" && r.medicalClass ? { ...r, expires: medicalExpiry(r, p.born, t.privileges) } : r;
+  });
+}

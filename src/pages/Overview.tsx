@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, CircleAlert, Plane, SearchCheck, Users, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
+import { qualificationsDue, kindOf } from "../certificates";
+import { showDueTab } from "./Training";
 import { ignoredIssues, missionCoverage, type Issue } from "../coverage";
 import { format } from "date-fns";
 import { dayAt, fmtRange, ms, overlaps, today } from "../time";
@@ -197,6 +199,8 @@ export function Overview({ issues }: { issues: Issue[] }) {
       <IssueList issues={issues} limit={10} />
       <IgnoredList />
 
+      <CertificatesDue />
+
       <h2>Coming up</h2>
       {upcoming.length === 0 ? (
         <div className="panel muted">No jobs coming up.</div>
@@ -322,5 +326,38 @@ function GettingStarted() {
         {!demo && <button className="btn" onClick={() => setDemo(true)}>Look at the demo first</button>}
       </div>
     </section>
+  );
+}
+
+/**
+ * Certificates, medicals and check rides that are missing, expired or running out soon, for the people who
+ * need them: the paperwork that could ground someone, one tap from the record to renew it.
+ */
+function CertificatesDue() {
+  const { data, open, go } = useStore();
+  const days = Math.max(60, data.settings.expiryWarningDays);
+  const rows = useMemo(() => qualificationsDue(data, days).filter((r) => r.needed && r.state !== "ok" && kindOf(r.training) !== "course"), [data, days]);
+  if (!data.trainings.some((t) => kindOf(t) !== "course")) return null;
+  const day = (iso: string) => format(new Date(`${iso}T00:00`), "MMM d");
+  return (
+    <>
+      <h2>Certificates and medicals</h2>
+      {rows.length === 0 ? <div className="panel muted">Nothing missing, expired or running out in the next {days} days.</div> : (
+        <div className="issues">
+          {rows.slice(0, 8).map((r) => (
+            <button key={`${r.person.id}-${r.training.id}`} className={`issue ${r.state === "soon" ? "warn" : "danger"}`}
+              onClick={() => open("person", r.person.id, undefined, { tab: "training", spot: `training:${r.training.id}` })}>
+              <span className={`pill ${r.state === "soon" ? "warn" : "danger"}`} style={{ minWidth: 92, justifyContent: "center" }}>
+                {r.state === "missing" ? "Not on record" : r.state === "expired" ? `Expired ${day(r.until!)}` : `Runs out ${day(r.until!)}`}
+              </span>
+              <span className="grow"><b>{r.person.name}</b> · {r.training.name}{r.record?.medicalClass ? ` (${["", "first", "second", "third"][r.record.medicalClass]} class)` : ""}
+                <div className="small muted">{r.jobs.length ? `Needed for ${r.jobs.join(", ")}` : `Every ${r.person.role.toLowerCase()} needs it`}{r.record?.number ? ` · No. ${r.record.number}` : ""}</div>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {rows.length > 8 && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => { showDueTab(); go("training"); }}>See all {rows.length} on Qualifications</button>}
+    </>
   );
 }

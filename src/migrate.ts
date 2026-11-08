@@ -55,6 +55,8 @@ export function migrate(raw: any): AppData {
   }));
   d.people = d.people.map((p) => ({ ...p, rotation: p.rotation ?? null }));
   delete d.areas;
+  // A backup's attached files are put back in the file storage before this; they're not part of the plan.
+  delete (d as { files?: unknown }).files;
 
   // 0.2.6: aircraft types and equipment are lists of their own. Types start from every name already in use
   // (tails, crew ratings, maintenance programs), with the seats of the first tail of each.

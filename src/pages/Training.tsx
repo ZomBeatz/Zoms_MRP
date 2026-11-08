@@ -5,7 +5,7 @@ import { useStore } from "../store";
 import { neededTraining } from "../coverage";
 import { daysSince } from "../currency";
 import { DAY, plural, today } from "../time";
-import { KINDS, dueList, kindOf } from "../certificates";
+import { KINDS, kindOf, qualificationsDue } from "../certificates";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, Empty } from "../components/ui";
 import { validUntil, type Person, type Training } from "../types";
@@ -31,9 +31,13 @@ function standing(p: Person, t: Training, warnDays: number): Standing {
   return { label: "Current", tone: "ok", date };
 }
 
+/** Open the Qualifications page on Due and expired next time it draws (from the Overview). */
+let wantDue = false;
+export const showDueTab = () => { wantDue = true; };
+
 export function TrainingPage() {
   const { data, open } = useStore();
-  const [tab, setTab] = useState<Tab>("current");
+  const [tab, setTab] = useState<Tab>(() => { const due = wantDue; wantDue = false; return due ? "due" : "current"; });
   const [kind, setKind] = useState("");
   const warn = data.settings.expiryWarningDays;
   const mission = data.missions.find((m) => m.id === kind);
@@ -247,7 +251,7 @@ function DueAndExpired() {
   const [days, setDays] = useState(90);
   const [kind, setKind] = useState<"" | NonNullable<Training["kind"]>>("");
   const [all, setAll] = useState(false);
-  const rows = useMemo(() => dueList(data, days), [data, days])
+  const rows = useMemo(() => qualificationsDue(data, days), [data, days])
     .filter((r) => (all || r.needed) && r.state !== "ok")
     .filter((r) => !kind || kindOf(r.training) === kind);
   const tone = { missing: "danger", expired: "danger", soon: "warn", ok: "ok" } as const;
