@@ -20,7 +20,7 @@
 - The Qualifications page shows what every pilot and every maintainer needs.
 
 **Fixes**
-- **Updates:** the desktop app can update itself again. Releases since 0.2.5 were missing their update file, so installed apps reported a JSON or offline error. Install 0.2.7 by hand once; later versions update themselves.
+- **Updates:** the desktop app can update itself again. The 0.2.5 and 0.2.6 releases were missing their update file, so installed apps reported a JSON or offline error. Copies of 0.2.5 and 0.2.6 find 0.2.7 by themselves once it's published.
 - Rotation boxes stay empty when you clear them.
 - Jobs show their client's color everywhere they're listed.
 
