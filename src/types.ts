@@ -22,6 +22,29 @@ export interface Aircraft {
   hoursPerDay?: number | null;
   /** What a flight hour costs (fuel, parts, reserves), for cost per mission. */
   hourCost?: number | null;
+  /** Equipment this tail has or can be fitted with (a hoist, a bucket), from the equipment list. */
+  equipmentIds?: ID[];
+}
+
+/**
+ * A kind of aircraft ("Bell 412"), set up once under Types & equipment and picked on each tail. Tails,
+ * crew ratings and maintenance programs refer to it by name, so renaming a type renames it everywhere.
+ */
+export interface AircraftType {
+  id: ID;
+  name: string;
+  /** Pilot seats a new tail of this type starts with. */
+  seats: number;
+  /** Equipment that can go on this type; a tail of it picks from these. Empty = any equipment. */
+  equipmentIds: ID[];
+  notes: string;
+}
+
+/** Something an aircraft carries for a kind of work: a rescue hoist, a fire bucket, a stretcher kit. */
+export interface Equipment {
+  id: ID;
+  name: string;
+  notes: string;
 }
 
 export type Role = "Pilot" | "Maintainer";
@@ -104,6 +127,8 @@ export interface Mission {
   location: string;
   /** Training everyone on this mission needs (NVG, mountain flying…). */
   requiredTrainingIds: ID[];
+  /** Equipment every aircraft on this mission needs (a hoist for rescue, a bucket for fire). */
+  requiredEquipmentIds?: ID[];
   /** How its slots look on the schedule. */
   color: string;
   pattern: Pattern;
@@ -156,7 +181,7 @@ export interface MaintainerNeed {
  * A season together with its mission's details, which is what the schedule, the fleet and the checks
  * work with (see `bookings` in src/bookings.ts). Its `id` is the season's.
  */
-export type Booking = Season & Pick<Mission, "name" | "contact" | "location" | "requiredTrainingIds" | "color" | "pattern">;
+export type Booking = Season & Pick<Mission, "name" | "contact" | "location" | "requiredTrainingIds" | "requiredEquipmentIds" | "color" | "pattern">;
 
 /** One person covering part of a season. Pilots rotate by adding several of these. */
 export interface Shift {
@@ -297,6 +322,10 @@ export interface Settings {
 export interface AppData {
   version: 1;
   aircraft: Aircraft[];
+  /** Kinds of aircraft, picked on each tail. */
+  aircraftTypes: AircraftType[];
+  /** Equipment aircraft can carry and missions can need. */
+  equipment: Equipment[];
   trainings: Training[];
   people: Person[];
   missions: Mission[];
@@ -311,4 +340,4 @@ export interface AppData {
   settings: Settings;
 }
 
-export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "inspections" | "balance" | "planner" | "reports" | "settings" | "guide";
+export type Page = "overview" | "schedule" | "missions" | "aircraft" | "types" | "people" | "maintenance" | "training" | "inspections" | "balance" | "planner" | "reports" | "settings" | "guide";

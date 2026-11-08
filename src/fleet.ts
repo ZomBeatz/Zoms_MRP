@@ -1,5 +1,6 @@
 import type { Aircraft, AppData, Booking, MaintenanceJob, Person } from "./types";
 import { bookings } from "./bookings";
+import { missingEquipment } from "./aircraftTypes";
 import { dutyOf, trainingStatus } from "./coverage";
 import { dayAt, ms, overlaps } from "./time";
 
@@ -102,6 +103,8 @@ export interface Job {
   pilotsNeeded: number;
   /** Training the crew needs. */
   training: string[];
+  /** Equipment the aircraft needs (a hoist, a bucket). */
+  equipment?: string[];
 }
 
 /** Can this pilot fly that day: qualified on the type, not booked, not off, training current for the day. */
@@ -164,6 +167,8 @@ export function canSupport(data: AppData, job: Job): SupportAnswer[] {
       const reasons: string[] = [];
       if (job.type && a.type !== job.type) reasons.push(`It's a ${a.type}.`);
       if (a.status === "Grounded") reasons.push("It's grounded.");
+      const missing = missingEquipment(data, a, job.equipment);
+      if (missing.length) reasons.push(`It has no ${missing.map((e) => e.name.toLowerCase()).join(" or ")}.`);
       if (job.pilotsNeeded > a.seats) reasons.push(`It has ${a.seats} pilot seat${a.seats === 1 ? "" : "s"}.`);
       for (const m of bookings(data))
         if (m.aircraftIds.includes(a.id) && live(m) && overlaps(job.start, job.end, ms(m.start), ms(m.end))) reasons.push(`Booked on “${m.name}”.`);
@@ -171,7 +176,7 @@ export function canSupport(data: AppData, job: Job): SupportAnswer[] {
         if (j.aircraftId === a.id && j.grounds && !j.done && overlaps(job.start, job.end, ms(j.start), ms(j.end))) reasons.push(`In maintenance (“${j.title}”).`);
       const crew = crewFor(a.type);
       // Only bookings and maintenance are worth waiting out; the wrong type or too few seats never clear.
-      const wrongKind = (job.type && a.type !== job.type) || a.status === "Grounded" || job.pilotsNeeded > a.seats;
+      const wrongKind = (job.type && a.type !== job.type) || a.status === "Grounded" || job.pilotsNeeded > a.seats || missing.length > 0;
       if (reasons.length)
         return { aircraft: a, verdict: "no", reasons: [...new Set(reasons)], shortDays: crew.short, fewestPilots: crew.fewest, earliest: wrongKind ? undefined : earliestFree(data, a, job.start, days.length) };
       if (crew.short) reasons.push(`Not enough free, qualified, current pilots on ${crew.short} day${crew.short === 1 ? "" : "s"}.`);

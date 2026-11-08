@@ -25,6 +25,7 @@ export interface PageHelp {
 export const PAGE_HELP: PageHelp[] = [
   { page: "overview", label: "Overview", about: "What's flying, and every problem with its fix", words: "problems needs attention gaps conflicts home dashboard", guide: "overview", docs: "overview" },
   { page: "aircraft", label: "Fleet", about: "Every tail over time, free windows, and Can we take a job?", words: "aircraft tails helicopters free windows take a job", guide: "fleet", docs: "fleet" },
+  { page: "types", label: "Types & equipment", about: "Kinds of aircraft, and the equipment they carry for different work", words: "aircraft types models makes equipment hoist bucket floats medical interior kit", guide: "types", docs: "fleet#types-and-equipment" },
   { page: "schedule", label: "Schedule", about: "The plan as a Gantt chart, by aircraft, mission or person", words: "gantt chart calendar timeline open seats", guide: "schedule", docs: "schedule" },
   { page: "missions", label: "Missions", about: "Each customer's work and its seasons", words: "customers seasons contracts jobs", guide: "missions", docs: "missions-and-seasons" },
   { page: "people", label: "Crew", about: "Pilots and maintainers, ratings and time off", words: "people pilots maintainers ratings time off leave sick", guide: "crew", docs: "crew" },
@@ -41,7 +42,7 @@ export const PAGE_HELP: PageHelp[] = [
 /** The online guide's page for each Guide section, for its "More online" link. */
 export const SECTION_DOCS: Record<string, string> = {
   flow: "quick-start", setup: "quick-start", colors: "overview", words: "glossary", mistakes: "data-and-backups#undo",
-  overview: "overview", fleet: "fleet", missions: "missions-and-seasons", rotations: "filling-the-schedule", schedule: "schedule",
+  overview: "overview", fleet: "fleet", types: "fleet#types-and-equipment", missions: "missions-and-seasons", rotations: "filling-the-schedule", schedule: "schedule",
   crew: "crew", training: "training", maintenance: "maintenance", checks: "overview#what-zom-s-mrp-checks", inspections: "maintenance#inspections",
   currency: "crew#currency", cost: "costs", limits: "work-limits", balance: "balance", planner: "crew-planner", reports: "reports", data: "data-and-backups",
 };
@@ -53,6 +54,7 @@ export const SECTION_DOCS: Record<string, string> = {
 export interface NewPageNote { page: Page; text: string }
 
 export const NEW_PAGE_NOTES: NewPageNote[] = [
+  { page: "types", text: "Your aircraft types are here already, from your tails and crew ratings. Add the equipment you fly with (a hoist, a bucket), tick what each type can carry, then tick what each tail has and what each mission needs." },
   { page: "planner", text: "Put in the job's dates and aircraft, or start from a season, and the answer updates as you type: how few pilots it takes, why, and the rotation. Several jobs adds up the coming jobs against the pilots you have." },
   { page: "balance", text: "Pick a period to see how busy everyone is. Try other crew sizes for a job, lock what should stay, and press Rebalance. Nothing changes until Apply." },
   { page: "inspections", text: "Add each aircraft type's inspections under Programs, type each tail's hours under Flight hours, then Due shows what's coming and Plan it books it." },

@@ -18,7 +18,8 @@ import { daysSince } from "./currency";
 import { ConfirmButton, IssueList } from "./pages/Overview";
 import type { Fix } from "./fixes";
 import { validUntil } from "./types";
-import type { Aircraft, AppData, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
+import { equipmentFor, missingEquipment, renameType } from "./aircraftTypes";
+import type { Aircraft, AircraftType, AppData, Equipment, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
 
 /** Opens the right dialog for whatever `editing` points at. */
 export function Dialogs() {
@@ -32,6 +33,8 @@ export function Dialogs() {
     case "job": return <JobDialog key={editing.id} {...props} />;
     case "timeOff": return <TimeOffDialog key={editing.id} {...props} />;
     case "training": return <TrainingDialog key={editing.id} {...props} />;
+    case "aircraftType": return <AircraftTypeDialog key={editing.id} {...props} />;
+    case "equipment": return <EquipmentDialog key={editing.id} {...props} />;
     case "support": return <SupportDialog key={editing.id} {...props} />;
     case "swap": return <SwapDialog key={editing.id} {...props} />;
     case "groupTraining": return <GroupTrainingDialog key={editing.id} {...props} />;
@@ -94,20 +97,21 @@ function Pick({ on, onToggle, children, title }: { on: boolean; onToggle: () => 
 
 const toggled = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
 
-/** Known aircraft types, for suggestions as you type. */
-const typesOf = (d: AppData) => [...new Set([...d.aircraft.map((a) => a.type), ...d.people.flatMap((p) => p.quals)])].sort();
+/** Known aircraft types: the list under Types & equipment, plus any name still in use. */
+const typesOf = (d: AppData) => [...new Set([...(d.aircraftTypes ?? []).map((t) => t.name), ...d.aircraft.map((a) => a.type), ...d.people.flatMap((p) => p.quals)])].filter(Boolean).sort();
 
 // ---------------------------------------------------------------- mission (the customer's work)
 
-function MissionDialog({ id, defaults }: Props) {
+function MissionDialog({ id, defaults, fix = {} }: Props) {
   const { data, change, remove, close, open } = useStore();
   const existing = data.missions.find((m) => m.id === id);
   const isNew = !existing;
   const [kept] = useState(() => keptForm<{ tab: string; m: Mission; pool: Set<string> }>());
-  const [tab, setTab] = useState(kept.tab ?? "details");
+  const [tab, setTab] = useState(kept.tab ?? fix.tab ?? "details");
   const [m, setM] = useState<Mission>(() => kept.m ?? existing ?? {
     id: uid(), name: "", contact: "", location: "", notes: "",
     requiredTrainingIds: (defaults.requiredTrainingIds as string[] | undefined) ?? [],
+    requiredEquipmentIds: (defaults.requiredEquipmentIds as string[] | undefined) ?? [],
     // A new mission takes the next color nobody is using yet.
     color: SWATCHES.find((c) => !data.missions.some((x) => x.color === c)) ?? SWATCHES[0], pattern: "solid",
   });
@@ -228,6 +232,7 @@ function MissionDialog({ id, defaults }: Props) {
         { key: "details", label: "Details", alert: !m.name.trim() && tab !== "details" },
         { key: "seasons", label: isNew ? "First season" : <>Seasons <span className="chip">{seasons.length}</span></>, alert: firstBad },
         { key: "training", label: <>Training <span className="chip">{m.requiredTrainingIds.length}</span></> },
+        { key: "equipment", label: <>Equipment <span className="chip">{(m.requiredEquipmentIds ?? []).length}</span></> },
         { key: "crew", label: <>Crew <span className="chip">{pool.size}</span></> },
         ...(isNew ? [] : [{ key: "rotations", label: "Rotations" }]),
       ]}
@@ -265,7 +270,7 @@ function MissionDialog({ id, defaults }: Props) {
         <>
           <div className="form-grid">
             <DateFields start={first.start} end={first.end} onChange={(start, end) => setF({ start, end })} />
-            <AircraftPicker value={first.aircraftIds} onChange={(aircraftIds) => setF({ aircraftIds })} when={{ start: first.start, end: first.end, seasonId: first.id }} />
+            <AircraftPicker value={first.aircraftIds} onChange={(aircraftIds) => setF({ aircraftIds })} when={{ start: first.start, end: first.end, seasonId: first.id }} needs={m.requiredEquipmentIds} />
             <CrewSize season={first} onChange={setF} />
             <RotationField label="Pilot rotation" value={first.pilotRotation} onChange={(pilotRotation) => setF({ pilotRotation })} />
             <RotationField label="Maintainer rotation" value={first.maintainerRotation} onChange={(maintainerRotation) => setF({ maintainerRotation })} />
@@ -325,6 +330,27 @@ function MissionDialog({ id, defaults }: Props) {
             ))}
             {data.trainings.length === 0 && <span className="muted">No training set up yet. Add courses under Training.</span>}
           </div>
+        </>
+      )}
+
+      {tab === "equipment" && (
+        <>
+          <p className="form-note" style={{ marginTop: 0, marginBottom: 12 }}>Every aircraft on this mission needs these. A tail booked on it without them shows as a problem.</p>
+          <div className="picker-row" data-spot="equipment">
+            {data.equipment.map((e) => (
+              <Pick key={e.id} on={(m.requiredEquipmentIds ?? []).includes(e.id)} onToggle={() => set({ requiredEquipmentIds: toggled(m.requiredEquipmentIds ?? [], e.id) })}>{e.name}</Pick>
+            ))}
+            {data.equipment.length === 0 && <span className="muted">No equipment set up yet. Add it under Types & equipment.</span>}
+          </div>
+          {(() => {
+            const short = (isNew ? [first] : seasons.filter((x) => ms(x.end) > now && x.status !== "Cancelled"))
+              .flatMap((x) => x.aircraftIds).map((id) => data.aircraft.find((a) => a.id === id)).filter((a) => !!a)
+              .filter((a, i, all) => all.indexOf(a) === i)
+              .map((a) => ({ a, missing: missingEquipment(data, a, m.requiredEquipmentIds) })).filter((x) => x.missing.length);
+            return short.length > 0 && (
+              <p className="form-note">Missing now: {short.map((x) => `${x.a.tail} has no ${x.missing.map((e) => e.name.toLowerCase()).join(" or ")}`).join("; ")}.</p>
+            );
+          })()}
         </>
       )}
 
@@ -465,13 +491,18 @@ function RotationsTab({ missionId, pool }: { missionId: string; pool: Set<string
  * The job's aircraft (any number, added whenever they're known): the chosen ones as tags, then every other
  * tail to tap, grouped by type, saying whether it's free for these dates or what it's busy with.
  */
-function AircraftPicker({ value, onChange, spot, when }: { value: string[]; onChange: (ids: string[]) => void; spot?: string; when?: { start: When; end: When; seasonId: string } }) {
+function AircraftPicker({ value, onChange, spot, when, needs }: { value: string[]; onChange: (ids: string[]) => void; spot?: string; when?: { start: When; end: When; seasonId: string }; needs?: string[] }) {
   const data = useStore((s) => s.data);
   const aircraft = data.aircraft;
   const seats = value.reduce((t, id) => t + (aircraft.find((a) => a.id === id)?.seats ?? 0), 0);
   const chosen = value.map((id) => aircraft.find((a) => a.id === id)).filter((a) => !!a);
   const rest = aircraft.filter((a) => !value.includes(a.id) && a.status !== "Retired").sort((a, b) => a.type.localeCompare(b.type) || a.tail.localeCompare(b.tail));
   const byType = [...new Set(rest.map((a) => a.type))];
+  /** Equipment the mission needs that a tail doesn't have ("No hoist"). */
+  const lacks = (a: Aircraft) => {
+    const missing = missingEquipment(data, a, needs);
+    return missing.length ? `No ${missing.map((e) => e.name.toLowerCase()).join(" or ")}` : null;
+  };
   /** What keeps a tail from this job's dates, if anything. */
   const busyWith = (a: Aircraft): string | null => {
     if (a.status === "Grounded") return "Grounded";
@@ -493,6 +524,7 @@ function AircraftPicker({ value, onChange, spot, when }: { value: string[]; onCh
               <span key={a.id} className="tag" title={`${a.type}, ${plural(a.seats, "pilot seat")}`}>
                 <b>{a.tail}</b> <span className="muted small">{a.type}</span>
                 {busy ? <span className="pill warn">{busy}</span> : a.status !== "Ready" && <span className="pill warn">{a.status}</span>}
+                {lacks(a) && <span className="pill warn">{lacks(a)}</span>}
                 <button type="button" className="icon-btn" aria-label={`Take ${a.tail} off this job`} onClick={() => onChange(value.filter((x) => x !== a.id))}>✕</button>
               </span>
             );
@@ -507,7 +539,7 @@ function AircraftPicker({ value, onChange, spot, when }: { value: string[]; onCh
               <span className="ac-type-name">{t}</span>
               <div className="picker-row">
                 {rest.filter((a) => a.type === t).map((a) => {
-                  const busy = busyWith(a);
+                  const busy = busyWith(a) ?? lacks(a);
                   return (
                     <button key={a.id} type="button" className={`chip pick ac-pick ${busy ? "busy" : "free"}`} onClick={() => onChange([...value, a.id])}
                       title={busy ? `${a.tail}: ${busy}. You can still add it; it will show as a problem.` : `${a.tail} is free${when ? " for these dates" : ""}`}>
@@ -882,7 +914,8 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           </Field>
           <StatusPicker value={season.status} onChange={(status) => set({ status })} />
           <DateFields spot="dates" start={season.start} end={season.end} onChange={(start, end) => set({ start, end })} />
-          <AircraftPicker spot="aircraft" value={season.aircraftIds} onChange={(aircraftIds) => set({ aircraftIds })} when={{ start: season.start, end: season.end, seasonId: season.id }} />
+          <AircraftPicker spot="aircraft" value={season.aircraftIds} onChange={(aircraftIds) => set({ aircraftIds })} when={{ start: season.start, end: season.end, seasonId: season.id }}
+            needs={data.missions.find((x) => x.id === season.missionId)?.requiredEquipmentIds} />
           <CrewSize season={season} onChange={set} />
           <RotationField label="Pilot rotation" value={season.pilotRotation} onChange={(pilotRotation) => set({ pilotRotation })} />
           <RotationField label="Maintainer rotation" value={season.maintainerRotation} onChange={(maintainerRotation) => set({ maintainerRotation })} />
@@ -985,8 +1018,20 @@ function AircraftDialog({ id, fix = {} }: Props) {
   const { data, change, remove, close, showToast } = useStore();
   useSpot(fix.spot);
   const existing = data.aircraft.find((a) => a.id === id);
-  const [a, setA] = useState<Aircraft>(() => existing ?? { id: uid(), tail: "", type: "", base: "", status: "Ready", seats: 2, notes: "" });
+  const [kept] = useState(() => keptForm<{ a: Aircraft; typing: boolean }>());
+  const [a, setA] = useState<Aircraft>(() => kept.a ?? existing ?? { id: uid(), tail: "", type: "", base: "", status: "Ready", seats: 2, notes: "", equipmentIds: [] });
   const set = (p: Partial<Aircraft>) => setA((x) => ({ ...x, ...p }));
+  const typeNames = [...new Set([...typesOf(data), ...(a.type ? [a.type] : [])])].sort();
+  // A new type is typed in; otherwise it's picked from the list (Types & equipment).
+  const [typing, setTyping] = useState(() => kept.typing ?? typesOf(data).length === 0);
+  useKeep({ a, typing });
+  const pickType = (name: string) => {
+    const t = data.aircraftTypes.find((x) => x.name === name);
+    set({ type: name, ...(!existing && t ? { seats: t.seats } : {}) });
+  };
+  const has = a.equipmentIds ?? [];
+  const fits = equipmentFor(data, a.type.trim());
+  const offered = [...fits, ...data.equipment.filter((e) => has.includes(e.id) && !fits.includes(e))];
   const tail = a.tail.trim().toUpperCase();
   const taken = data.aircraft.some((x) => x.id !== a.id && x.tail.trim().toUpperCase() === tail);
   const error = taken ? `${tail} is already in your fleet.` : null;
@@ -1011,16 +1056,26 @@ function AircraftDialog({ id, fix = {} }: Props) {
   return (
     <Dialog title={existing ? <span style={{ fontFamily: "var(--zb-font-mono)" }}>{a.tail}</span> : "Add aircraft"} onClose={close} dirty={dirty}
       meta={existing && <><StatusPill status={a.status} /><span>{a.type}</span>{a.base && <>·<span>{a.base}</span></>}</>}
-      foot={<Foot isNew={!existing} label="aircraft" problem={!tail ? "Type the tail number first." : !a.type.trim() ? "Type the aircraft type, like Bell 412." : taken && `${tail} is already in your fleet.`}
+      foot={<Foot isNew={!existing} label="aircraft" problem={!tail ? "Type the tail number first." : !a.type.trim() ? (typing ? "Type the aircraft type, like Bell 412." : "Pick the aircraft type.") : taken && `${tail} is already in your fleet.`}
         onSave={save}
         onDelete={() => { remove("aircraft", a.id, `Deleted ${a.tail}`); close(); }} />}>
       <div className="form-grid">
         <Field label="Tail number" error={error}>
           <input autoFocus={autoFocusBox} value={a.tail} placeholder="N412ZM" style={{ fontFamily: "var(--zb-font-mono)", textTransform: "uppercase" }} onChange={(e) => set({ tail: e.target.value })} />
         </Field>
-        <Field label="Type" hint="Crew ratings match this.">
-          <input list="mrp-types" value={a.type} placeholder="Bell 412" onChange={(e) => set({ type: e.target.value })} />
-          <datalist id="mrp-types">{typesOf(data).map((t) => <option key={t} value={t} />)}</datalist>
+        <Field label="Type" hint={typing ? "A new type joins the list under Types & equipment." : "Crew ratings match this. Types are set up under Types & equipment."}>
+          {typing ? (
+            <span className="row gap-sm">
+              <input value={a.type} placeholder="Bell 412" autoFocus={!!tail} onChange={(e) => set({ type: e.target.value })} />
+              {typeNames.length > 0 && <button type="button" className="btn sm ghost" onClick={() => { setTyping(false); set({ type: existing?.type ?? "" }); }}>Pick from list</button>}
+            </span>
+          ) : (
+            <select value={a.type} onChange={(e) => (e.target.value === NEW_TYPE ? (setTyping(true), set({ type: "" })) : pickType(e.target.value))}>
+              <option value="" disabled>Pick a type</option>
+              {typeNames.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value={NEW_TYPE}>New type…</option>
+            </select>
+          )}
         </Field>
         <div className="full pair">
           <Field label="Status" spot="status">
@@ -1051,9 +1106,21 @@ function AircraftDialog({ id, fix = {} }: Props) {
             {existing && a.hours && <span className="hint">About {flightHours({ ...data, aircraft: data.aircraft.map((x) => (x.id === a.id ? a : x)) }, a, today().getTime())} hours now, counting its mission days since then.</span>}
           </div>
         )}
+        <div className="field full" data-spot="equipment">
+          <span>Equipment</span>
+          {offered.length > 0 ? (
+            <div className="picker-row">
+              {offered.map((e) => <Pick key={e.id} on={has.includes(e.id)} onToggle={() => set({ equipmentIds: toggled(has, e.id) })}>{e.name}</Pick>)}
+            </div>
+          ) : <span className="small muted">{data.equipment.length ? `No equipment is listed for the ${type || "type"}.` : "No equipment set up yet."}</span>}
+          <span className="hint">
+            What this tail has now. Missions that need equipment check for it.{" "}
+            <button type="button" className="link" onClick={() => { close(); useStore.getState().go("types"); }}>Set up equipment and types…</button>
+          </span>
+        </div>
         <div className="field full" data-spot="rated">
           <span>Crew rated on {type ? `the ${type}` : "this type"}</span>
-          {!type ? <span className="small muted">Type the aircraft type first.</span>
+          {!type ? <span className="small muted">{typing ? "Type" : "Pick"} the aircraft type first.</span>
             : data.people.length === 0 ? <span className="small muted">No crew yet. Add pilots and maintainers under Crew.</span>
             : (["Pilot", "Maintainer"] as const).map((role) => {
               const people = data.people.filter((p) => p.role === role).sort((x, y) => x.name.localeCompare(y.name));
@@ -1069,6 +1136,158 @@ function AircraftDialog({ id, fix = {} }: Props) {
           <span className="hint">Only people rated on the type are offered for its jobs. Tap to rate or unrate them; it's saved with the aircraft.</span>
         </div>
         <Field label="Notes" full><textarea rows={2} value={a.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
+      </div>
+    </Dialog>
+  );
+}
+
+const NEW_TYPE = "\u0000new";
+
+// ---------------------------------------------------------------- aircraft type
+
+/** A kind of aircraft: its name (crew ratings and programs follow a rename), seats, the equipment it can carry and who's rated. */
+function AircraftTypeDialog({ id }: Props) {
+  const { data, change, close, showToast } = useStore();
+  const existing = data.aircraftTypes.find((t) => t.id === id);
+  const [t, setT] = useState<AircraftType>(() => existing ?? { id: uid(), name: "", seats: 2, equipmentIds: [], notes: "" });
+  const [ratings, setRatings] = useState<Record<string, boolean>>({});
+  const dirty = useDirty({ t, ratings });
+  const set = (patch: Partial<AircraftType>) => setT((x) => ({ ...x, ...patch }));
+  const name = t.name.trim();
+  const was = existing?.name ?? "";
+  const taken = data.aircraftTypes.some((x) => x.id !== t.id && x.name.trim().toLowerCase() === name.toLowerCase());
+  const tails = data.aircraft.filter((a) => a.type === was && was);
+  // Ratings are kept by type name, so they follow the name being typed.
+  const isRated = (p: Person) => ratings[p.id] ?? (!!was && p.quals.includes(was));
+  const save = () => {
+    change((d) => {
+      let next = existing ? renameType(d, was, name) : d;
+      next = { ...next, aircraftTypes: existing ? next.aircraftTypes.map((x) => (x.id === t.id ? { ...t, name } : x)) : [...next.aircraftTypes, { ...t, name }] };
+      next.people = next.people.map((p) => {
+        const want = ratings[p.id];
+        if (want === undefined || want === p.quals.includes(name)) return p;
+        return { ...p, quals: want ? [...p.quals, name] : p.quals.filter((q) => q !== name) };
+      });
+      return next;
+    }, existing ? (was !== name ? `Renamed ${was} to ${name}` : undefined) : `Added the ${name}`);
+    close();
+  };
+  const del = () => {
+    if (tails.length) { showToast(`${plural(tails.length, "tail is", "tails are")} a ${was}. Change their type first.`); return; }
+    change((d) => ({
+      ...d,
+      aircraftTypes: d.aircraftTypes.filter((x) => x.id !== t.id),
+      people: d.people.map((p) => (p.quals.includes(was) ? { ...p, quals: p.quals.filter((q) => q !== was) } : p)),
+      programs: d.programs.filter((x) => x.type !== was),
+    }), `Deleted the ${was}`);
+    close();
+  };
+  return (
+    <Dialog title={existing ? was || "Aircraft type" : "Add aircraft type"} onClose={close} dirty={dirty}
+      meta={existing && <><span>{tails.length ? tails.map((a) => a.tail).join(", ") : "No tails"}</span>·<span>{plural(t.seats, "pilot seat")}</span></>}
+      foot={<Foot isNew={!existing} label="type" problem={!name ? "Name the type first, like Bell 412." : taken && `There's already a ${name}.`} onSave={save} onDelete={del} />}>
+      <div className="form-grid">
+        <Field label="Type" error={taken ? `There's already a ${name}.` : null} hint={existing && was !== name && name ? `Renames it on ${plural(tails.length, "tail")}, crew ratings and its maintenance program.` : undefined}>
+          <input autoFocus={autoFocusBox} value={t.name} placeholder="Bell 412" onChange={(e) => set({ name: e.target.value })} />
+        </Field>
+        <div className="field"><span>Pilot seats</span><Stepper label="pilot seats" min={1} max={2} value={t.seats} onChange={(seats) => set({ seats })} /><span className="hint">What a new tail of this type starts with.</span></div>
+        <div className="field full" data-spot="equipment">
+          <span>Equipment it can carry</span>
+          <div className="picker-row">
+            {data.equipment.map((e) => <Pick key={e.id} on={t.equipmentIds.includes(e.id)} onToggle={() => set({ equipmentIds: toggled(t.equipmentIds, e.id) })}>{e.name}</Pick>)}
+            {data.equipment.length === 0 && <span className="small muted">No equipment set up yet. Add it on the Equipment tab.</span>}
+          </div>
+          <span className="hint">Its tails pick from these. None ticked: any equipment.</span>
+        </div>
+        <div className="field full" data-spot="rated">
+          <span>Crew rated on {name ? `the ${name}` : "this type"}</span>
+          {data.people.length === 0 ? <span className="small muted">No crew yet. Add pilots and maintainers under Crew.</span>
+            : (["Pilot", "Maintainer"] as const).map((role) => {
+              const people = data.people.filter((p) => p.role === role).sort((x, y) => x.name.localeCompare(y.name));
+              return people.length > 0 && (
+                <div key={role} className="ac-type">
+                  <span className="ac-type-name">{role === "Pilot" ? "Pilots" : "Maintainers"} · {people.filter(isRated).length} rated</span>
+                  <div className="picker-row">
+                    {people.map((p) => <Pick key={p.id} on={isRated(p)} onToggle={() => setRatings((r) => ({ ...r, [p.id]: !isRated(p) }))}>{p.name}</Pick>)}
+                  </div>
+                </div>
+              );
+            })}
+          <span className="hint">Only people rated on the type are offered for its jobs.</span>
+        </div>
+        <Field label="Notes" full><textarea rows={2} value={t.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
+      </div>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- equipment
+
+/** Something aircraft carry for a kind of work: which types it fits, which tails have it, and the missions that need it. */
+function EquipmentDialog({ id }: Props) {
+  const { data, change, close, open } = useStore();
+  const existing = data.equipment.find((e) => e.id === id);
+  const [e, setE] = useState<Equipment>(() => existing ?? { id: uid(), name: "", notes: "" });
+  const [types, setTypes] = useState<string[]>(() => data.aircraftTypes.filter((t) => t.equipmentIds.includes(id)).map((t) => t.id));
+  const [tails, setTails] = useState<string[]>(() => data.aircraft.filter((a) => (a.equipmentIds ?? []).includes(id)).map((a) => a.id));
+  const dirty = useDirty({ e, types, tails });
+  const name = e.name.trim();
+  const taken = data.equipment.some((x) => x.id !== e.id && x.name.trim().toLowerCase() === name.toLowerCase());
+  const missions = data.missions.filter((m) => (m.requiredEquipmentIds ?? []).includes(id));
+  const fitting = types.map((tid) => data.aircraftTypes.find((t) => t.id === tid)?.name);
+  const offered = data.aircraft.filter((a) => a.status !== "Retired" || tails.includes(a.id)).sort((x, y) => x.type.localeCompare(y.type) || x.tail.localeCompare(y.tail));
+  const save = () => {
+    const item = { ...e, name };
+    change((d) => ({
+      ...d,
+      equipment: existing ? d.equipment.map((x) => (x.id === e.id ? item : x)) : [...d.equipment, item],
+      aircraftTypes: d.aircraftTypes.map((t) => {
+        const want = types.includes(t.id), had = t.equipmentIds.includes(e.id);
+        return want === had ? t : { ...t, equipmentIds: want ? [...t.equipmentIds, e.id] : t.equipmentIds.filter((x) => x !== e.id) };
+      }),
+      aircraft: d.aircraft.map((a) => {
+        const list = a.equipmentIds ?? [];
+        const want = tails.includes(a.id), had = list.includes(e.id);
+        return want === had ? a : { ...a, equipmentIds: want ? [...list, e.id] : list.filter((x) => x !== e.id) };
+      }),
+    }), existing ? undefined : `Added ${name}`);
+    close();
+  };
+  return (
+    <Dialog title={existing ? existing.name || "Equipment" : "Add equipment"} onClose={close} dirty={dirty}
+      meta={existing && <><span>On {plural(tails.length, "tail")}</span>·<span>Needed by {plural(missions.length, "mission")}</span></>}
+      foot={<Foot isNew={!existing} label="equipment" problem={!name ? "Name the equipment first, like Rescue hoist." : taken && `There's already ${name}.`} onSave={save}
+        onDelete={() => { useStore.getState().remove("equipment", e.id, `Deleted ${existing?.name ?? name}`); close(); }} />}>
+      <div className="form-grid">
+        <Field label="Name" full error={taken ? `There's already ${name}.` : null}>
+          <input autoFocus={autoFocusBox} value={e.name} placeholder="Rescue hoist" onChange={(x) => setE({ ...e, name: x.target.value })} />
+        </Field>
+        <div className="field full">
+          <span>Fits these types</span>
+          <div className="picker-row">
+            {data.aircraftTypes.map((t) => <Pick key={t.id} on={types.includes(t.id)} onToggle={() => setTypes((x) => toggled(x, t.id))}>{t.name}</Pick>)}
+            {data.aircraftTypes.length === 0 && <span className="small muted">No aircraft types yet. Add them on the Aircraft types tab.</span>}
+          </div>
+          <span className="hint">{types.length ? `Offered on ${fitting.join(", ")} tails.` : "None ticked: offered on any type that doesn't list its own equipment."}</span>
+        </div>
+        <div className="field full">
+          <span>Tails that have it</span>
+          <div className="picker-row">
+            {offered.map((a) => (
+              <Pick key={a.id} on={tails.includes(a.id)} onToggle={() => setTails((x) => toggled(x, a.id))} title={a.type}>
+                <span className="mono">{a.tail}</span> <span className="small muted">{a.type}</span>
+              </Pick>
+            ))}
+            {offered.length === 0 && <span className="small muted">No aircraft yet. Add them on the Fleet page.</span>}
+          </div>
+        </div>
+        <div className="field full">
+          <span>Missions that need it</span>
+          {missions.length ? (
+            <div className="picker-row">{missions.map((m) => <button key={m.id} type="button" className="chip" onClick={() => open("mission", m.id, undefined, { tab: "equipment" })}>{m.name}</button>)}</div>
+          ) : <span className="small muted">None yet. Tick it on a mission's Equipment tab.</span>}
+        </div>
+        <Field label="Notes" full><textarea rows={2} value={e.notes} onChange={(x) => setE({ ...e, notes: x.target.value })} /></Field>
       </div>
     </Dialog>
   );
@@ -1728,15 +1947,16 @@ function SupportDialog(_: Props) {
   const [type, setType] = useState<string>("");
   const [pilots, setPilots] = useState(2);
   const [training, setTraining] = useState<string[]>([]);
+  const [equipment, setEquipment] = useState<string[]>([]);
   const bad = !(ms(end) > ms(start));
   const answers = useMemo(
-    () => (bad ? [] : canSupport(data, { start: ms(start), end: ms(end), type: type || null, pilotsNeeded: pilots, training })),
-    [data, start, end, type, pilots, training, bad],
+    () => (bad ? [] : canSupport(data, { start: ms(start), end: ms(end), type: type || null, pilotsNeeded: pilots, training, equipment })),
+    [data, start, end, type, pilots, training, equipment, bad],
   );
   const types = [...new Set(data.aircraft.map((a) => a.type))].sort();
   const yes = answers.filter((a) => a.verdict === "yes").length;
   const book = (aircraftId: string) =>
-    open("mission", "new", { start, end, aircraftIds: [aircraftId], pilotsNeeded: pilots, requiredTrainingIds: training });
+    open("mission", "new", { start, end, aircraftIds: [aircraftId], pilotsNeeded: pilots, requiredTrainingIds: training, requiredEquipmentIds: equipment });
 
   return (
     <Dialog wide title="Can we take a job?" onClose={close} foot={<button className="btn" onClick={close}>Close</button>}
@@ -1760,6 +1980,14 @@ function SupportDialog(_: Props) {
             ))}
           </div>
         </div>
+        {data.equipment.length > 0 && (
+          <div className="field full">
+            <span>Equipment the aircraft need</span>
+            <div className="picker-row">
+              {data.equipment.map((e) => <Pick key={e.id} on={equipment.includes(e.id)} onToggle={() => setEquipment((x) => toggled(x, e.id))}>{e.name}</Pick>)}
+            </div>
+          </div>
+        )}
       </div>
 
       {!bad && (

@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { validUntil, type AppData, type Mission, type Person, type Season, type Shift } from "./types";
 import { bookings } from "./bookings";
+import { missingEquipment } from "./aircraftTypes";
 import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
 import { rulesFor } from "./limits";
 import { dueList } from "./program";
@@ -149,6 +150,11 @@ export function findIssues(data: AppData): Issue[] {
       issues.push({ id: `noac-${m.id}`, severity: "warn", title: `“${m.name}” has no aircraft`, detail: "Pick an aircraft for this job.", at: from, seasonId: m.id });
     }
     for (const ac of tails) {
+      // Equipment the mission needs (a hoist, a bucket) that this tail doesn't have.
+      const missing = missingEquipment(data, ac, m.requiredEquipmentIds);
+      if (missing.length)
+        issues.push({ id: `equip-${m.id}-${ac.id}`, severity: "warn", title: `${ac.tail} doesn't have the ${missing.map((e) => e.name.toLowerCase()).join(" or ")} “${m.name}” needs`,
+          detail: `Fit it and tick it on ${ac.tail}, or pick an aircraft that has it.`, at: from, seasonId: m.id, aircraftId: ac.id });
       if (ac.status === "Grounded" || ac.status === "Retired")
         issues.push({ id: `acstat-${m.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is ${ac.status.toLowerCase()}`, detail: `It's booked for “${m.name}”. Pick another aircraft or change its status.`, at: from, seasonId: m.id, aircraftId: ac.id });
       for (const j of data.jobs) {

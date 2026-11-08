@@ -8,7 +8,7 @@ import { dueList, planFor } from "./program";
  * usual one (the button on the problem); the rest are the other ways out ("Or: add the rating").
  *
  * `spot` names what the form outlines and scrolls to:
- *   "dates", "aircraft", "status", "quals", "rotation", "maintainers" (fields),
+ *   "dates", "aircraft", "status", "equipment", "quals", "rotation", "maintainers" (fields),
  *   "shift:<id>" (opened for editing), "gap:<midnight>" (an open seat), "training:<course id>", "pilots" (the list).
  */
 export interface Fix {
@@ -49,6 +49,10 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
     case "acstat": return [
       ...season("Pick another aircraft", "details", "aircraft"),
       { label: `Change ${tail}'s status`, kind: "aircraft", id: i.aircraftId!, spot: "status" },
+    ];
+    case "equip": return [
+      { label: `Tick it on ${tail}`, kind: "aircraft", id: i.aircraftId!, spot: "equipment" },
+      ...season("Pick another aircraft", "details", "aircraft"),
     ];
     case "acjob": return [
       ...season("Pick another aircraft", "details", "aircraft"),

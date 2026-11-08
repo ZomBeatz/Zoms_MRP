@@ -100,7 +100,7 @@ describe("fixes", () => {
 
     const issues = findIssues(data);
     const kinds = new Set(issues.map((i) => i.id.slice(0, i.id.indexOf("-"))));
-    for (const k of ["time", "noac", "acstat", "acjob", "acdbl", "pgap", "seats", "qual", "offrot", "outside", "stime", "jqual", "dbl", "off", "duty", "rest", "train", "lapsed", "renew"])
+    for (const k of ["time", "noac", "equip", "acstat", "acjob", "acdbl", "pgap", "seats", "qual", "offrot", "outside", "stime", "jqual", "dbl", "off", "duty", "rest", "train", "lapsed", "renew"])
       expect(kinds, k).toContain(k);
     for (const i of issues) {
       const fixes = fixesFor(data, i);
