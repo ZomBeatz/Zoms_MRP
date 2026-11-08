@@ -207,7 +207,7 @@ function OneJob() {
               <Plus size={14} /> Add an aircraft
             </button>
             {form.aircraft.some((a) => a.night) && (
-              <Field label="Night qualified means" hint="Only pilots with this course current count for night seats.">
+              <Field label="Night qualified means" hint="Only pilots with this qualification current count for night seats.">
                 <select value={form.nightTrainingId} onChange={(e) => set({ nightTrainingId: e.target.value })}>
                   <option value="">Any rated pilot</option>
                   {data.trainings.filter((t) => t.appliesTo !== "Maintainer").map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -414,7 +414,7 @@ function Board({ plan, first, days, season, data, nightTrainingId }: { plan: Cre
           const c = answer.get(p.id);
           if (!c || c.ok) continue;
           bad++;
-          why ||= !c.trained ? "training not current" : !c.current ? "not flown the type lately" : c.off ? "time off" : !c.onRotation ? "off their rotation" : "booked elsewhere";
+          why ||= !c.trained ? "qualifications not current" : !c.current ? "not flown the type lately" : c.off ? "time off" : !c.onRotation ? "off their rotation" : "booked elsewhere";
         }
         out.set(`${i}|${p.id}`, { bad, why });
       }

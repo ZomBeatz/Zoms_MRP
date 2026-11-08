@@ -60,7 +60,7 @@ export function Inspections() {
       ) : (
         <>
           <p className="muted" style={{ marginTop: -8 }}>
-            Type a tail's hours when you have them (from the hour meter or the logbook). Between readings, Zom's MRP adds its mission days × its hours per flying day.
+            Type a tail's hours when you have them (from the hour meter or the logbook). Between readings, Zom's MRP adds its job days × its hours per flying day.
           </p>
           <div className="issues">
             {data.aircraft.filter((a) => a.status !== "Retired").map((a) => <HoursRow key={a.id} id={a.id} />)}

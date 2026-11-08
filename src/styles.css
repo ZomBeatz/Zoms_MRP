@@ -173,6 +173,8 @@ button.tile:hover { background: var(--zb-surface-2); }
 .table tbody tr:hover { background: var(--zb-surface-2); }
 .table tbody tr.group-row { cursor: default; }
 .ac-line { border: 1px solid var(--zb-border); border-radius: var(--zb-radius-sm); padding: 10px 12px; margin-top: 8px; display: grid; gap: 8px; }
+.swatch-grid { display: grid; grid-template-columns: repeat(10, max-content); gap: 6px; }
+@media (max-width: 520px) { .swatch-grid { grid-template-columns: repeat(5, max-content); } }
 .ac-line-head { display: flex; align-items: center; justify-content: space-between; }
 .doc-view { width: 100%; height: min(70vh, 900px); border: 1px solid var(--zb-border); border-radius: var(--zb-radius-sm); background: var(--zb-surface-2); }
 .doc-view.img { height: auto; max-height: 70vh; object-fit: contain; }

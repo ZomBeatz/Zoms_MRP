@@ -52,14 +52,14 @@ export function TrainingPage() {
   return (
     <>
       <div className="page-head">
-        <h1>Training</h1>
+        <h1>Qualifications</h1>
         {data.trainings.length > 0 && data.people.length > 0 && <button className="btn" onClick={() => open("groupTraining", "new")}><Users size={16} /> Record for several people…</button>}
-        <button className="btn primary" onClick={() => open("training", "new")}><Plus size={16} /> Add training…</button>
+        <button className="btn primary" onClick={() => open("training", "new")}><Plus size={16} /> Add qualification…</button>
       </div>
       <div className="row gap wrap" style={{ marginBottom: 14 }}>
         <div className="seg">
           <button className={tab === "current" ? "active" : ""} onClick={() => setTab("current")}>Who's current</button>
-          <button className={tab === "courses" ? "active" : ""} onClick={() => setTab("courses")}>Courses <span className="chip">{data.trainings.length}</span></button>
+          <button className={tab === "courses" ? "active" : ""} onClick={() => setTab("courses")}>Qualifications <span className="chip">{data.trainings.length}</span></button>
         </div>
         {tab === "current" && (
           <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Show crew for">
@@ -71,14 +71,14 @@ export function TrainingPage() {
 
       {tab === "current" && (
         data.trainings.length === 0 || rows.length === 0 ? (
-          <Empty icon={<GraduationCap size={28} />} text={mission ? "Nobody works this mission yet. Pick its crew in the mission." : "Add training courses, set which missions need them, then record who has done what."}
-            action={<button className="btn primary" onClick={() => (mission ? open("mission", mission.id) : open("training", "new"))}>{mission ? "Open the mission…" : "Add training…"}</button>} />
+          <Empty icon={<GraduationCap size={28} />} text={mission ? "Nobody works this job yet. Pick its crew in the job." : "Add qualifications, set which jobs need them, then record who has done what."}
+            action={<button className="btn primary" onClick={() => (mission ? open("mission", mission.id) : open("training", "new"))}>{mission ? "Open the job…" : "Add qualification…"}</button>} />
         ) : (
           <>
             <NeedsTraining rows={rows} warn={warn} />
             <p className="small muted" style={{ marginTop: 0 }}>
-              {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their missions need. "}
-              People need only the training their missions ask for. Tap a person to record training or change what they work on.
+              {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their jobs need. "}
+              People need only the qualifications their jobs ask for. Tap a person to record qualifications or change what they work on.
             </p>
             <div className="table-wrap">
               <table className="table">
@@ -125,7 +125,7 @@ export function TrainingPage() {
                       const s = standing(p, t, warn);
                       return <span key={id} className={`pill ${s.tone}`}>{t.name}: {s.label}</span>;
                     })}
-                    {needs.size === 0 && <span className="small muted">No training needed</span>}
+                    {needs.size === 0 && <span className="small muted">No qualifications needed</span>}
                   </span>
                 </button>
               ))}
@@ -136,11 +136,11 @@ export function TrainingPage() {
 
       {tab === "courses" && (
         data.trainings.length === 0 ? (
-          <Empty icon={<GraduationCap size={28} />} text="Courses and certifications some missions need, like NVG or mountain flying." action={<button className="btn primary" onClick={() => open("training", "new")}>Add training…</button>} />
+          <Empty icon={<GraduationCap size={28} />} text="Qualifications and certifications some jobs need, like NVG or mountain flying." action={<button className="btn primary" onClick={() => open("training", "new")}>Add qualification…</button>} />
         ) : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Training</th><th>For</th><th className="r">Renew every</th><th>Missions that need it</th><th className="r">Need it</th><th className="r">Current</th></tr></thead>
+              <thead><tr><th>Qualifications</th><th>For</th><th className="r">Renew every</th><th>Jobs that need it</th><th className="r">Need it</th><th className="r">Current</th></tr></thead>
               <tbody>
                 {data.trainings.map((t) => {
                   const missions = data.missions.filter((m) => m.requiredTrainingIds.includes(t.id));
@@ -208,8 +208,8 @@ function NeedsTraining({ rows, warn }: { rows: { p: Person; needs: Map<string, {
 
   if (!list.length) return null;
   return (
-    <section className="panel needs-training">
-      <h3>Needs training <span className="chip">{list.length}</span></h3>
+    <section className="panel needs-qualifications">
+      <h3>Needs qualifications <span className="chip">{list.length}</span></h3>
       <div className="needs-list">
         {list.map(({ p, items, stale }) => (
           <div key={p.id} className="needs-person">

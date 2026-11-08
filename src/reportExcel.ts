@@ -91,10 +91,10 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
     const crewShare = r.crew.length ? r.crew.reduce((t, c) => t + c.on, 0) / (r.crew.length * r.days) : 0;
     const problems = r.issues.filter((i) => i.severity === "danger").length;
     const tiles: [string, number, string, string][] = [
-      ["Missions", r.byMission.length, "0", INK],
-      ["Mission days", Math.round(r.total), "0", INK],
+      ["Jobs", r.byMission.length, "0", INK],
+      ["Job days", Math.round(r.total), "0", INK],
       ["Fully crewed", r.crewedShare, "0%", r.crewedShare < 1 ? "#d97706" : "#16a34a"],
-      ["Fleet on missions", fleetUse, "0%", INK],
+      ["Fleet on jobs", fleetUse, "0%", INK],
       ["Crew busy", crewShare, "0%", INK],
       ["Problems", problems, "0", problems ? "#dc2626" : "#16a34a"],
     ];
@@ -125,9 +125,9 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
         c.fill = fill(BLUE);
       });
     };
-    ws.getCell("B11").value = "Days by mission";
+    ws.getCell("B11").value = "Days by job";
     ws.getCell("B11").font = { size: 13, bold: true };
-    head(12, 2, ["Mission", "Days", "Share"]);
+    head(12, 2, ["Job", "Days", "Share"]);
     const most = r.byMission[0]?.days ?? 1;
     r.byMission.forEach(({ m, days }, i) => {
       const row = 13 + i;
@@ -140,11 +140,11 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
       ws.getCell(row, 4).numFmt = "0%";
     });
     if (r.byMission.length) dataBar(ws, `C13:C${12 + r.byMission.length}`, BLUE, Math.round(most));
-    else ws.getCell("B13").value = "No missions in this period.";
+    else ws.getCell("B13").value = "No jobs in this period.";
 
     ws.getCell("F11").value = "Aircraft use";
     ws.getCell("F11").font = { size: 13, bold: true };
-    head(12, 6, ["Tail", "Type", "On missions", "Maintenance", "Available", "Booked"]);
+    head(12, 6, ["Tail", "Type", "On jobs", "Maintenance", "Available", "Booked"]);
     // Keep the type column readable even though the tiles share it.
     r.fleet.forEach(({ a, flying, maint, idle }, i) => {
       const row = 13 + i;
@@ -284,8 +284,8 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
 
   // ---- Missions in the period.
   {
-    const ws = table("Missions", "Missions", [
-      { header: "Mission", key: "name", width: 32 }, { header: "Aircraft", key: "tail", width: 14 }, { header: "First day", key: "start", width: 13, date: true },
+    const ws = table("Jobs", "Jobs", [
+      { header: "Job", key: "name", width: 32 }, { header: "Aircraft", key: "tail", width: 14 }, { header: "First day", key: "start", width: 13, date: true },
       { header: "Last day", key: "end", width: 13, date: true }, { header: "Status", key: "status", width: 12 }, { header: "Days in period", key: "days", width: 14 },
       { header: "Crewed", key: "crewed", width: 16, pct: true }, { header: "Contact", key: "contact", width: 30 },
       ...(hasRates(data) ? [{ header: "Crew cost", key: "crewCost", width: 12 }, { header: "Flying cost", key: "flyCost", width: 12 }, { header: "Cost", key: "cost", width: 12 }, { header: "Charged", key: "charged", width: 12 }, { header: "Margin", key: "margin", width: 12 }] : []),
@@ -302,7 +302,7 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
       row.getCell(1).font = { bold: true, color: { argb: argb(textOn(b.color)) } };
     }
     if (list.length) dataBar(ws, `G5:G${4 + list.length}`, "#16a34a");
-    else line(ws, "No missions in this period.");
+    else line(ws, "No jobs in this period.");
   }
 
   // ---- Crew workload.
@@ -318,8 +318,8 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
 
   // ---- Training over the period.
   {
-    const ws = table("Training", "Training", [
-      { header: "Person", key: "person", width: 22 }, { header: "Role", key: "role", width: 12 }, { header: "Course", key: "course", width: 28 },
+    const ws = table("Qualifications", "Qualifications", [
+      { header: "Person", key: "person", width: 22 }, { header: "Role", key: "role", width: 12 }, { header: "Qualification", key: "course", width: 28 },
       { header: "Needed for", key: "for", width: 40 }, { header: "Runs out", key: "expires", width: 13, date: true }, { header: "In this period", key: "standing", width: 15 },
     ]);
     for (const t of r.training) {
@@ -327,7 +327,7 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
       row.getCell(6).fill = fill(STANDING[t.state]);
       row.getCell(6).font = { bold: true };
     }
-    if (!r.training.length) line(ws, "No training is needed for these missions.");
+    if (!r.training.length) line(ws, "No qualifications are needed for these jobs.");
   }
 
   // ---- Maintenance in the period.

@@ -93,7 +93,7 @@ export function Reports() {
       <div className="page-head">
         <h1>Reports</h1>
         <div className="row gap-sm">
-          <button className="btn" onClick={() => make("pdf")} disabled={!!making} title="A PDF of this period: the numbers, the fleet and crew boards, missions, workload, training, maintenance and problems">
+          <button className="btn" onClick={() => make("pdf")} disabled={!!making} title="A PDF of this period: the numbers, the fleet and crew boards, jobs, workload, qualifications, maintenance and problems">
             <FileText size={16} /> {making === "pdf" ? "Making the PDF…" : "PDF report"}
           </button>
           <button className="btn" onClick={week} disabled={!!making} title="One page with who's on each day of the week, for the crew room or Teams">
@@ -122,17 +122,17 @@ export function Reports() {
       </div>
 
       <div className="tiles">
-        <div className="tile"><div className="label">Missions</div><div className="value">{r.byMission.length}</div></div>
-        <div className="tile"><div className="label">Mission days</div><div className="value">{Math.round(r.total)}</div></div>
+        <div className="tile"><div className="label">Jobs</div><div className="value">{r.byMission.length}</div></div>
+        <div className="tile"><div className="label">Job days</div><div className="value">{Math.round(r.total)}</div></div>
         <div className="tile"><div className="label">Fully crewed</div><div className={`value ${r.crewedShare < 1 ? "warn" : "ok"}`}>{Math.round(r.crewedShare * 100)}%</div></div>
-        <div className="tile"><div className="label">Fleet on missions</div><div className="value">{Math.round(fleetUse * 100)}%</div></div>
+        <div className="tile"><div className="label">Fleet on jobs</div><div className="value">{Math.round(fleetUse * 100)}%</div></div>
         <div className="tile"><div className="label">Crew busy</div><div className="value">{Math.round(crewShare * 100)}%</div></div>
       </div>
 
       <div className="report-grid">
         <section className="panel">
-          <h3>Days by mission</h3>
-          {r.byMission.length === 0 ? <p className="muted">No missions in this period.</p> : (
+          <h3>Days by job</h3>
+          {r.byMission.length === 0 ? <p className="muted">No jobs in this period.</p> : (
             <div className="hbars">
               {r.byMission.map(({ m, days }) => (
                 <button key={m.id} className="hbar" onClick={() => open("mission", m.id)} title={`${m.name}: ${fmtDays(days)} in this period`}>
@@ -148,14 +148,14 @@ export function Reports() {
         <section className="panel">
           <h3>Aircraft use</h3>
           <div className="legend" style={{ marginTop: 0, marginBottom: 10 }}>
-            <span><span className="swatch" style={{ background: "var(--zb-cat-1)" }} />On missions</span>
+            <span><span className="swatch" style={{ background: "var(--zb-cat-1)" }} />On jobs</span>
             <span><span className="swatch" style={{ background: "var(--zb-cat-4)" }} />Maintenance</span>
             <span><span className="swatch" style={{ background: "var(--zb-surface-3)" }} />Available</span>
           </div>
           <div className="hbars">
             {r.fleet.map(({ a, flying, maint, idle }) => (
               <button key={a.id} className="hbar" onClick={() => open("aircraft", a.id)}
-                title={`${a.tail}: ${fmtDays(flying)} on missions, ${fmtDays(maint)} maintenance, ${fmtDays(idle)} available`}>
+                title={`${a.tail}: ${fmtDays(flying)} on jobs, ${fmtDays(maint)} maintenance, ${fmtDays(idle)} available`}>
                 <span className="hbar-label" style={{ fontFamily: "var(--zb-font-mono)" }}>{a.tail}</span>
                 <span className="hbar-track stack">
                   <span style={{ width: `${(flying / r.days) * 100}%`, background: "var(--zb-cat-1)" }} />
@@ -184,12 +184,12 @@ export function Reports() {
         ))}
       </div>
 
-      <h2>Missions in this period</h2>
-      {r.missions.length === 0 ? <div className="panel muted">No missions in this period.</div> : (
+      <h2>Jobs in this period</h2>
+      {r.missions.length === 0 ? <div className="panel muted">No jobs in this period.</div> : (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Mission</th><th>Aircraft</th><th>When</th><th className="r">Days in period</th><th className="r">Crewed</th>
-              {costs && <><th className="r" title="Crew days × day rates">Crew</th><th className="r" title="Mission days × hours a flying day × cost per hour">Flying</th><th className="r">Cost</th><th className="r">Charged</th><th className="r">Margin</th></>}</tr></thead>
+            <thead><tr><th>Job</th><th>Aircraft</th><th>When</th><th className="r">Days in period</th><th className="r">Crewed</th>
+              {costs && <><th className="r" title="Crew days × day rates">Crew</th><th className="r" title="Job days × hours a flying day × cost per hour">Flying</th><th className="r">Cost</th><th className="r">Charged</th><th className="r">Margin</th></>}</tr></thead>
             <tbody>
               {[...r.missions].sort((a, b) => ms(a.start) - ms(b.start)).map((m) => {
                 const pct = Math.round(missionCoverage(data, m).covered * 100);

@@ -159,7 +159,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
       {!data.missions.length && (!withDemo || !data.aircraft.length) && <GettingStarted />}
       <div className="tiles">
         <button className="tile" onClick={() => go("missions")}>
-          <div className="label"><Plane size={14} /> Missions now or in the next 30 days</div>
+          <div className="label"><Plane size={14} /> Jobs now or in the next 30 days</div>
           <div className="value">{stats.thisWeek.length}</div>
         </button>
         <div className="tile">
@@ -199,7 +199,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
 
       <h2>Coming up</h2>
       {upcoming.length === 0 ? (
-        <div className="panel muted">No missions coming up.</div>
+        <div className="panel muted">No jobs coming up.</div>
       ) : (
         <div className="issues">
           {upcoming.map((m) => {
@@ -316,7 +316,7 @@ function GettingStarted() {
   return (
     <section className="panel getting-started">
       <h3><BookOpen size={16} /> Getting started</h3>
-      <p>Nothing is set up yet. The Guide lists what to add, in order, with a button for each step: aircraft, training, crew, then each customer as a mission.</p>
+      <p>Nothing is set up yet. The Guide lists what to add, in order, with a button for each step: aircraft, qualifications, crew, then each customer as a job.</p>
       <div className="row gap-sm wrap">
         <button className="btn primary" onClick={toSetup}>Set up step by step</button>
         {!demo && <button className="btn" onClick={() => setDemo(true)}>Look at the demo first</button>}
