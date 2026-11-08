@@ -19,7 +19,7 @@ export function bookings(data: AppData): Booking[] {
 }
 
 export const booking = (m: Mission, s: Season): Booking => ({
-  ...s, name: m.name, contact: m.contact, location: m.location, requiredTrainingIds: m.requiredTrainingIds, color: m.color, pattern: m.pattern,
+  ...s, name: m.name, contact: m.contact, location: m.location, requiredTrainingIds: m.requiredTrainingIds, requiredEquipmentIds: m.requiredEquipmentIds ?? [], color: m.color, pattern: m.pattern,
 });
 
 /** The seasons of one mission, earliest first. */

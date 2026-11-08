@@ -104,7 +104,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           <div className="field" style={{ marginTop: 12 }}>
             <span>Pages in the menu</span>
             <div className="picker-row">
-              {([["aircraft", "Fleet"], ["schedule", "Schedule"], ["missions", "Missions"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Training"], ["balance", "Balance"], ["planner", "Crew planner"], ["reports", "Reports"]] as const).map(([pg, label]) => {
+              {([["aircraft", "Fleet"], ["types", "Types & equipment"], ["schedule", "Schedule"], ["missions", "Missions"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Training"], ["balance", "Balance"], ["planner", "Crew planner"], ["reports", "Reports"]] as const).map(([pg, label]) => {
                 const hidden = (data.settings.hiddenPages ?? []).includes(pg);
                 return (
                   <label key={pg} className={`chip pick ${hidden ? "" : "on"}`}>

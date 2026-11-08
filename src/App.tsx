@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen, FlaskConical,
-  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale, ClipboardCheck, Search, Calculator
+  BarChart3, CalendarRange, ClipboardList, GraduationCap, ChevronsLeft, ChevronsRight, LayoutDashboard, Menu, Package, Plane, Plus, Settings as Cog, Users, Wrench, X, Scale, ClipboardCheck, Search, Calculator
 } from "lucide-react";
 import { useStore } from "./store";
 import { RELEASES_URL, isDesktopApp, isOnlineDemo } from "./platform";
@@ -20,6 +20,7 @@ import { Balance } from "./pages/Balance";
 import { Planner } from "./pages/Planner";
 import { Inspections } from "./pages/Inspections";
 import { TrainingPage } from "./pages/Training";
+import { TypesPage } from "./pages/Types";
 import { SettingsPage } from "./pages/Settings";
 import { Dialogs } from "./dialogs";
 import { Welcome } from "./pages/Welcome";
@@ -34,6 +35,7 @@ import { startUpdates } from "./updates";
 const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
   { page: "aircraft", label: "Fleet", icon: Plane },
+  { page: "types", label: "Types & equipment", icon: Package },
   { page: "schedule", label: "Schedule", icon: CalendarRange },
   { page: "missions", label: "Missions", icon: ClipboardList },
   { page: "people", label: "Crew", icon: Users },
@@ -88,7 +90,7 @@ export default function App() {
       if (mod || e.altKey || typing(e) || useStore.getState().editing) return;
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
-        const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training" } as const)[page as "aircraft"] ?? "mission";
+        const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training", types: "aircraftType" } as const)[page as "aircraft"] ?? "mission";
         open(kind, "new");
       } else if (e.key === "[") updateSettings({ sidebarCollapsed: !useStore.getState().data.settings.sidebarCollapsed });
       else if (e.key === "?") useStore.getState().go("guide");
@@ -207,6 +209,7 @@ export default function App() {
           {page === "schedule" && <Schedule issues={issues} />}
           {page === "missions" && <Missions issues={issues} />}
           {page === "aircraft" && <AircraftPage />}
+          {page === "types" && <TypesPage />}
           {page === "people" && <People issues={issues} />}
           {page === "maintenance" && <Maintenance />}
           {page === "training" && <TrainingPage />}

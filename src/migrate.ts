@@ -1,5 +1,6 @@
 import type { AppData, Mission, Season, Shift } from "./types";
 import { defaultSettings, emptyData } from "./sample";
+import { withTypes } from "./aircraftTypes";
 
 /**
  * Bring any older save up to today's shape, so saves from earlier versions keep opening.
@@ -55,6 +56,13 @@ export function migrate(raw: any): AppData {
   d.people = d.people.map((p) => ({ ...p, rotation: p.rotation ?? null }));
   delete d.areas;
 
+  // 0.2.6: aircraft types and equipment are lists of their own. Types start from every name already in use
+  // (tails, crew ratings, maintenance programs), with the seats of the first tail of each.
+  d.equipment = (d.equipment ?? []).map((e) => ({ ...e, notes: e.notes ?? "" }));
+  d.aircraft = (d.aircraft ?? []).map((a) => ({ ...a, equipmentIds: a.equipmentIds ?? [] }));
+  d.missions = d.missions.map((m) => ({ ...m, requiredEquipmentIds: m.requiredEquipmentIds ?? [] }));
+  d.aircraftTypes = (d.aircraftTypes ?? []).map((t) => ({ ...t, equipmentIds: t.equipmentIds ?? [], notes: t.notes ?? "", seats: t.seats || 2 }));
+
   // 0.2.3: maintenance programs, and settings for them.
   d.programs = d.programs ?? [];
   d.ignored = d.ignored ?? [];
@@ -65,7 +73,7 @@ export function migrate(raw: any): AppData {
   delete (settings as { flightLimit?: unknown }).flightLimit;
   settings.scheduleSpan = Math.min(365, Math.max(7, Math.round(Number(settings.scheduleSpan) || 30)));
   if (!["missions", "aircraft", "people"].includes(settings.scheduleGroup)) settings.scheduleGroup = "aircraft";
-  return { ...d, settings };
+  return withTypes({ ...d, settings });
 }
 
 /**

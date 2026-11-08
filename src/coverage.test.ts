@@ -18,6 +18,23 @@ function base(): AppData {
 }
 
 describe("coverage", () => {
+  it("flags a tail that lacks equipment its mission needs", () => {
+    const data = base();
+    data.equipment = [{ id: "hoist", name: "Rescue hoist", notes: "" }, { id: "bucket", name: "Fire bucket", notes: "" }];
+    data.missions[0].requiredEquipmentIds = ["bucket"];
+    // A new object each time: bookings are cached per data object.
+    const equip = () => findIssues({ ...data }).filter((i) => i.id.startsWith("equip-"));
+    expect(equip()).toHaveLength(1);
+    expect(equip()[0]).toMatchObject({ seasonId: "m1", aircraftId: "a1", severity: "warn" });
+    expect(equip()[0].title).toContain("fire bucket");
+    data.aircraft[0].equipmentIds = ["hoist", "bucket"];
+    expect(equip()).toHaveLength(0);
+    // Not on a cancelled season.
+    data.aircraft[0].equipmentIds = [];
+    data.seasons[0].status = "Cancelled";
+    expect(equip()).toHaveLength(0);
+  });
+
   it("counts overlapping spans", () => {
     expect(coverageSteps(0, 10, [[0, 5], [3, 10]])).toEqual([{ a: 0, b: 3, n: 1 }, { a: 3, b: 5, n: 2 }, { a: 5, b: 10, n: 1 }]);
   });

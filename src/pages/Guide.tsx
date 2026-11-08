@@ -317,6 +317,15 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
     ),
   },
   {
+    id: "types", title: "Types and equipment",
+    body: (
+      <>
+        <p><b>Types & equipment</b> keeps the kinds of aircraft you fly, like Bell 412 or AS350, and the equipment they carry for different work, like a rescue hoist, a fire bucket or a medical interior. Each tail picks its type from a list, and crew are rated on types. Renaming a type renames it on its tails, crew ratings and maintenance program.</p>
+        <p>Each type lists the equipment its tails can carry (none listed means any). On a tail's form, tick what it has now. On a mission's <b>Equipment</b> tab, tick what its aircraft need: a tail booked on it without that equipment shows under Needs attention, with <b>Tick it on</b> the tail or <b>Pick another aircraft</b>. <b>Can we take a job?</b> on the Fleet page can ask for equipment too.</p>
+      </>
+    ),
+  },
+  {
     id: "missions", title: "Missions and seasons", tour: "crew",
     body: (
       <>
@@ -372,6 +381,7 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
         <li>People or aircraft booked twice, or booked during time off or maintenance</li>
         <li>Confirmed jobs with no aircraft, and aircraft that are grounded or retired</li>
         <li>More pilots booked than the aircraft have seats</li>
+        <li>Aircraft without equipment their mission needs</li>
         <li>People on a type they aren't rated on, or booked on their own days off</li>
         <li>Training that's missing, has run out, or runs out during a hitch</li>
         <li>Hitches longer than the limit, or too few days off between them (Settings › Hitches and days off)</li>

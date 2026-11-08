@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AppData, Page, Settings } from "./types";
 import { emptyData, sampleData } from "./sample";
 import { migrate } from "./migrate";
+import { withTypes } from "./aircraftTypes";
 import { isOnlineDemo, withDemo } from "./platform";
 import { DEMO_KEY, demoBackend, ownBackend, type Backend } from "./backends";
 import { browserBackend } from "./backends/browser";
@@ -15,7 +16,7 @@ import { browserBackend } from "./backends/browser";
 const MODE_KEY = "zoms-mrp:mode";
 const THEME_KEY = "zoms-mrp:theme"; // read by index.html before the page draws
 
-type Collection = "aircraft" | "trainings" | "people" | "missions" | "seasons" | "shifts" | "jobs" | "timeOff";
+type Collection = "aircraft" | "aircraftTypes" | "equipment" | "trainings" | "people" | "missions" | "seasons" | "shifts" | "jobs" | "timeOff";
 type Item<C extends Collection> = AppData[C][number];
 
 const read = (k: string) => {
@@ -82,7 +83,7 @@ interface State {
   page: Page;
   /** What's open in a dialog: a kind and an id ("new" for a new one), plus defaults for new items. */
   /** The open form. `fix` opens it on a tab and points at what needs fixing (see src/fixes.ts). */
-  editing: { kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "support" | "swap" | "groupTraining"; id: string; defaults?: Record<string, unknown>; fix?: { tab?: string; spot?: string } } | null;
+  editing: { kind: "mission" | "season" | "aircraft" | "person" | "job" | "timeOff" | "training" | "aircraftType" | "equipment" | "support" | "swap" | "groupTraining"; id: string; defaults?: Record<string, unknown>; fix?: { tab?: string; spot?: string } } | null;
   past: AppData[];
   future: AppData[];
   toast: Toast | null;
@@ -216,7 +217,8 @@ export const useStore = create<State>((set, get) => ({
       return;
     }
     const before = get().data;
-    const data = fn(before);
+    // A type typed on a tail or a person joins the list of types.
+    const data = withTypes(fn(before));
     save(data);
     set({ data, past: [...get().past.slice(-49), before], future: [] });
     if (message) get().showToast(message, { label: "Undo", run: () => get().undo() });
@@ -248,6 +250,11 @@ export const useStore = create<State>((set, get) => ({
       if (c === "aircraft") {
         next.jobs = next.jobs.filter((j) => j.aircraftId !== id);
         next.seasons = next.seasons.map((m) => (m.aircraftIds.includes(id) ? { ...m, aircraftIds: m.aircraftIds.filter((a) => a !== id) } : m));
+      }
+      if (c === "equipment") {
+        next.aircraft = next.aircraft.map((a) => ({ ...a, equipmentIds: (a.equipmentIds ?? []).filter((e) => e !== id) }));
+        next.aircraftTypes = next.aircraftTypes.map((t) => ({ ...t, equipmentIds: t.equipmentIds.filter((e) => e !== id) }));
+        next.missions = next.missions.map((m) => ({ ...m, requiredEquipmentIds: (m.requiredEquipmentIds ?? []).filter((e) => e !== id) }));
       }
       if (c === "trainings") {
         next.missions = next.missions.map((m) => ({ ...m, requiredTrainingIds: m.requiredTrainingIds.filter((t) => t !== id) }));
