@@ -1,6 +1,7 @@
 import type { Aircraft, AppData, Booking, MaintenanceJob, Person } from "./types";
 import { bookings } from "./bookings";
 import { downSpan, missingEquipment, statusWords } from "./aircraftTypes";
+import { tailSpan } from "./slots";
 import { dutyOf, trainingStatus } from "./coverage";
 import { dayAt, ms, overlaps } from "./time";
 
@@ -35,7 +36,7 @@ export function dayUser(data: AppData, a: Aircraft): (day: number) => DayUse {
   const out = downSpan(a);
   if (out && out[0] === -Infinity && out[1] === Infinity) return () => ({ kind: "down", status: a.status });
   const jobs = data.jobs.filter((j) => j.aircraftId === a.id).map((j) => ({ j, a: ms(j.start), b: ms(j.end) }));
-  const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m)).map((m) => ({ m, a: ms(m.start), b: ms(m.end) }));
+  const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m) && m.kind !== "ground").map((m) => { const [x, y] = tailSpan(m, a.id); return { m, a: x, b: y }; });
   return (day) => {
     const end = dayAt(day, 1);
     if (out && overlaps(day, end, out[0], out[1])) return { kind: "down", status: a.status };
@@ -175,7 +176,7 @@ export function canSupport(data: AppData, job: Job): SupportAnswer[] {
       if (missing.length) reasons.push(`It has no ${missing.map((e) => e.name.toLowerCase()).join(" or ")}.`);
       if (job.pilotsNeeded > a.seats) reasons.push(`It has ${a.seats} pilot seat${a.seats === 1 ? "" : "s"}.`);
       for (const m of bookings(data))
-        if (m.aircraftIds.includes(a.id) && live(m) && overlaps(job.start, job.end, ms(m.start), ms(m.end))) reasons.push(`Booked on “${m.name}”.`);
+        if (m.aircraftIds.includes(a.id) && live(m) && m.kind !== "ground" && overlaps(job.start, job.end, ...tailSpan(m, a.id))) reasons.push(`Booked on “${m.name}”.`);
       for (const j of data.jobs)
         if (j.aircraftId === a.id && j.grounds && !j.done && overlaps(job.start, job.end, ms(j.start), ms(j.end))) reasons.push(`In maintenance (“${j.title}”).`);
       const crew = crewFor(a.type);

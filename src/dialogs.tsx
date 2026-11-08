@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Calculator, Check, CopyPlus, Download, Plus, Trash2, Wand2 } from "lucide-react";
+import { Calculator, Check, CopyPlus, Download, FileText, Plus, Trash2, Upload, Wand2 } from "lucide-react";
+import { fileSize, getFile, putFile, viewable } from "./docs";
+import { isServerBuild } from "./platform";
 import { planSeason } from "./pages/Planner";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
@@ -19,7 +21,9 @@ import { ConfirmButton, IssueList } from "./pages/Overview";
 import type { Fix } from "./fixes";
 import { validUntil } from "./types";
 import { downSpan, equipmentFor, missingEquipment, renameType, statusWords } from "./aircraftTypes";
-import type { Aircraft, AircraftType, AppData, Equipment, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
+import { slotSpan, slotsOf, tailSpan, withSlots } from "./slots";
+import { seasonSeats } from "./rotation";
+import type { Aircraft, AircraftSlot, AircraftType, AppData, Equipment, MissionDocument, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
 
 /** Opens the right dialog for whatever `editing` points at. */
 export function Dialogs() {
@@ -170,6 +174,7 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
     if (!last) return;
     const next: Season = {
       ...last, id: uid(), status: "Planned", notes: "",
+      ...(last.slots ? { slots: last.slots.map((x) => ({ ...x, id: uid(), start: null, end: null })) } : {}),
       start: toWhen(addMonths(ms(last.start), 12)), end: toWhen(addMonths(ms(last.end), 12)),
     };
     change((d) => ({ ...d, missions: d.missions.map((x) => (x.id === m.id ? m : x)), seasons: [...d.seasons, next] }), `Added the season ${fmtDates(next.start, next.end)}`);
@@ -232,7 +237,8 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
         { key: "details", label: "Details", alert: !m.name.trim() && tab !== "details" },
         { key: "seasons", label: isNew ? "First season" : <>Seasons <span className="chip">{seasons.length}</span></>, alert: firstBad },
         { key: "training", label: <>Training <span className="chip">{m.requiredTrainingIds.length}</span></> },
-        { key: "equipment", label: <>Equipment <span className="chip">{(m.requiredEquipmentIds ?? []).length}</span></> },
+        ...(m.kind === "ground" ? [] : [{ key: "equipment", label: <>Equipment <span className="chip">{(m.requiredEquipmentIds ?? []).length}</span></> }]),
+        { key: "documents", label: <>Documents <span className="chip">{(m.documents ?? []).length}</span></> },
         { key: "crew", label: <>Crew <span className="chip">{pool.size}</span></> },
         ...(isNew ? [] : [{ key: "rotations", label: "Rotations" }]),
       ]}
@@ -244,8 +250,28 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
           <Field label="Mission (customer)" full>
             <input autoFocus={autoFocusBox} value={m.name} placeholder="Interior Fire Service" onChange={(e) => set({ name: e.target.value })} />
           </Field>
-          <Field label="Contact"><input value={m.contact} placeholder="Who to call" onChange={(e) => set({ contact: e.target.value })} /></Field>
+          <div className="field full">
+            <span>Kind of work</span>
+            <div className="seg" role="radiogroup" aria-label="Kind of work">
+              {([["flight", "Flying"], ["ground", "Ground duty"]] as const).map(([k, label]) => (
+                <button key={k} type="button" role="radio" aria-checked={(m.kind ?? "flight") === k} className={(m.kind ?? "flight") === k ? "active" : ""}
+                  onClick={() => { set({ kind: k }); if (isNew && k === "ground") setFirst((x) => ({ ...x, slots: [], aircraftIds: [], pilotsNeeded: 0, maintainersNeeded: Math.max(1, x.maintainersNeeded), maintainerNeed: { mode: "always", days: 1 } })); }}>{label}</button>
+              ))}
+            </div>
+            <span className="hint">{m.kind === "ground" ? "No aircraft: someone on call in the hangar, standby, or any other work on the ground. Its seasons are dates and how many people, filled like any other." : "Aircraft and their crew."}</span>
+          </div>
+          <Field label="Customer contact"><input value={m.contact} placeholder="Name" onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="Location"><input value={m.location} onChange={(e) => set({ location: e.target.value })} /></Field>
+          <Field label="Phone"><input type="tel" value={m.phone ?? ""} placeholder="(907) 555-0142" onChange={(e) => set({ phone: e.target.value })} /></Field>
+          <Field label="Email" error={m.email && !/^\S+@\S+\.\S+$/.test(m.email.trim()) ? "That doesn't look like an email address." : null}>
+            <input type="email" value={m.email ?? ""} placeholder="dispatch@example.com" onChange={(e) => set({ email: e.target.value })} />
+          </Field>
+          {!isNew && (m.phone || m.email) && (
+            <div className="full row gap-sm">
+              {m.phone && <a className="btn sm" href={`tel:${m.phone.replace(/[^\d+]/g, "")}`}>Call {m.phone}</a>}
+              {m.email && <a className="btn sm" href={`mailto:${m.email.trim()}`}>Email {m.contact || m.email}</a>}
+            </div>
+          )}
           {(data.settings.ruleSets ?? []).length > 0 && (
             <Field label="Kind of contract" hint="Its days on and off replace Settings' for this mission (Settings › Kinds of contract).">
               <select value={m.ruleSetId ?? ""} onChange={(e) => set({ ruleSetId: e.target.value || null })}>
@@ -272,7 +298,7 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
         <>
           <div className="form-grid">
             <DateFields start={first.start} end={first.end} onChange={(start, end) => setF({ start, end })} />
-            <AircraftPicker value={first.aircraftIds} onChange={(aircraftIds) => setF({ aircraftIds })} when={{ start: first.start, end: first.end, seasonId: first.id }} needs={m.requiredEquipmentIds} />
+            {m.kind !== "ground" && <AircraftLines season={first} onChange={setFirst} needs={m.requiredEquipmentIds} />}
             <CrewSize season={first} onChange={setF} />
             <RotationField label="Pilot rotation" value={first.pilotRotation} onChange={(pilotRotation) => setF({ pilotRotation })} />
             <RotationField label="Maintainer rotation" value={first.maintainerRotation} onChange={(maintainerRotation) => setF({ maintainerRotation })} />
@@ -356,6 +382,8 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
         </>
       )}
 
+      {tab === "documents" && <MissionDocuments docs={m.documents ?? []} onChange={(documents) => set({ documents })} />}
+
       {tab === "rotations" && !isNew && <RotationsTab missionId={m.id} pool={pool} />}
 
       {tab === "crew" && (
@@ -366,6 +394,89 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
         </>
       )}
     </Dialog>
+  );
+}
+
+/**
+ * A mission's documents: add files (PDFs mostly, any type works), view PDFs, pictures and text right here,
+ * open or save the rest. The list is saved with the mission; the files stay in this device's file storage.
+ */
+function MissionDocuments({ docs, onChange }: { docs: MissionDocument[]; onChange: (d: MissionDocument[]) => void }) {
+  const demo = useStore((s) => s.demo);
+  const showToast = useStore((s) => s.showToast);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null | "missing">(null);
+  const [busy, setBusy] = useState(false);
+  const doc = docs.find((d) => d.id === viewing);
+  // The file for the one being viewed, as a link the viewer can show (let go of when it changes).
+  useEffect(() => {
+    if (!viewing) return;
+    let link: string | null = null, gone = false;
+    setUrl(null);
+    void getFile(demo, viewing).then((b) => { if (gone) return; if (!b) setUrl("missing"); else setUrl((link = URL.createObjectURL(b))); }).catch(() => !gone && setUrl("missing"));
+    return () => { gone = true; if (link) URL.revokeObjectURL(link); };
+  }, [viewing, demo]);
+  const add = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    const added: MissionDocument[] = [];
+    for (const f of [...files]) {
+      if (f.size > 50 * 1024 * 1024) { showToast(`${f.name} is over 50 MB. Attach a smaller copy.`); continue; }
+      const id = uid();
+      try {
+        await putFile(demo, id, f);
+        added.push({ id, name: f.name, type: f.type || "application/octet-stream", size: f.size, added: format(today(), "yyyy-MM-dd") });
+      } catch (e) {
+        showToast(`Couldn't keep ${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    setBusy(false);
+    if (added.length) { onChange([...docs, ...added]); if (added.length === 1 && viewable(added[0].type)) setViewing(added[0].id); }
+  };
+  const save = async (d: MissionDocument) => {
+    const b = await getFile(demo, d.id);
+    if (!b) return showToast("That file isn't on this device.");
+    const link = URL.createObjectURL(b);
+    const el = document.createElement("a");
+    el.href = link; el.download = d.name; el.click();
+    setTimeout(() => URL.revokeObjectURL(link), 10_000);
+  };
+  return (
+    <>
+      <p className="form-note" style={{ marginTop: 0 }}>Contracts, task orders, maps: PDFs show right here, and so do pictures and text; other files can be downloaded and opened. They're kept with the mission when you press Save.</p>
+      <label className="btn sm primary" style={{ cursor: "pointer" }}>
+        <Upload size={14} /> {busy ? "Adding…" : "Add files…"}
+        <input type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
+      </label>
+      {docs.length > 0 ? (
+        <div className="lines" style={{ marginTop: 12 }}>
+          {docs.map((d) => (
+            <div key={d.id} className="line">
+              <FileText size={16} className="muted" />
+              <span className="grow">
+                <button type="button" className="link" onClick={() => setViewing(viewing === d.id ? null : d.id)}><b>{d.name}</b></button>
+                <span className="small muted"> · {fileSize(d.size)} · added {format(new Date(`${d.added}T00:00`), "MMM d, yyyy")}</span>
+              </span>
+              <button type="button" className="btn sm" onClick={() => setViewing(viewing === d.id ? null : d.id)}>{viewing === d.id ? "Hide" : viewable(d.type) ? "View" : "Open"}</button>
+              <button type="button" className="btn sm" onClick={() => void save(d)}><Download size={14} /> Download</button>
+              <button type="button" className="icon-btn danger" aria-label={`Remove ${d.name}`} onClick={() => { onChange(docs.filter((x) => x.id !== d.id)); if (viewing === d.id) setViewing(null); }}><Trash2 size={14} /></button>
+            </div>
+          ))}
+        </div>
+      ) : <p className="muted">No documents yet.</p>}
+      {doc && (
+        <div style={{ marginTop: 12 }}>
+          {url === null ? <p className="muted">Opening {doc.name}…</p>
+            : url === "missing" ? <p className="muted">{doc.name} isn't on this device. Files are kept on the device they were added on; add it again here.</p>
+            : doc.type.startsWith("image/") ? <img className="doc-view img" src={url} alt={doc.name} />
+            : viewable(doc.type) ? <iframe className="doc-view" src={url} title={doc.name} />
+            : <p className="muted">{doc.name} can't be shown here. <button type="button" className="link" onClick={() => void save(doc)}>Download it</button> and open it with its own app.</p>}
+          {url && url !== "missing" && <p className="small"><a href={url} target="_blank" rel="noreferrer">Open in a new window</a></p>}
+        </div>
+      )}
+      {isServerBuild && <p className="form-note">Files stay on this device for now: others signed in to the server see the list, not the files.</p>}
+      <p className="form-note">Files aren't in backups yet. Keep the originals.</p>
+    </>
   );
 }
 
@@ -490,74 +601,90 @@ function RotationsTab({ missionId, pool }: { missionId: string; pool: Set<string
 }
 
 /**
- * The job's aircraft (any number, added whenever they're known): the chosen ones as tags, then every other
- * tail to tap, grouped by type, saying whether it's free for these dates or what it's busy with.
+ * The aircraft a season needs, one line each: how many, the type of each, the tail once it's known, and
+ * its own dates when it doesn't fly the whole season. Each tail says whether it's free for its dates.
  */
-function AircraftPicker({ value, onChange, spot, when, needs }: { value: string[]; onChange: (ids: string[]) => void; spot?: string; when?: { start: When; end: When; seasonId: string }; needs?: string[] }) {
+function AircraftLines({ season, onChange, spot, needs }: { season: Season; onChange: (s: Season) => void; spot?: string; needs?: string[] }) {
   const data = useStore((s) => s.data);
-  const aircraft = data.aircraft;
-  const seats = value.reduce((t, id) => t + (aircraft.find((a) => a.id === id)?.seats ?? 0), 0);
-  const chosen = value.map((id) => aircraft.find((a) => a.id === id)).filter((a) => !!a);
-  const rest = aircraft.filter((a) => !value.includes(a.id) && a.status !== "Retired").sort((a, b) => a.type.localeCompare(b.type) || a.tail.localeCompare(b.tail));
-  const byType = [...new Set(rest.map((a) => a.type))];
-  /** Equipment the mission needs that a tail doesn't have ("No hoist"). */
-  const lacks = (a: Aircraft) => {
-    const missing = missingEquipment(data, a, needs);
-    return missing.length ? `No ${missing.map((e) => e.name.toLowerCase()).join(" or ")}` : null;
+  const lines = slotsOf(data, season);
+  const types = typesOf(data);
+  const put = (next: AircraftSlot[]) => onChange(withSlots(season, next));
+  const setLine = (id: string, patch: Partial<AircraftSlot>) => put(lines.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const setCount = (n: number) => {
+    if (n > lines.length) put([...lines, ...Array.from({ length: n - lines.length }, () => ({ id: uid(), type: lines.at(-1)?.type ?? "", aircraftId: null }))]);
+    else {
+      // Take off lines without a tail first, then the last ones.
+      const keep = [...lines];
+      while (keep.length > n) {
+        const i = keep.map((x) => !x.aircraftId).lastIndexOf(true);
+        keep.splice(i >= 0 ? i : keep.length - 1, 1);
+      }
+      put(keep);
+    }
   };
-  /** What keeps a tail from this job's dates, if anything. */
-  const busyWith = (a: Aircraft): string | null => {
+  const okDates = ms(season.end) > ms(season.start);
+  /** What keeps a tail from a line's dates, or what it lacks, if anything. */
+  const busyWith = (a: Aircraft, line: AircraftSlot): string | null => {
     const out = downSpan(a);
-    if (!when || !(ms(when.end) > ms(when.start))) return out ? a.status : null;
-    const from = ms(when.start), to = ms(when.end);
+    if (!okDates) return out ? a.status : null;
+    const [from, to] = slotSpan(season, line);
     if (out && overlaps(from, to, out[0], out[1])) return a.status === "Retired" ? "Retired" : `${a.status}${a.backOn ? ` until ${format(ms(dateToStart(a.backOn)), "MMM d")}` : ""}`;
     const job = data.jobs.find((j) => j.aircraftId === a.id && j.grounds && !j.done && ms(j.start) < to && ms(j.end) > from);
     if (job) return `In maintenance: ${job.title}`;
-    const other = bookings(data).find((b) => b.id !== when.seasonId && b.status !== "Cancelled" && b.aircraftIds.includes(a.id) && ms(b.start) < to && ms(b.end) > from);
-    return other ? `On ${other.name}` : null;
+    const other = bookings(data).find((b) => b.id !== season.id && b.status !== "Cancelled" && b.kind !== "ground" && b.aircraftIds.includes(a.id) && overlaps(from, to, ...tailSpan(b, a.id)));
+    if (other) return `On ${other.name}`;
+    const missing = missingEquipment(data, a, needs);
+    return missing.length ? `No ${missing.map((e) => e.name.toLowerCase()).join(" or ")}` : null;
   };
+  const seats = seasonSeats(data, season);
   return (
     <div className="field full" data-spot={spot}>
       <span>Aircraft</span>
-      {chosen.length > 0 && (
-        <div className="tags">
-          {chosen.map((a) => {
-            const busy = busyWith(a);
-            return (
-              <span key={a.id} className="tag" title={`${a.type}, ${plural(a.seats, "pilot seat")}`}>
-                <b>{a.tail}</b> <span className="muted small">{a.type}</span>
-                {busy ? <span className="pill warn">{busy}</span> : a.status !== "Airworthy" && <span className="pill warn">{a.status}</span>}
-                {lacks(a) && <span className="pill warn">{lacks(a)}</span>}
-                <button type="button" className="icon-btn" aria-label={`Take ${a.tail} off this job`} onClick={() => onChange(value.filter((x) => x !== a.id))}>✕</button>
-              </span>
-            );
-          })}
-        </div>
-      )}
-      {rest.length > 0 && (
-        <div className="ac-choices">
-          <span className="small muted">{chosen.length ? "Add another:" : "Tap to add:"}</span>
-          {byType.map((t) => (
-            <div key={t} className="ac-type">
-              <span className="ac-type-name">{t}</span>
-              <div className="picker-row">
-                {rest.filter((a) => a.type === t).map((a) => {
-                  const busy = busyWith(a) ?? lacks(a);
-                  return (
-                    <button key={a.id} type="button" className={`chip pick ac-pick ${busy ? "busy" : "free"}`} onClick={() => onChange([...value, a.id])}
-                      title={busy ? `${a.tail}: ${busy}. You can still add it; it will show as a problem.` : `${a.tail} is free${when ? " for these dates" : ""}`}>
-                      <Plus size={13} /><b>{a.tail}</b>
-                      <span className="small">{busy ?? (when ? "Free" : a.status === "Airworthy" ? "" : a.status)}</span>
-                    </button>
-                  );
-                })}
-              </div>
+      <div className="row gap-sm">
+        <Stepper label="aircraft" min={0} max={12} value={lines.length} onChange={setCount} />
+        <span className="small muted">{lines.length ? `${plural(seats, "pilot seat")} in all${lines.some((x) => !x.aircraftId) ? ", counting types still to pick" : ""}.` : "None yet. Add them now or when you know."}</span>
+      </div>
+      {lines.map((x, i) => {
+        const tails = data.aircraft.filter((a) => (a.status !== "Retired" || a.id === x.aircraftId) && (!x.type || a.type === x.type)).sort((p, q) => p.type.localeCompare(q.type) || p.tail.localeCompare(q.tail));
+        const taken = new Set(lines.filter((y) => y.id !== x.id).map((y) => y.aircraftId));
+        const picked = data.aircraft.find((a) => a.id === x.aircraftId);
+        const busy = picked ? busyWith(picked, x) : null;
+        const own = !!(x.start || x.end);
+        return (
+          <div key={x.id} className="ac-line">
+            <div className="ac-line-head">
+              <b>Aircraft {i + 1}</b>
+              <button type="button" className="icon-btn" aria-label={`Remove aircraft ${i + 1}`} onClick={() => put(lines.filter((y) => y.id !== x.id))}><Trash2 size={14} /></button>
             </div>
-          ))}
-        </div>
-      )}
-      {aircraft.length === 0 && <span className="small muted">No aircraft yet. Add them on the Fleet page.</span>}
-      <span className="hint">{value.length ? `${plural(seats, "pilot seat")} in all.` : "Add them when you know. The job can wait for its aircraft."}</span>
+            <div className="pair">
+              <Field label="Type">
+                <select value={x.type} onChange={(e) => setLine(x.id, { type: e.target.value, ...(picked && e.target.value && picked.type !== e.target.value ? { aircraftId: null } : {}) })}>
+                  <option value="">Any type</option>
+                  {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Tail" error={busy}>
+                <select value={x.aircraftId ?? ""} onChange={(e) => { const a = data.aircraft.find((y) => y.id === e.target.value); setLine(x.id, { aircraftId: a?.id ?? null, ...(a ? { type: a.type } : {}) }); }}>
+                  <option value="">Pick later</option>
+                  {tails.map((a) => {
+                    const why = busyWith(a, x);
+                    return <option key={a.id} value={a.id} disabled={taken.has(a.id)}>{a.tail}{x.type ? "" : ` · ${a.type}`} · {taken.has(a.id) ? "on another line" : why ?? (okDates ? "free" : a.status)}</option>;
+                  })}
+                </select>
+              </Field>
+            </div>
+            <label className="check small">
+              <input type="checkbox" checked={!own} onChange={(e) => setLine(x.id, e.target.checked ? { start: null, end: null } : { start: season.start, end: season.end })} />
+              The whole season
+            </label>
+            {own && okDates && (
+              <DateFields labels={["Joins on", "Last day"]} start={x.start ?? season.start} end={x.end ?? season.end} min={season.start} max={season.end}
+                onChange={(start, end) => setLine(x.id, { start, end })} />
+            )}
+          </div>
+        );
+      })}
+      <span className="hint">Pick each type now and the tail when you know it; a confirmed season with a tail still to pick shows as a problem. Crew needed are for the whole job, across its aircraft.</span>
     </div>
   );
 }
@@ -680,7 +807,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
     const last = seasonsOf(data, missionId).at(-1);
     return {
       id: uid(), missionId, start: toWhen(tomorrow()), end: toWhen(dayAt(tomorrow(), 30)),
-      aircraftIds: last?.aircraftIds ?? [], pilotsNeeded: last?.pilotsNeeded ?? sd.pilots, maintainersNeeded: last?.maintainersNeeded ?? sd.maintainers, maintainerNeed: last?.maintainerNeed,
+      aircraftIds: last?.aircraftIds ?? [], ...(last?.slots ? { slots: last.slots.map((x) => ({ ...x, id: uid(), start: null, end: null })) } : {}), pilotsNeeded: last?.pilotsNeeded ?? sd.pilots, maintainersNeeded: last?.maintainersNeeded ?? sd.maintainers, maintainerNeed: last?.maintainerNeed,
       pilotRotation: last?.pilotRotation ?? sd.pilotRotation, maintainerRotation: last?.maintainerRotation ?? null, dutyHours: last?.dutyHours ?? sd.dutyHours,
       status: "Planned", notes: "", ...(defaults as Partial<Season>),
     };
@@ -917,8 +1044,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           </Field>
           <StatusPicker value={season.status} onChange={(status) => set({ status })} />
           <DateFields spot="dates" start={season.start} end={season.end} onChange={(start, end) => set({ start, end })} />
-          <AircraftPicker spot="aircraft" value={season.aircraftIds} onChange={(aircraftIds) => set({ aircraftIds })} when={{ start: season.start, end: season.end, seasonId: season.id }}
-            needs={data.missions.find((x) => x.id === season.missionId)?.requiredEquipmentIds} />
+          {mission?.kind !== "ground" && <AircraftLines spot="aircraft" season={season} onChange={setSeason} needs={mission?.requiredEquipmentIds} />}
           <CrewSize season={season} onChange={set} />
           <RotationField label="Pilot rotation" value={season.pilotRotation} onChange={(pilotRotation) => set({ pilotRotation })} />
           <RotationField label="Maintainer rotation" value={season.maintainerRotation} onChange={(maintainerRotation) => set({ maintainerRotation })} />

@@ -1,3 +1,5 @@
+import { openSlots } from "../slots";
+import { seasonTails } from "../rotation";
 import { useState } from "react";
 import { ClipboardList, Plus } from "lucide-react";
 import { byId, useStore } from "../store";
@@ -62,7 +64,16 @@ export function Missions({ issues }: { issues: Issue[] }) {
                   return (
                     <tr key={m.id} onClick={() => open("mission", m.id)}>
                       <td className="name"><span className="row gap-sm"><span className="swatch" style={slotStyle(missionLook(m))} />{m.name}</span></td>
-                      <td>{m.contact || <span className="muted">None</span>}</td>
+                      <td>
+                        {m.contact || (!m.phone && !m.email) ? <div>{m.contact || <span className="muted">None</span>}</div> : null}
+                        {(m.phone || m.email) && (
+                          <div className="small" onClick={(e) => e.stopPropagation()}>
+                            {m.phone && <a href={`tel:${m.phone.replace(/[^\d+]/g, "")}`}>{m.phone}</a>}
+                            {m.phone && m.email && " · "}
+                            {m.email && <a href={`mailto:${m.email.trim()}`}>{m.email}</a>}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         {current ? (
                           <span className="row gap-sm wrap">
@@ -72,7 +83,12 @@ export function Missions({ issues }: { issues: Issue[] }) {
                           </span>
                         ) : <span className="muted">No seasons yet</span>}
                       </td>
-                      <td>{tails.length ? tails.map((x) => <span key={x.id} style={{ marginRight: 8 }}><b>{x.tail}</b> <span className="muted small">{x.type}</span></span>) : current ? <span className="pill warn">No aircraft</span> : null}</td>
+                      <td>{m.kind === "ground" ? <span className="pill">Ground duty</span>
+                        : <>
+                          {tails.map((x) => <span key={x.id} style={{ marginRight: 8 }}><b>{x.tail}</b> <span className="muted small">{x.type}</span></span>)}
+                          {current && openSlots(data, current).length > 0 && <span className="pill warn">{seasonTails(data, { aircraftIds: [], slots: current.slots })}</span>}
+                          {current && !tails.length && !openSlots(data, current).length && <span className="pill warn">No aircraft</span>}
+                        </>}</td>
                       <td className="r">
                         {!active ? <span className="muted">Not running</span>
                           : problems.has(current!.id) && cov === 1 ? <span className="pill danger">Conflict</span>

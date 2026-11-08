@@ -2,7 +2,8 @@ import { format } from "date-fns";
 import { validUntil, type AppData, type Mission, type Person, type Season, type Shift } from "./types";
 import { bookings } from "./bookings";
 import { downSpan, missingEquipment, statusWords } from "./aircraftTypes";
-import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
+import { slotSpan, slotsOf, tailSpan } from "./slots";
+import { fmtRotation, onRotationFor, seasonSeats, seasonTypes } from "./rotation";
 import { rulesFor } from "./limits";
 import { dueList } from "./program";
 import { currencyDays, staleOn } from "./currency";
@@ -144,12 +145,22 @@ export function findIssues(data: AppData): Issue[] {
       issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the mission and fix its times.", at: from, seasonId: m.id });
       continue;
     }
-    const tails = m.aircraftIds.map((id) => aircraft.get(id)).filter((a): a is NonNullable<typeof a> => !!a);
-    if (!tails.length && m.status !== "Planned") {
+    const ground = m.kind === "ground";
+    const tails = ground ? [] : m.aircraftIds.map((id) => aircraft.get(id)).filter((a): a is NonNullable<typeof a> => !!a);
+    const lines = ground ? [] : slotsOf(data, m);
+    if (!ground && !lines.length && m.status !== "Planned") {
       // A planned job can wait for its aircraft; once it's confirmed it needs one.
       issues.push({ id: `noac-${m.id}`, severity: "warn", title: `“${m.name}” has no aircraft`, detail: "Pick an aircraft for this job.", at: from, seasonId: m.id });
     }
+    // A confirmed job with aircraft still to pick (the type is known, the tail isn't yet).
+    if (m.status !== "Planned")
+      for (const x of lines.filter((l) => !l.aircraftId)) {
+        const [a, b] = slotSpan(m, x);
+        issues.push({ id: `slot-${m.id}-${x.id}`, severity: "warn", title: `“${m.name}” still needs ${x.type ? `a ${x.type}` : "an aircraft"}`, detail: `${range(a, b)}. Pick the tail.`, at: a, seasonId: m.id });
+      }
     for (const ac of tails) {
+      // The days this tail is on the job (its own line's dates, or the whole season).
+      const [from, to] = tailSpan(m, ac.id);
       // Equipment the mission needs (a hoist, a bucket) that this tail doesn't have.
       const missing = missingEquipment(data, ac, m.requiredEquipmentIds);
       if (missing.length)
@@ -166,8 +177,8 @@ export function findIssues(data: AppData): Issue[] {
           issues.push({ id: `acjob-${m.id}-${j.id}`, severity: "danger", title: `${ac.tail} is in maintenance during “${m.name}”`, detail: `“${j.title}”, ${fmtRange(j.start, j.end)}. Move the job or pick another aircraft.`, at: Math.max(from, ms(j.start)), seasonId: m.id, aircraftId: ac.id, jobId: j.id });
       }
       for (const o of missions) {
-        if (o.id > m.id && o.aircraftIds.includes(ac.id) && overlaps(from, to, ms(o.start), ms(o.end)))
-          issues.push({ id: `acdbl-${m.id}-${o.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, ms(o.start)), seasonId: m.id, aircraftId: ac.id, otherSeasonId: o.id });
+        if (o.id > m.id && o.kind !== "ground" && o.aircraftIds.includes(ac.id) && overlaps(from, to, ...tailSpan(o, ac.id)))
+          issues.push({ id: `acdbl-${m.id}-${o.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, tailSpan(o, ac.id)[0]), seasonId: m.id, aircraftId: ac.id, otherSeasonId: o.id });
       }
     }
 
@@ -197,7 +208,7 @@ export function findIssues(data: AppData): Issue[] {
       });
 
     if (tails.length) {
-      const seats = tails.reduce((t, a) => t + a.seats, 0);
+      const seats = seasonSeats(data, m);
       const pilotSpans = data.shifts
         .filter((s) => s.seasonId === m.id && people.get(s.personId)?.role === "Pilot")
         .map((s) => [ms(s.start), ms(s.end)] as [number, number]);

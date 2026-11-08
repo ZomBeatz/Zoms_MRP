@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { coverageSteps, findIssues, missionCoverage, neededTraining, trainingStatus } from "./coverage";
 import { emptyData } from "./sample";
+import { withSlots } from "./slots";
 import type { AppData, Person, Season } from "./types";
 
 const DAY = 86_400_000;
@@ -18,6 +19,42 @@ function base(): AppData {
 }
 
 describe("coverage", () => {
+  it("books a tail only for its own dates within a season", () => {
+    const data = base();
+    // A second season on the same tail, the 20th to the 29th.
+    data.missions.push({ ...data.missions[0], id: "survey", name: "Survey" });
+    data.seasons.push({ ...data.seasons[0], id: "m2", missionId: "survey", start: d(20), end: d(29) });
+    const dbl = () => findIssues({ ...data }).filter((i) => i.id.startsWith("acdbl-"));
+    expect(dbl()).toHaveLength(1);
+    // The fire season only has the tail until the 15th: no clash.
+    data.seasons[0] = withSlots(data.seasons[0], [{ id: "l1", type: "Bell 412", aircraftId: "a1", end: d(15) }]);
+    expect(dbl()).toHaveLength(0);
+  });
+
+  it("asks for the tail on a confirmed season's line that has only a type", () => {
+    const data = base();
+    data.seasons[0] = withSlots(data.seasons[0], [{ id: "l1", type: "Bell 412", aircraftId: "a1" }, { id: "l2", type: "AS350", aircraftId: null, start: d(10) }]);
+    const open = findIssues({ ...data }).filter((i) => i.id.startsWith("slot-"));
+    expect(open).toHaveLength(1);
+    expect(open[0].title).toContain("AS350");
+    expect(data.seasons[0].aircraftIds).toEqual(["a1"]);
+    // Planned seasons can wait.
+    data.seasons[0].status = "Planned";
+    expect(findIssues({ ...data }).some((i) => i.id.startsWith("slot-"))).toBe(false);
+  });
+
+  it("ground duty needs no aircraft and no type rating", () => {
+    const data = base();
+    data.missions[0] = { ...data.missions[0], kind: "ground" };
+    data.seasons[0] = { ...data.seasons[0], aircraftIds: [], pilotsNeeded: 0, maintainersNeeded: 1 };
+    data.people.push({ ...data.people[2], id: "m1", name: "Drew", role: "Maintainer", quals: [] });
+    data.shifts = [{ id: "s1", seasonId: "m1", personId: "m1", start: d(1), end: d(29) }];
+    const ids = findIssues({ ...data }).map((i) => i.id.split("-")[0]);
+    expect(ids).not.toContain("noac");
+    expect(ids).not.toContain("qual");
+    expect(ids).not.toContain("mgap");
+  });
+
   it("keeps a tail in maintenance or AOG off missions only while it's down", () => {
     const data = base();
     const acstat = () => findIssues({ ...data }).filter((i) => i.id.startsWith("acstat-"));

@@ -37,14 +37,22 @@ export function offRotationSpans(p: Person, from: number, to: number): [number, 
   return out;
 }
 
-/** The aircraft types a season flies (several aircraft can mean several types). */
-export const seasonTypes = (data: AppData, s: Pick<Season, "aircraftIds">): string[] =>
-  [...new Set(s.aircraftIds.map((id) => data.aircraft.find((a) => a.id === id)?.type).filter((t): t is string => !!t))];
+/** The aircraft types a season flies (several aircraft can mean several types), counting lines whose tail isn't picked yet. */
+export const seasonTypes = (data: AppData, s: Pick<Season, "aircraftIds" | "slots">): string[] =>
+  [...new Set([
+    ...s.aircraftIds.map((id) => data.aircraft.find((a) => a.id === id)?.type),
+    ...(s.slots ?? []).filter((x) => !x.aircraftId).map((x) => x.type),
+  ].filter((t): t is string => !!t))];
 
-/** "N412AK, N414AK" or "No aircraft yet". */
-export const seasonTails = (data: AppData, s: Pick<Season, "aircraftIds">, none = "No aircraft yet") =>
-  s.aircraftIds.map((id) => data.aircraft.find((a) => a.id === id)?.tail).filter(Boolean).join(", ") || none;
+/** "N412AK, N414AK + a Bell 412 to pick" or "No aircraft yet". */
+export const seasonTails = (data: AppData, s: Pick<Season, "aircraftIds" | "slots">, none = "No aircraft yet") => {
+  const tails = s.aircraftIds.map((id) => data.aircraft.find((a) => a.id === id)?.tail).filter(Boolean);
+  const open = (s.slots ?? []).filter((x) => !x.aircraftId);
+  const pick = open.length === 1 ? `${open[0].type ? `a ${open[0].type}` : "an aircraft"} to pick` : open.length ? `${open.length} aircraft to pick` : "";
+  return [tails.join(", "), pick].filter(Boolean).join(" + ") || none;
+};
 
-/** Pilot seats across a season's aircraft. */
-export const seasonSeats = (data: AppData, s: Pick<Season, "aircraftIds">) =>
-  s.aircraftIds.reduce((t, id) => t + (data.aircraft.find((a) => a.id === id)?.seats ?? 0), 0);
+/** Pilot seats across a season's aircraft (a line without its tail yet counts its type's seats). */
+export const seasonSeats = (data: AppData, s: Pick<Season, "aircraftIds" | "slots">) =>
+  s.aircraftIds.reduce((t, id) => t + (data.aircraft.find((a) => a.id === id)?.seats ?? 0), 0)
+  + (s.slots ?? []).filter((x) => !x.aircraftId).reduce((t, x) => t + (data.aircraftTypes?.find((y) => y.name === x.type)?.seats ?? 0), 0);

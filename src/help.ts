@@ -27,7 +27,7 @@ export const PAGE_HELP: PageHelp[] = [
   { page: "aircraft", label: "Fleet", about: "Every tail over time, free windows, and Can we take a job?", words: "aircraft tails helicopters free windows take a job", guide: "fleet", docs: "fleet" },
   { page: "types", label: "Types & equipment", about: "Kinds of aircraft, and the equipment they carry for different work", words: "aircraft types models makes equipment hoist bucket floats medical interior kit", guide: "types", docs: "fleet#types-and-equipment" },
   { page: "schedule", label: "Schedule", about: "The plan as a Gantt chart, by aircraft, mission or person", words: "gantt chart calendar timeline open seats", guide: "schedule", docs: "schedule" },
-  { page: "missions", label: "Missions", about: "Each customer's work and its seasons", words: "customers seasons contracts jobs", guide: "missions", docs: "missions-and-seasons" },
+  { page: "missions", label: "Missions", about: "Each customer's work and its seasons", words: "customers seasons contracts jobs contact phone email documents files pdf attachments ground duty hangar on call standby", guide: "missions", docs: "missions-and-seasons" },
   { page: "people", label: "Crew", about: "Pilots and maintainers, ratings and time off", words: "people pilots maintainers ratings time off leave sick", guide: "crew", docs: "crew" },
   { page: "maintenance", label: "Maintenance", about: "Jobs on a tail, with the maintainers on them", words: "repairs grounded jobs", guide: "maintenance", docs: "maintenance" },
   { page: "training", label: "Training", about: "Courses, who's current, and what runs out next", words: "courses current renewals qualifications nvg", guide: "training", docs: "training" },
