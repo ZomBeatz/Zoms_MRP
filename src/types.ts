@@ -6,7 +6,21 @@ export type ID = string;
  */
 export type When = string;
 
-export type AircraftStatus = "Ready" | "In maintenance" | "Grounded" | "Retired";
+/**
+ * Airworthy: free to fly. In maintenance: down for planned work. AOG (aircraft on ground): down for something
+ * unplanned, like a part on order. Both keep it off missions from `statusSince` until `backOn`.
+ * Retired: out of the fleet for good.
+ */
+export type AircraftStatus = "Airworthy" | "In maintenance" | "AOG" | "Retired";
+
+/** One line in a tail's log: a status change (written when it's saved) or a note someone added. */
+export interface AircraftLogEntry {
+  id: ID;
+  /** The day it happened ("2026-11-04"). */
+  on: string;
+  kind: "status" | "note";
+  text: string;
+}
 
 export interface Aircraft {
   id: ID;
@@ -14,6 +28,12 @@ export interface Aircraft {
   type: string;          // "Bell 412"
   base: string;          // "North pad"
   status: AircraftStatus;
+  /** The day it went into maintenance or AOG ("2026-11-04"). Empty: as long as anyone knows. */
+  statusSince?: string | null;
+  /** The day it's expected to fly again, when it's down. Empty: not known yet. */
+  backOn?: string | null;
+  /** What happened to it, newest last. */
+  log?: AircraftLogEntry[];
   seats: number;         // pilot seats in the cockpit (1 or 2)
   notes: string;
   /** The last flight-hours reading: total hours on the airframe as of a day ("2026-11-04"). */
@@ -305,6 +325,8 @@ export interface Settings {
   hiddenPages: Page[];
   /** What a new season starts with when its mission has none before it. */
   seasonDefaults: { pilots: number; maintainers: number; pilotRotation: Rotation | null; dutyHours: number | null };
+  /** Show costs and charges (day rates, cost per flight hour, margins). Off until someone needs them. */
+  costs: boolean;
   /** Shown before amounts ($, €, £, kr). */
   currencySymbol: string;
   /** Maintenance programs and flight hours (off for anyone who tracks them in another system). */

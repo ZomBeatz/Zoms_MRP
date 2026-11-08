@@ -20,8 +20,9 @@ export const defaultSettings = (): Settings => ({
   weekStart: 1,
   hiddenPages: [],
   seasonDefaults: { pilots: 1, maintainers: 0, pilotRotation: null, dutyHours: null },
+  costs: false,
   currencySymbol: "$",
-  maintenance: { enabled: true, autoPlan: false, hoursPerDay: 3, dueSoonDays: 30 },
+  maintenance: { enabled: false, autoPlan: false, hoursPerDay: 3, dueSoonDays: 30 },
 });
 
 export const emptyData = (): AppData => ({
@@ -82,7 +83,7 @@ export function sampleData(settings = defaultSettings()): AppData {
   const trainings = [tMtn, tFire, tWater, tNvg, tHoist, tArctic, tCold, tFuel];
 
   // ---- fleet: twelve tails, three of each type
-  const ac = (tail: string, type: string, seats: number, base: string): Aircraft => ({ id: `a-${tail}`, tail, type, seats, base, status: "Ready", notes: "" });
+  const ac = (tail: string, type: string, seats: number, base: string): Aircraft => ({ id: `a-${tail}`, tail, type, seats, base, status: "Airworthy", notes: "" });
   const B412 = "Bell 412", AW = "AW139", AS = "AS350 B3", B407 = "Bell 407";
   const n412 = ac("N412AK", B412, 2, "Anchorage");
   const n413 = ac("N413AK", B412, 2, "Fairbanks");
@@ -384,6 +385,18 @@ export function sampleData(settings = defaultSettings()): AppData {
     // About what the demo's inspection jobs allow for (a 100 hour inspection every few months).
     a.hoursPerDay = 1.2;
   }
+
+  // ---- status and logs: one tail AOG waiting on a part, one in for planned work, and a few log lines.
+  const ymd = (n: number) => iso(dayAt(t0, n));
+  let logId = 0;
+  const log = (a: Aircraft, on: number, kind: "status" | "note", text: string) => (a.log = [...(a.log ?? []), { id: `lg-${++logId}`, on: ymd(on), kind, text }]);
+  for (const a of aircraft) log(a, -360, "status", "Added to the fleet, airworthy.");
+  Object.assign(n352, { status: "AOG", statusSince: ymd(-3), backOn: ymd(12) });
+  log(n352, -3, "status", `Airworthy → AOG. Expected back ${format(dayAt(t0, 12), "MMM d, yyyy")}. Main rotor damper leaking, part on order.`);
+  Object.assign(n408, { status: "In maintenance", statusSince: ymd(-1), backOn: ymd(5) });
+  log(n408, -1, "status", `Airworthy → In maintenance. Expected back ${format(dayAt(t0, 5), "MMM d, yyyy")}. Avionics upgrade.`);
+  log(n412, -40, "note", "Bird strike on approach to Anchorage. Inspected, no damage.");
+  log(n139, -12, "note", "Hoist cable replaced, load tested.");
 
   return { version: 1, aircraft, aircraftTypes, equipment, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, ignored: [], settings };
 }

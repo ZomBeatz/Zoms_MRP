@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClipboardCheck, Download, Plus, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { ClipboardCheck, Coins, Download, Plus, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
@@ -203,12 +203,21 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
         </section>
 
         <section className="panel">
+          <h3><Coins size={16} /> Costs</h3>
+          <label className="check">
+            <input type="checkbox" checked={!!data.settings.costs} onChange={(e) => updateSettings({ costs: e.target.checked })} />
+            Show costs and charges
+          </label>
+          <p className="small muted" style={{ margin: "6px 0 0" }}>Day rates on crew, cost per flight hour on aircraft, a charge per day on missions, and cost and margin in Reports and the Crew planner. Off: they're hidden, and anything already typed in is kept.</p>
+        </section>
+
+        <section className="panel">
           <h3><ClipboardCheck size={16} /> Maintenance programs</h3>
           <label className="check">
             <input type="checkbox" checked={mx.enabled} onChange={(e) => updateSettings({ maintenance: { ...mx, enabled: e.target.checked } })} />
-            Track inspections and flight hours here
+            Track flight hours and inspections here
           </label>
-          <p className="small muted" style={{ margin: "6px 0 0" }}>Each aircraft type's inspections (every so many hours or months), when each tail is due, and its flight hours, on the Inspections page. Turn it off if another system already does this.</p>
+          <p className="small muted" style={{ margin: "6px 0 0" }}>Each aircraft type's inspections (every so many hours or months), when each tail is due, and its flight hours, on the Inspections page. Off: the Inspections page, flight hours on aircraft and due inspections are hidden, and anything already typed in is kept.</p>
           {mx.enabled && (
             <>
               <label className="check" style={{ marginTop: 10 }}>

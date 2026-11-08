@@ -10,8 +10,8 @@ const pilot = (id: string, quals: string[]): Person => ({ id, name: id, role: "P
 function base(): AppData {
   const data = emptyData();
   data.aircraft = [
-    { id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" },
-    { id: "a2", tail: "N2", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" },
+    { id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "" },
+    { id: "a2", tail: "N2", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "" },
   ];
   data.people = [pilot("p1", ["Bell 412"]), pilot("p2", ["Bell 412"])];
   data.missions = [{ id: "fire", name: "Fire", contact: "", requiredTrainingIds: [], location: "", color: "#c2410c", pattern: "solid", notes: "" }];

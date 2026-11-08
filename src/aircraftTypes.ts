@@ -1,4 +1,5 @@
 import type { Aircraft, AircraftType, AppData, Equipment } from "./types";
+import { dateToStart, ms } from "./time";
 
 /**
  * Aircraft types and equipment (the Types & equipment page). Tails, crew ratings and maintenance
@@ -57,3 +58,21 @@ export function equipmentFor(d: Pick<AppData, "aircraftTypes" | "equipment">, ty
 /** Equipment a mission needs that this tail doesn't have. */
 export const missingEquipment = (d: Pick<AppData, "equipment">, a: Pick<Aircraft, "equipmentIds">, needs: string[] | undefined): Equipment[] =>
   (needs ?? []).filter((id) => !(a.equipmentIds ?? []).includes(id)).map((id) => (d.equipment ?? []).find((e) => e.id === id)).filter((e): e is Equipment => !!e);
+
+// ---------------------------------------------------------------- status
+
+/**
+ * When a tail's status keeps it from flying, as [first midnight, midnight it flies again]; an open end is
+ * ±Infinity. In maintenance and AOG run from `statusSince` to `backOn`; retired is for good. null: it can fly.
+ */
+export function downSpan(a: Pick<Aircraft, "status" | "statusSince" | "backOn">): [number, number] | null {
+  if (a.status === "Retired") return [-Infinity, Infinity];
+  if (a.status !== "AOG" && a.status !== "In maintenance") return null;
+  const from = a.statusSince ? ms(dateToStart(a.statusSince)) : -Infinity;
+  const to = a.backOn ? ms(dateToStart(a.backOn)) : Infinity;
+  return [from, Math.max(from, to)];
+}
+
+/** "AOG", "in maintenance" or "retired", for sentences. */
+export const statusWords = (s: Aircraft["status"]) => (s === "AOG" ? "AOG" : s.toLowerCase());
+

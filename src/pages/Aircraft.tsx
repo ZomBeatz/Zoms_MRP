@@ -4,9 +4,11 @@ import { format } from "date-fns";
 import { bookings } from "../bookings";
 import { useStore } from "../store";
 import { fleetUse, freePerDay } from "../fleet";
+import { downSpan } from "../aircraftTypes";
 import { dayAt, fmtDates, ms, plural, toWhen, today } from "../time";
 import { missionLook, slotStyle } from "../look";
-import { Empty, StatusPill } from "../components/ui";
+import { Empty, StatusPill, usePref } from "../components/ui";
+import type { Aircraft } from "../types";
 import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } from "../components/timeline";
 
 /**
@@ -16,6 +18,7 @@ import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } f
  */
 export function AircraftPage() {
   const { data, open } = useStore();
+  const [view, setView] = usePref<"status" | "timeline">("zoms-mrp:fleet-view", "status");
   const [span, setSpan] = useState(90);
   const tl = useTimeline(span, setSpan, 7);
   const { from, to, pct } = tl;
@@ -55,6 +58,14 @@ export function AircraftPage() {
             <div className="tile"><div className="label">Days with nothing free, next 90</div><div className={`value ${nextPerDay.some((d) => d.free === 0) ? "warn" : ""}`}>{nextPerDay.filter((d) => d.free === 0).length}</div></div>
           </div>
 
+          <div className="row gap wrap" style={{ marginTop: 14 }}>
+            <div className="seg">
+              <button className={view === "status" ? "active" : ""} onClick={() => setView("status")}>Fleet status</button>
+              <button className={view === "timeline" ? "active" : ""} onClick={() => setView("timeline")}>Timeline</button>
+            </div>
+          </div>
+          {view === "status" && <FleetStatus />}
+          {view === "timeline" && <>
           <div className="sched-bar" style={{ marginTop: 14 }}>
             <TimelineControls tl={tl} />
           </div>
@@ -108,6 +119,21 @@ export function AircraftPage() {
                                 </button>
                               );
                             })}
+                            {(() => {
+                              // Down for its status (in maintenance, AOG), across the dates it's out.
+                              const out = downSpan(a);
+                              if (!out || a.status === "Retired") return null;
+                              const fa = Math.max(out[0], from), fb = Math.min(out[1], to);
+                              if (!(fb > fa)) return null;
+                              return (
+                                <button className={`slot down ${a.status === "AOG" ? "aog" : ""}`} style={{ left: `${pct(fa)}%`, width: `calc(${pct(fb) - pct(fa)}% - 2px)` }}
+                                  title={`${a.tail} is ${a.status}${a.backOn ? `, expected back ${format(ms(`${a.backOn}T00:00`), "MMM d")}` : ", back not known"}`}
+                                  onClick={() => !tl.justDragged.current && open("aircraft", a.id, undefined, { spot: "status" })}>
+                                  <span className="t">{a.status}</span>
+                                  <span className="s">{a.backOn ? `back ${format(ms(`${a.backOn}T00:00`), "MMM d")}` : "back not known"}</span>
+                                </button>
+                              );
+                            })()}
                             {missions.map((m) => (
                               <button key={m.id} className={`slot ${m.status === "Done" ? "past" : ""}`} style={{ ...slotStyle(missionLook(m)), left: `${pct(ms(m.start))}%`, width: `calc(${pct(ms(m.end)) - pct(ms(m.start))}% - 2px)` }}
                                 title={`${m.name}\n${fmtDates(m.start, m.end)}\n${m.status}`} onClick={() => !tl.justDragged.current && open("season", m.id)}>
@@ -148,11 +174,87 @@ export function AircraftPage() {
             <span><span className="swatch" style={{ background: "var(--zb-surface-3)", border: "1px dashed var(--zb-text-2)" }} />Check (still flies)</span>
             <span><span className="swatch" style={{ background: "var(--zb-orange)", width: 3 }} />Today</span>
             <span><span className="swatch" style={{ background: "color-mix(in srgb, var(--zb-danger) 22%, var(--zb-surface))", outline: "2px solid var(--zb-danger)" }} />Maintenance during a mission</span>
+            <span><span className="swatch" style={{ background: "repeating-linear-gradient(45deg, var(--zb-surface-3) 0 4px, var(--zb-surface) 4px 8px)" }} />In maintenance, AOG</span>
             <span className="muted">Missions show in their own colors. Free windows count from today. Tap a free block to book it.</span>
           </div>
+          </>}
           {retired.length > 0 && <p className="small muted">Retired: {retired.map((a) => a.tail).join(", ")}.</p>}
         </>
       )}
+    </>
+  );
+}
+
+/**
+ * The fleet at a glance: how many tails are airworthy, in maintenance or AOG, then each tail with its status,
+ * when it went down and is expected back, what it's doing today, its next booking and its latest log line.
+ */
+function FleetStatus() {
+  const { data, open } = useStore();
+  const t0 = today().getTime();
+  const live = data.aircraft.filter((a) => a.status !== "Retired");
+  const count = (s: Aircraft["status"]) => live.filter((a) => a.status === s).length;
+  const types = [...new Set(live.map((a) => a.type))].sort();
+  const now = useMemo(() => new Map(fleetUse(data, t0, dayAt(t0, 1)).map((f) => [f.aircraft.id, f.days[0]])), [data, t0]);
+  const day = (iso: string) => format(new Date(`${iso}T00:00`), "MMM d");
+  const next = (a: Aircraft) => bookings(data)
+    .filter((b) => b.aircraftIds.includes(a.id) && b.status !== "Cancelled" && b.status !== "Done" && ms(b.start) > t0)
+    .sort((x, y) => ms(x.start) - ms(y.start))[0];
+  const last = (a: Aircraft) => [...(a.log ?? [])].sort((x, y) => x.on.localeCompare(y.on)).at(-1);
+  const doing = (a: Aircraft) => {
+    const u = now.get(a.id);
+    if (!u || u.kind === "free") return <span style={{ color: "var(--zb-ok)" }}>Free today</span>;
+    if (u.kind === "mission") return <>On <b>{u.mission.name}</b></>;
+    if (u.kind === "maintenance") return <>Maintenance: {u.job.title}</>;
+    return <span className="muted">Down</span>;
+  };
+  const downFor = (a: Aircraft) => (a.status === "AOG" || a.status === "In maintenance")
+    ? <>{a.statusSince ? `Since ${day(a.statusSince)}` : "Down"}{" · "}{a.backOn ? <b>back {day(a.backOn)}</b> : <span className="muted">back not known</span>}</>
+    : null;
+  return (
+    <>
+      <div className="tiles" style={{ marginTop: 14 }}>
+        <div className="tile"><div className="label">Airworthy</div><div className="value ok">{count("Airworthy")} <span className="muted small">of {live.length}</span></div></div>
+        <div className="tile"><div className="label">In maintenance</div><div className={`value ${count("In maintenance") ? "warn" : ""}`}>{count("In maintenance")}</div></div>
+        <div className="tile"><div className="label">AOG</div><div className={`value ${count("AOG") ? "danger" : ""}`}>{count("AOG")}</div></div>
+        <div className="tile"><div className="label">Flying a mission today</div><div className="value">{live.filter((a) => now.get(a.id)?.kind === "mission").length}</div></div>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Tail</th><th>Status</th><th>Down</th><th>Today</th><th>Next booking</th><th>Base</th><th>Latest in the log</th></tr></thead>
+          <tbody>
+            {types.map((type) => (
+              <Fragment key={type}>
+                <tr className="group-row"><td colSpan={7}><b>{type}</b> <span className="muted small">· {plural(live.filter((a) => a.type === type).length, "aircraft", "aircraft")}</span></td></tr>
+                {live.filter((a) => a.type === type).sort((x, y) => x.tail.localeCompare(y.tail)).map((a) => {
+                  const n = next(a), l = last(a);
+                  return (
+                    <tr key={a.id} onClick={() => open("aircraft", a.id)}>
+                      <td className="name mono">{a.tail}</td>
+                      <td><StatusPill status={a.status} /></td>
+                      <td className="small">{downFor(a) ?? <span className="muted">–</span>}</td>
+                      <td className="small">{doing(a)}</td>
+                      <td className="small">{n ? <>{n.name} <span className="muted">· {day(n.start.slice(0, 10))}</span></> : <span className="muted">None</span>}</td>
+                      <td className="small">{a.base || <span className="muted">–</span>}</td>
+                      <td className="small" style={{ maxWidth: 280 }}>{l ? <><span className="muted">{day(l.on)}:</span> {l.text}</> : <span className="muted">Nothing yet</span>}</td>
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="cards-list">
+        {[...live].sort((x, y) => x.type.localeCompare(y.type) || x.tail.localeCompare(y.tail)).map((a) => (
+          <button key={a.id} className="list-card" onClick={() => open("aircraft", a.id)}>
+            <span className="row gap-sm"><b className="mono">{a.tail}</b> <span className="small muted">{a.type}</span> <StatusPill status={a.status} /></span>
+            {downFor(a) && <span className="small">{downFor(a)}</span>}
+            <span className="small">{doing(a)}</span>
+          </button>
+        ))}
+      </div>
+      <p className="small muted">In maintenance and AOG keep a tail off every mission from the day it went down until it's expected back; missions booked on it then show under Needs attention. Tap a tail to change its status or read its log.</p>
     </>
   );
 }

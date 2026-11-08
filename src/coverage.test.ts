@@ -10,7 +10,7 @@ const pilot = (id: string, name: string, quals: string[]): Person => ({ id, name
 
 function base(): AppData {
   const data = emptyData();
-  data.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" }];
+  data.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "" }];
   data.people = [pilot("p1", "Alex", ["Bell 412"]), pilot("p2", "Maya", ["Bell 412"]), pilot("p3", "Sam", ["AS350"])];
   data.missions = [{ id: "fire", name: "Fire season", contact: "", requiredTrainingIds: [], location: "", color: "#c2410c", pattern: "solid", notes: "" }];
   data.seasons = [{ id: "m1", missionId: "fire", start: d(1), end: d(29), aircraftIds: ["a1"], pilotRotation: null, maintainerRotation: null, pilotsNeeded: 1, maintainersNeeded: 0, status: "Confirmed", notes: "" }];
@@ -18,6 +18,33 @@ function base(): AppData {
 }
 
 describe("coverage", () => {
+  it("keeps a tail in maintenance or AOG off missions only while it's down", () => {
+    const data = base();
+    const acstat = () => findIssues({ ...data }).filter((i) => i.id.startsWith("acstat-"));
+    expect(acstat()).toHaveLength(0);
+    // AOG from the 10th with no return date: the season (1st to 28th) is hit.
+    data.aircraft[0] = { ...data.aircraft[0], status: "AOG", statusSince: "2030-11-10", backOn: null };
+    expect(acstat()).toHaveLength(1);
+    expect(acstat()[0].title).toContain("AOG");
+    // In maintenance and back before the season starts: fine.
+    data.aircraft[0] = { ...data.aircraft[0], status: "In maintenance", statusSince: "2030-10-01", backOn: "2030-11-01" };
+    expect(acstat()).toHaveLength(0);
+    // Back a day into it: a problem again.
+    data.aircraft[0] = { ...data.aircraft[0], backOn: "2030-11-02" };
+    expect(acstat()).toHaveLength(1);
+    // Airworthy: nothing.
+    data.aircraft[0] = { ...data.aircraft[0], status: "Airworthy", statusSince: null, backOn: null };
+    expect(acstat()).toHaveLength(0);
+  });
+
+  it("asks for a status update once a tail is past the day it was expected back", () => {
+    const data = base();
+    data.aircraft[0] = { ...data.aircraft[0], status: "AOG", statusSince: "2020-01-01", backOn: "2020-02-01" };
+    expect(findIssues({ ...data }).some((i) => i.id === "acback-a1")).toBe(true);
+    data.aircraft[0] = { ...data.aircraft[0], backOn: "2099-02-01" };
+    expect(findIssues({ ...data }).some((i) => i.id === "acback-a1")).toBe(false);
+  });
+
   it("flags a tail that lacks equipment its mission needs", () => {
     const data = base();
     data.equipment = [{ id: "hoist", name: "Rescue hoist", notes: "" }, { id: "bucket", name: "Fire bucket", notes: "" }];

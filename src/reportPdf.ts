@@ -284,7 +284,7 @@ class Pdf {
         if (last && (last as { key?: string }).key === key) { last.b = day + DAY; return; }
         const s = u.kind === "mission" ? { label: u.mission.name, color: u.mission.color, kind: "mission" as const }
           : u.kind === "maintenance" ? { label: u.job.title, color: REPORT_COLORS.maintenance, kind: "maintenance" as const }
-          : u.kind === "down" ? { label: "Grounded", color: REPORT_COLORS.down, kind: "down" as const }
+          : u.kind === "down" ? { label: u.status, color: REPORT_COLORS.down, kind: "down" as const }
           : { label: "Free", color: REPORT_COLORS.free, kind: "free" as const };
         spans.push(Object.assign({ a: day, b: day + DAY, key }, s));
       });

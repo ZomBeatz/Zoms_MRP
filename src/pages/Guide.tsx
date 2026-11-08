@@ -287,7 +287,9 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
         <dt>Rotation</dt><dd>A repeating pattern of days on and days off, like 14 on, 7 off.</dd>
         <dt>Open seat</dt><dd>A day a job needs one more pilot or maintainer than it has.</dd>
         <dt>Current</dt><dd>Training that hasn't run out yet.</dd>
-        <dt>Grounded</dt><dd>An aircraft that can't fly, usually because of maintenance.</dd>
+        <dt>Airworthy</dt><dd>An aircraft that's free to fly and can be booked.</dd>
+        <dt>In maintenance</dt><dd>Down for planned work, from the day it went in until it's expected back. It's off every mission in between.</dd>
+        <dt>AOG</dt><dd>Aircraft on ground: down for something unplanned, like a part on order. Like In maintenance, it's off every mission until it's back.</dd>
       </dl>
     ),
   },
@@ -311,7 +313,9 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
     id: "fleet", title: "Fleet", tour: "call",
     body: (
       <>
-        <p>Every tail over time, grouped by type. Colored bars are missions, green dashed blocks are free windows (counted from today), and a thin row under each tail holds its maintenance. The row at the top counts how many aircraft are free each day.</p>
+        <p><b>Fleet status</b> shows the fleet at a glance: how many tails are airworthy, in maintenance or AOG, then each tail with its status, when it went down and is expected back, what it's doing today, its next booking and the latest line in its log.</p>
+        <p>A tail's <b>status</b> matters: <b>In maintenance</b> (planned work) and <b>AOG</b> (aircraft on ground, something unplanned) keep it off every mission from the day it went down until the day it's expected back. Missions booked on it then show under Needs attention, and Can we take a job? leaves it out. With no return date it's off from then on. Once that date passes, you're asked to update it. <b>Retired</b> takes it out of the fleet. Every status change goes in the tail's <b>Log</b> tab with why, next to notes you add and its maintenance jobs.</p>
+        <p><b>Timeline</b> shows every tail over time, grouped by type. Colored bars are missions, green dashed blocks are free windows (counted from today), and a thin row under each tail holds its maintenance. The row at the top counts how many aircraft are free each day.</p>
         <p><b>Can we take a job?</b> takes dates, an aircraft type, pilots on board and any training, and answers tail by tail: <i>Can do</i>, <i>Short crew</i> or <i>Can't</i>, with the reason and the first day a busy tail is free. <b>Book on…</b> starts the mission with it all filled in. Tap a free window on the board to book that window.</p>
       </>
     ),
@@ -390,7 +394,7 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
   },
   {
     id: "inspections", title: "Inspections",
-    body: <p>Each aircraft type's maintenance program: its inspections every so many flight hours and/or months, whichever comes first. A job on the tail with the same name counts as doing it. <b>Due</b> lists every tail's inspections with when they were last done and when they're due; <b>Plan it…</b> books one in the latest free days before it's due. <b>Flight hours</b> takes readings, and between them counts mission days × hours per flying day. Overdue and due-soon inspections show under Needs attention. Turn it all off, or have it plan by itself, in <b>Settings › Maintenance programs</b>.</p>,
+    body: <p>Each aircraft type's maintenance program: its inspections every so many flight hours and/or months, whichever comes first. A job on the tail with the same name counts as doing it. <b>Due</b> lists every tail's inspections with when they were last done and when they're due; <b>Plan it…</b> books one in the latest free days before it's due. <b>Flight hours</b> takes readings, and between them counts mission days × hours per flying day. Overdue and due-soon inspections show under Needs attention. It's off until you turn it on in <b>Settings › Maintenance programs</b>, where it can also plan by itself.</p>,
   },
   {
     id: "currency", title: "Currency, preferences and notes",
@@ -404,7 +408,7 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
   },
   {
     id: "cost", title: "Cost per mission and duty days",
-    body: <p>Give people a <b>Day rate</b>, aircraft a <b>Cost per flight hour</b> and missions a <b>Charge per day</b> (all optional), and Reports shows each mission's crew and flying cost, the total, what's charged and the margin, in the Excel report too. A season can set its <b>Hours on duty in a day</b>; longer than the most in Settings (14 to start) is flagged.</p>,
+    body: <p>Costs are off until you turn them on in <b>Settings › Costs</b>. Then give people a <b>Day rate</b>, aircraft a <b>Cost per flight hour</b> and missions a <b>Charge per day</b> (all optional), and Reports shows each mission's crew and flying cost, the total, what's charged and the margin, in the Excel report too. A season can set its <b>Hours on duty in a day</b>; longer than the most in Settings (14 to start) is flagged.</p>,
   },
   {
     id: "limits", title: "Work limits",

@@ -165,7 +165,7 @@ export function Field({ label, hint, error, full, spot, children }: { label: str
 }
 
 const missionTone: Record<MissionStatus, string> = { Planned: "accent", Confirmed: "ok", Flying: "ok", Done: "", Cancelled: "" };
-const aircraftTone: Record<AircraftStatus, string> = { Ready: "ok", "In maintenance": "warn", Grounded: "danger", Retired: "" };
+const aircraftTone: Record<AircraftStatus, string> = { Airworthy: "ok", "In maintenance": "warn", AOG: "danger", Retired: "" };
 
 export function StatusPill({ status }: { status: MissionStatus | AircraftStatus }) {
   const tone = (missionTone as Record<string, string>)[status] ?? (aircraftTone as Record<string, string>)[status] ?? "";

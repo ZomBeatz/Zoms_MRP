@@ -15,8 +15,8 @@ const rules = { maxDaysOn: 21, minDaysOff: 7 };
 function base(pilots: Person[], days = 70): AppData {
   const data = emptyData();
   data.aircraft = [
-    { id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" },
-    { id: "a2", tail: "N2", type: "AS350", base: "", status: "Ready", seats: 1, notes: "" },
+    { id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "" },
+    { id: "a2", tail: "N2", type: "AS350", base: "", status: "Airworthy", seats: 1, notes: "" },
   ];
   data.people = pilots;
   data.missions = [{ id: "fire", name: "Fire", contact: "", location: "", requiredTrainingIds: [], color: "#c2410c", pattern: "solid", notes: "" }];

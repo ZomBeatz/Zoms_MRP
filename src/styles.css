@@ -171,6 +171,10 @@ button.tile:hover { background: var(--zb-surface-2); }
 .table tr:last-child td { border-bottom: none; }
 .table tbody tr { cursor: pointer; }
 .table tbody tr:hover { background: var(--zb-surface-2); }
+.table tbody tr.group-row { cursor: default; }
+.table tbody tr.group-row td { background: var(--zb-surface-2); padding-top: 6px; padding-bottom: 6px; }
+.slot.down { background: repeating-linear-gradient(45deg, var(--zb-surface-3) 0 4px, var(--zb-surface) 4px 8px); border: 1px dashed var(--zb-text-2); color: var(--zb-text-2); cursor: pointer; }
+.slot.down.aog { border-color: var(--zb-danger); color: var(--zb-danger); }
 .table td.r, .table th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .table .name { font-weight: 600; }
 .cards-list { display: none; }

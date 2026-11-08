@@ -6,7 +6,7 @@ import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
 import { keepForm, keptForm, useStore } from "./store";
 import { dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
 import { canSupport } from "./fleet";
-import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, plural, startToDate, toWhen, today, uid } from "./time";
+import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, overlaps, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
 import { SWATCHES, missionLook, slotStyle } from "./look";
 import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useDirty, useGuardedClose, useSpot } from "./components/ui";
@@ -18,7 +18,7 @@ import { daysSince } from "./currency";
 import { ConfirmButton, IssueList } from "./pages/Overview";
 import type { Fix } from "./fixes";
 import { validUntil } from "./types";
-import { equipmentFor, missingEquipment, renameType } from "./aircraftTypes";
+import { downSpan, equipmentFor, missingEquipment, renameType, statusWords } from "./aircraftTypes";
 import type { Aircraft, AircraftType, AppData, Equipment, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
 
 /** Opens the right dialog for whatever `editing` points at. */
@@ -255,9 +255,11 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
             </Field>
           )}
           <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this mission" applies={stricter(baseRules(data, m), m.limits)} />
-          <Field label="Charge per day" hint="What the customer pays for a day, for the margin in Reports. Optional.">
-            <input type="number" inputMode="decimal" min={0} value={m.dayCharge ?? ""} placeholder="0" onChange={(e) => set({ dayCharge: e.target.value === "" ? null : Number(e.target.value) })} />
-          </Field>
+          {data.settings.costs && (
+            <Field label="Charge per day" hint="What the customer pays for a day, for the margin in Reports. Optional.">
+              <input type="number" inputMode="decimal" min={0} value={m.dayCharge ?? ""} placeholder="0" onChange={(e) => set({ dayCharge: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
+          )}
           <div className="full">
             <h4 className="form-section">Look on the schedule</h4>
             <LookPicker color={m.color} pattern={m.pattern} onChange={(color, pattern) => set({ color, pattern })} />
@@ -505,9 +507,10 @@ function AircraftPicker({ value, onChange, spot, when, needs }: { value: string[
   };
   /** What keeps a tail from this job's dates, if anything. */
   const busyWith = (a: Aircraft): string | null => {
-    if (a.status === "Grounded") return "Grounded";
-    if (!when || !(ms(when.end) > ms(when.start))) return null;
+    const out = downSpan(a);
+    if (!when || !(ms(when.end) > ms(when.start))) return out ? a.status : null;
     const from = ms(when.start), to = ms(when.end);
+    if (out && overlaps(from, to, out[0], out[1])) return a.status === "Retired" ? "Retired" : `${a.status}${a.backOn ? ` until ${format(ms(dateToStart(a.backOn)), "MMM d")}` : ""}`;
     const job = data.jobs.find((j) => j.aircraftId === a.id && j.grounds && !j.done && ms(j.start) < to && ms(j.end) > from);
     if (job) return `In maintenance: ${job.title}`;
     const other = bookings(data).find((b) => b.id !== when.seasonId && b.status !== "Cancelled" && b.aircraftIds.includes(a.id) && ms(b.start) < to && ms(b.end) > from);
@@ -523,7 +526,7 @@ function AircraftPicker({ value, onChange, spot, when, needs }: { value: string[
             return (
               <span key={a.id} className="tag" title={`${a.type}, ${plural(a.seats, "pilot seat")}`}>
                 <b>{a.tail}</b> <span className="muted small">{a.type}</span>
-                {busy ? <span className="pill warn">{busy}</span> : a.status !== "Ready" && <span className="pill warn">{a.status}</span>}
+                {busy ? <span className="pill warn">{busy}</span> : a.status !== "Airworthy" && <span className="pill warn">{a.status}</span>}
                 {lacks(a) && <span className="pill warn">{lacks(a)}</span>}
                 <button type="button" className="icon-btn" aria-label={`Take ${a.tail} off this job`} onClick={() => onChange(value.filter((x) => x !== a.id))}>✕</button>
               </span>
@@ -544,7 +547,7 @@ function AircraftPicker({ value, onChange, spot, when, needs }: { value: string[
                     <button key={a.id} type="button" className={`chip pick ac-pick ${busy ? "busy" : "free"}`} onClick={() => onChange([...value, a.id])}
                       title={busy ? `${a.tail}: ${busy}. You can still add it; it will show as a problem.` : `${a.tail} is free${when ? " for these dates" : ""}`}>
                       <Plus size={13} /><b>{a.tail}</b>
-                      <span className="small">{busy ?? (when ? "Free" : a.status === "Ready" ? "" : a.status)}</span>
+                      <span className="small">{busy ?? (when ? "Free" : a.status === "Airworthy" ? "" : a.status)}</span>
                     </button>
                   );
                 })}
@@ -1018,13 +1021,26 @@ function AircraftDialog({ id, fix = {} }: Props) {
   const { data, change, remove, close, showToast } = useStore();
   useSpot(fix.spot);
   const existing = data.aircraft.find((a) => a.id === id);
-  const [kept] = useState(() => keptForm<{ a: Aircraft; typing: boolean }>());
-  const [a, setA] = useState<Aircraft>(() => kept.a ?? existing ?? { id: uid(), tail: "", type: "", base: "", status: "Ready", seats: 2, notes: "", equipmentIds: [] });
+  const [kept] = useState(() => keptForm<{ a: Aircraft; typing: boolean; tab: string; why: string }>());
+  const [tab, setTab] = useState(kept.tab ?? fix.tab ?? "details");
+  const [a, setA] = useState<Aircraft>(() => kept.a ?? existing ?? { id: uid(), tail: "", type: "", base: "", status: "Airworthy", seats: 2, notes: "", equipmentIds: [], log: [] });
+  // Why its status changed, written into the log on Save.
+  const [why, setWhy] = useState(kept.why ?? "");
+  const todayIso = format(today(), "yyyy-MM-dd");
+  const down = a.status === "AOG" || a.status === "In maintenance";
+  const setStatus = (status: Aircraft["status"]) => {
+    const wasDown = existing && (existing.status === "AOG" || existing.status === "In maintenance");
+    const toDown = status === "AOG" || status === "In maintenance";
+    // Going down starts today with no return date yet; back to airworthy (or retired) clears both.
+    set(toDown
+      ? { status, statusSince: wasDown ? existing.statusSince ?? todayIso : a.statusSince && down ? a.statusSince : todayIso, backOn: down || wasDown ? a.backOn ?? null : null }
+      : { status, statusSince: status === "Retired" ? todayIso : null, backOn: null });
+  };
   const set = (p: Partial<Aircraft>) => setA((x) => ({ ...x, ...p }));
   const typeNames = [...new Set([...typesOf(data), ...(a.type ? [a.type] : [])])].sort();
   // A new type is typed in; otherwise it's picked from the list (Types & equipment).
   const [typing, setTyping] = useState(() => kept.typing ?? typesOf(data).length === 0);
-  useKeep({ a, typing });
+  useKeep({ a, typing, tab, why });
   const pickType = (name: string) => {
     const t = data.aircraftTypes.find((x) => x.name === name);
     set({ type: name, ...(!existing && t ? { seats: t.seats } : {}) });
@@ -1041,9 +1057,17 @@ function AircraftDialog({ id, fix = {} }: Props) {
   const dirty = useDirty({ a, ratings });
   const isRated = (p: Person) => ratings[p.id] ?? p.quals.includes(type);
   const save = () => {
+    // A status change (or a new return date) goes in the log, with why.
+    const said = why.trim() ? ` ${why.trim().replace(/[.]?$/, ".")}` : "";
+    const back = down && a.backOn ? ` Expected back ${format(ms(dateToStart(a.backOn)), "MMM d, yyyy")}.` : "";
+    const line = !existing ? `Added to the fleet, ${statusWords(a.status)}.${back}${said}`
+      : existing.status !== a.status ? `${existing.status} → ${a.status}.${back}${said}`
+      : down && (existing.backOn ?? null) !== (a.backOn ?? null) ? `${a.status}: ${a.backOn ? `expected back ${format(ms(dateToStart(a.backOn)), "MMM d, yyyy")}` : "return date cleared"}.${said}`
+      : said ? `${a.status}.${said}` : "";
+    const saved: Aircraft = { ...a, tail, log: line ? [...(a.log ?? []), { id: uid(), on: down && a.statusSince && existing?.status !== a.status ? a.statusSince : todayIso, kind: "status", text: line }] : a.log ?? [] };
     change((d) => ({
       ...d,
-      aircraft: existing ? d.aircraft.map((x) => (x.id === a.id ? { ...a, tail } : x)) : [...d.aircraft, { ...a, tail }],
+      aircraft: existing ? d.aircraft.map((x) => (x.id === a.id ? saved : x)) : [...d.aircraft, saved],
       people: d.people.map((p) => {
         const want = ratings[p.id];
         if (want === undefined || want === p.quals.includes(type)) return p;
@@ -1056,10 +1080,13 @@ function AircraftDialog({ id, fix = {} }: Props) {
   return (
     <Dialog title={existing ? <span style={{ fontFamily: "var(--zb-font-mono)" }}>{a.tail}</span> : "Add aircraft"} onClose={close} dirty={dirty}
       meta={existing && <><StatusPill status={a.status} /><span>{a.type}</span>{a.base && <>·<span>{a.base}</span></>}</>}
+      tabs={[{ key: "details", label: "Details" }, { key: "log", label: <>Log <span className="chip">{(a.log ?? []).length + data.jobs.filter((j) => j.aircraftId === a.id).length}</span></> }]}
+      tab={tab} onTab={setTab}
       foot={<Foot isNew={!existing} label="aircraft" problem={!tail ? "Type the tail number first." : !a.type.trim() ? (typing ? "Type the aircraft type, like Bell 412." : "Pick the aircraft type.") : taken && `${tail} is already in your fleet.`}
         onSave={save}
         onDelete={() => { remove("aircraft", a.id, `Deleted ${a.tail}`); close(); }} />}>
-      <div className="form-grid">
+      {tab === "log" && <AircraftLog aircraft={a} onChange={(log) => set({ log })} />}
+      {tab === "details" && <div className="form-grid">
         <Field label="Tail number" error={error}>
           <input autoFocus={autoFocusBox} value={a.tail} placeholder="N412ZM" style={{ fontFamily: "var(--zb-font-mono)", textTransform: "uppercase" }} onChange={(e) => set({ tail: e.target.value })} />
         </Field>
@@ -1078,13 +1105,25 @@ function AircraftDialog({ id, fix = {} }: Props) {
           )}
         </Field>
         <div className="full pair">
-          <Field label="Status" spot="status">
-            <select value={a.status} onChange={(e) => set({ status: e.target.value as Aircraft["status"] })}>
-              {(["Ready", "In maintenance", "Grounded", "Retired"] as const).map((s) => <option key={s}>{s}</option>)}
+          <Field label="Status" spot="status" hint={STATUS_MEANS[a.status]}>
+            <select value={a.status} onChange={(e) => setStatus(e.target.value as Aircraft["status"])}>
+              {(["Airworthy", "In maintenance", "AOG", "Retired"] as const).map((s) => <option key={s} value={s}>{s === "AOG" ? "AOG (aircraft on ground)" : s}</option>)}
             </select>
           </Field>
           <div className="field"><span>Pilot seats</span><Stepper label="pilot seats" min={1} max={2} value={a.seats} onChange={(seats) => set({ seats })} /></div>
         </div>
+        {down && (
+          <div className="full pair">
+            <DateInput label="Down since" today value={a.statusSince ?? todayIso} onChange={(statusSince) => set({ statusSince })} />
+            <DateInput label="Expected back" clearable="Not known yet" min={a.statusSince ?? undefined} value={a.backOn ?? ""} onChange={(v) => set({ backOn: v || null })}
+              hint={a.backOn ? "The first day it can fly again." : "Not known yet: it's off every mission from then on."} />
+          </div>
+        )}
+        {existing && (existing.status !== a.status || down) && (
+          <Field label={existing.status !== a.status ? "Why (for the log)" : "Note for the log"} full>
+            <input value={why} placeholder={a.status === "AOG" ? "Tail rotor gearbox on order" : a.status === "In maintenance" ? "Phase inspection" : "Back in service after repairs"} onChange={(e) => setWhy(e.target.value)} />
+          </Field>
+        )}
         <Field label="Base" full><input value={a.base} onChange={(e) => set({ base: e.target.value })} /></Field>
         {data.settings.maintenance.enabled && (
           <div className="field full" data-spot="hours">
@@ -1096,15 +1135,17 @@ function AircraftDialog({ id, fix = {} }: Props) {
               </Field>
               <DateInput label="As of" today value={a.hours?.on ?? format(today(), "yyyy-MM-dd")} onChange={(on) => set({ hours: { hours: a.hours?.hours ?? 0, on } })} />
             </div>
-            <Field label="Cost per flight hour" hint="For cost per mission. Optional.">
-              <input type="number" inputMode="decimal" min={0} value={a.hourCost ?? ""} placeholder="0" onChange={(e) => set({ hourCost: e.target.value === "" ? null : Number(e.target.value) })} />
-            </Field>
             <Field label="Hours on a mission day" hint={`Empty: ${data.settings.maintenance.hoursPerDay} from Settings.`}>
               <input type="number" inputMode="decimal" step="0.1" min={0} value={a.hoursPerDay ?? ""} placeholder={String(data.settings.maintenance.hoursPerDay)}
                 onChange={(e) => set({ hoursPerDay: e.target.value === "" ? null : Number(e.target.value) })} />
             </Field>
             {existing && a.hours && <span className="hint">About {flightHours({ ...data, aircraft: data.aircraft.map((x) => (x.id === a.id ? a : x)) }, a, today().getTime())} hours now, counting its mission days since then.</span>}
           </div>
+        )}
+        {data.settings.costs && (
+          <Field label="Cost per flight hour" full hint="For cost per mission. Optional.">
+            <input type="number" inputMode="decimal" min={0} value={a.hourCost ?? ""} placeholder="0" onChange={(e) => set({ hourCost: e.target.value === "" ? null : Number(e.target.value) })} />
+          </Field>
         )}
         <div className="field full" data-spot="equipment">
           <span>Equipment</span>
@@ -1136,8 +1177,61 @@ function AircraftDialog({ id, fix = {} }: Props) {
           <span className="hint">Only people rated on the type are offered for its jobs. Tap to rate or unrate them; it's saved with the aircraft.</span>
         </div>
         <Field label="Notes" full><textarea rows={2} value={a.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
-      </div>
+      </div>}
     </Dialog>
+  );
+}
+
+/** What each status does, under the Status field. */
+const STATUS_MEANS: Record<Aircraft["status"], string> = {
+  Airworthy: "Free to fly. It can be booked on missions.",
+  "In maintenance": "Down for planned work: off every mission until it's back, and booked missions show as problems.",
+  AOG: "Aircraft on ground, for something unplanned: off every mission until it's back, and booked missions show as problems.",
+  Retired: "Out of the fleet for good: off the board, the counts and Can we take a job?",
+};
+
+/** A tail's log: status changes, notes, and its maintenance jobs, newest first. Notes are added here and saved with the aircraft. */
+function AircraftLog({ aircraft: a, onChange }: { aircraft: Aircraft; onChange: (log: NonNullable<Aircraft["log"]>) => void }) {
+  const data = useStore((s) => s.data);
+  const open = useStore((s) => s.open);
+  const [on, setOn] = useState(() => format(today(), "yyyy-MM-dd"));
+  const [text, setText] = useState("");
+  const log = a.log ?? [];
+  const jobs = data.jobs.filter((j) => j.aircraftId === a.id);
+  type Row = { key: string; on: string; what: ReactNode; label: string; tone: string; remove?: () => void; openJob?: string };
+  const rows: Row[] = [
+    ...log.map((x): Row => ({ key: x.id, on: x.on, what: x.text, label: x.kind === "status" ? "Status" : "Note", tone: x.kind === "status" ? "warn" : "", remove: () => onChange(log.filter((y) => y.id !== x.id)) })),
+    ...jobs.map((j): Row => ({ key: j.id, on: startToDate(j.start), what: <>{j.title} · {fmtDates(j.start, j.end)}{j.grounds ? "" : " (still flies)"}</>, label: j.done ? "Maintenance done" : "Maintenance", tone: j.done ? "ok" : "", openJob: j.id })),
+  ].sort((x, y) => y.on.localeCompare(x.on));
+  const add = () => {
+    if (!text.trim()) return;
+    onChange([...log, { id: uid(), on, kind: "note", text: text.trim() }]);
+    setText("");
+  };
+  return (
+    <>
+      <div className="form-grid">
+        <DateInput label="Day" today value={on} onChange={setOn} />
+        <Field label="Add to the log">
+          <input value={text} placeholder="Bird strike on approach, inspected, no damage" onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+        </Field>
+        <div className="full"><button type="button" className="btn sm" onClick={add}><Plus size={14} /> Add to the log</button> <span className="small muted">Saved with the aircraft. Status changes are logged on their own.</span></div>
+      </div>
+      <h4 className="form-section">History</h4>
+      {rows.length ? (
+        <div className="lines">
+          {rows.map((r) => (
+            <div key={r.key} className="line">
+              <span className="small muted" style={{ minWidth: 92 }}>{format(new Date(`${r.on}T00:00`), "MMM d, yyyy")}</span>
+              <span className={`pill ${r.tone}`}>{r.label}</span>
+              <span className="grow">{r.openJob ? <button type="button" className="link" onClick={() => open("job", r.openJob!)}>{r.what}</button> : r.what}</span>
+              {r.remove && <button type="button" className="icon-btn" aria-label="Remove from the log" onClick={r.remove}><Trash2 size={14} /></button>}
+            </div>
+          ))}
+        </div>
+      ) : <p className="muted">Nothing yet. Status changes, notes and maintenance jobs on {a.tail || "this tail"} show here.</p>}
+    </>
   );
 }
 
@@ -1342,9 +1436,11 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
           </Field>
           <Field label="Base"><input value={p.base} onChange={(e) => set({ base: e.target.value })} /></Field>
           <Field label="Phone"><input type="tel" value={p.phone} onChange={(e) => set({ phone: e.target.value })} /></Field>
-          <Field label="Day rate" hint="Pay and per diem for a day on duty, for cost per mission. Optional.">
-            <input type="number" inputMode="decimal" min={0} value={p.dayRate ?? ""} placeholder="0" onChange={(e) => set({ dayRate: e.target.value === "" ? null : Number(e.target.value) })} />
-          </Field>
+          {data.settings.costs && (
+            <Field label="Day rate" hint="Pay and per diem for a day on duty, for cost per mission. Optional.">
+              <input type="number" inputMode="decimal" min={0} value={p.dayRate ?? ""} placeholder="0" onChange={(e) => set({ dayRate: e.target.value === "" ? null : Number(e.target.value) })} />
+            </Field>
+          )}
           <PersonRotationField value={p.rotation} onChange={(rotation) => set({ rotation })} />
           <LimitsField value={p.limits} onChange={(limits) => set({ limits })} who="them" applies={rulesFor(data, p)} />
           <Field label="Notes" full><textarea rows={2} value={p.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>

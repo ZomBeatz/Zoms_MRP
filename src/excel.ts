@@ -61,7 +61,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
         const tally = new Map<string, { n: number; label: string; color: string }>();
         for (const u of uses) {
           const key = u.kind === "mission" ? u.mission.missionId : u.kind;
-          const label = u.kind === "mission" ? u.mission.name : u.kind === "maintenance" ? "Maintenance" : u.kind === "down" ? "Grounded" : "Free";
+          const label = u.kind === "mission" ? u.mission.name : u.kind === "maintenance" ? "Maintenance" : u.kind === "down" ? u.status : "Free";
           const color = u.kind === "mission" ? u.mission.color : u.kind === "maintenance" ? "#7a5a33" : u.kind === "down" ? "#5b6375" : "#dcfce7";
           tally.set(key, { n: (tally.get(key)?.n ?? 0) + 1, label, color });
         }

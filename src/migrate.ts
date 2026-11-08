@@ -60,6 +60,12 @@ export function migrate(raw: any): AppData {
   // (tails, crew ratings, maintenance programs), with the seats of the first tail of each.
   d.equipment = (d.equipment ?? []).map((e) => ({ ...e, notes: e.notes ?? "" }));
   d.aircraft = (d.aircraft ?? []).map((a) => ({ ...a, equipmentIds: a.equipmentIds ?? [] }));
+  // 0.2.6: statuses are Airworthy, In maintenance, AOG and Retired, and each tail keeps a log.
+  d.aircraft = d.aircraft.map((a) => {
+    const old = a.status as string;
+    const status = old === "Ready" ? "Airworthy" : old === "Grounded" ? "AOG" : a.status;
+    return { ...a, status, log: a.log ?? [] };
+  });
   d.missions = d.missions.map((m) => ({ ...m, requiredEquipmentIds: m.requiredEquipmentIds ?? [] }));
   d.aircraftTypes = (d.aircraftTypes ?? []).map((t) => ({ ...t, equipmentIds: t.equipmentIds ?? [], notes: t.notes ?? "", seats: t.seats || 2 }));
 
@@ -71,6 +77,12 @@ export function migrate(raw: any): AppData {
   const old = (d.settings as { flightLimit?: { hours: number; days: number } } | undefined)?.flightLimit;
   settings.flightLimits = Array.isArray(d.settings?.flightLimits) ? d.settings.flightLimits : old && old.hours > 0 ? [{ hours: old.hours, days: old.days || 30 }] : [];
   delete (settings as { flightLimit?: unknown }).flightLimit;
+  // 0.2.6: costs and maintenance programs are off unless they're in use (older saves had programs on by default).
+  if (typeof d.settings?.costs !== "boolean") {
+    const inUse = (d.programs ?? []).length > 0 || d.aircraft.some((a) => a.hours || a.hourCost);
+    settings.costs = d.people.some((p) => p.dayRate) || d.aircraft.some((a) => a.hourCost) || d.missions.some((m) => m.dayCharge);
+    settings.maintenance = { ...settings.maintenance, enabled: !!d.settings?.maintenance?.enabled && inUse };
+  }
   settings.scheduleSpan = Math.min(365, Math.max(7, Math.round(Number(settings.scheduleSpan) || 30)));
   if (!["missions", "aircraft", "people"].includes(settings.scheduleGroup)) settings.scheduleGroup = "aircraft";
   return withTypes({ ...d, settings });

@@ -10,7 +10,7 @@ const pilot = (id: string, extra: Partial<Person> = {}): Person => ({ id, name: 
 
 function plan(): AppData {
   const data = emptyData();
-  data.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" }];
+  data.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "" }];
   data.missions = [{ id: "m", name: "Fire", contact: "", location: "", requiredTrainingIds: [], color: "#c2410c", pattern: "solid", notes: "" }];
   data.seasons = [{ id: "s", missionId: "m", start: d(1), end: d(29), aircraftIds: ["a1"], pilotsNeeded: 1, maintainersNeeded: 0, pilotRotation: null, maintainerRotation: null, status: "Confirmed", notes: "" }];
   return data;

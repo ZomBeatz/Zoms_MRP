@@ -1,13 +1,13 @@
 import { format } from "date-fns";
 import { validUntil, type AppData, type Mission, type Person, type Season, type Shift } from "./types";
 import { bookings } from "./bookings";
-import { missingEquipment } from "./aircraftTypes";
+import { downSpan, missingEquipment, statusWords } from "./aircraftTypes";
 import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
 import { rulesFor } from "./limits";
 import { dueList } from "./program";
 import { currencyDays, staleOn } from "./currency";
 import { flightSpans, overLimit } from "./flight";
-import { DAY, dayAt, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
+import { DAY, dateToStart, dayAt, fmtDay, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
  * Everything MRP checks before a mission flies: coverage gaps, double bookings, qualifications,
@@ -155,8 +155,12 @@ export function findIssues(data: AppData): Issue[] {
       if (missing.length)
         issues.push({ id: `equip-${m.id}-${ac.id}`, severity: "warn", title: `${ac.tail} doesn't have the ${missing.map((e) => e.name.toLowerCase()).join(" or ")} “${m.name}” needs`,
           detail: `Fit it and tick it on ${ac.tail}, or pick an aircraft that has it.`, at: from, seasonId: m.id, aircraftId: ac.id });
-      if (ac.status === "Grounded" || ac.status === "Retired")
-        issues.push({ id: `acstat-${m.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is ${ac.status.toLowerCase()}`, detail: `It's booked for “${m.name}”. Pick another aircraft or change its status.`, at: from, seasonId: m.id, aircraftId: ac.id });
+      // Down for maintenance, AOG or retired while it's booked.
+      const out = downSpan(ac);
+      if (out && overlaps(from, to, out[0], out[1])) {
+        const back = ac.backOn && ac.status !== "Retired" ? ` It's expected back ${fmtDay(ms(dateToStart(ac.backOn)))}.` : "";
+        issues.push({ id: `acstat-${m.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is ${statusWords(ac.status)} during “${m.name}”`, detail: `${back ? back.trim() + " " : ""}Pick another aircraft or change its status.`, at: Math.max(from, out[0]), seasonId: m.id, aircraftId: ac.id });
+      }
       for (const j of data.jobs) {
         if (j.aircraftId === ac.id && j.grounds && !j.done && overlaps(from, to, ms(j.start), ms(j.end)))
           issues.push({ id: `acjob-${m.id}-${j.id}`, severity: "danger", title: `${ac.tail} is in maintenance during “${m.name}”`, detail: `“${j.title}”, ${fmtRange(j.start, j.end)}. Move the job or pick another aircraft.`, at: Math.max(from, ms(j.start)), seasonId: m.id, aircraftId: ac.id, jobId: j.id });
@@ -201,6 +205,12 @@ export function findIssues(data: AppData): Issue[] {
       for (const s of crowded)
         issues.push({ id: `seats-${m.id}-${s.a}`, severity: "warn", title: `${plural(s.n, "pilot")} on “${m.name}”, with ${plural(seats, "pilot seat")}`, detail: `${tails.map((a) => a.tail).join(", ")}, ${range(s.a, s.b)}.`, at: s.a, seasonId: m.id });
     }
+  }
+
+  // Down past the day it was expected back: the status needs updating (or the date moved).
+  for (const ac of data.aircraft) {
+    if ((ac.status === "AOG" || ac.status === "In maintenance") && ac.backOn && ms(dateToStart(ac.backOn)) <= dayAt(Date.now(), 0))
+      issues.push({ id: `acback-${ac.id}`, severity: "warn", title: `${ac.tail} was expected back ${fmtDay(ms(dateToStart(ac.backOn)))}`, detail: `It's still ${statusWords(ac.status)}. Mark it airworthy, or move the date.`, at: ms(dateToStart(ac.backOn)), aircraftId: ac.id });
   }
 
   // Shifts: qualifications, outside the mission, time off.

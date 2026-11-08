@@ -264,14 +264,14 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
           a: d, b: d + DAY, key,
           ...(u.kind === "mission" ? { label: u.mission.name, color: u.mission.color, kind: "mission" }
             : u.kind === "maintenance" ? { label: u.job.title, color: REPORT_COLORS.maintenance, kind: "maintenance" }
-            : u.kind === "down" ? { label: "Grounded", color: REPORT_COLORS.down, kind: "down" }
+            : u.kind === "down" ? { label: u.status, color: REPORT_COLORS.down, kind: "down" }
             : { label: "Free", color: REPORT_COLORS.free, kind: "free" }),
         });
       });
       rows.push({ label: t.aircraft.tail, sub: `${Math.round(t.use * 100)}% booked`, spans });
     }
     const missions = [...new Map(r.missions.map((m) => [m.missionId, m])).values()];
-    board("Fleet board", "Aircraft", rows, [...missions.map((m) => [m.name, m.color] as [string, string]), ["Maintenance", REPORT_COLORS.maintenance], ["Grounded", REPORT_COLORS.down], ["Free", REPORT_COLORS.free]]);
+    board("Fleet board", "Aircraft", rows, [...missions.map((m) => [m.name, m.color] as [string, string]), ["Maintenance", REPORT_COLORS.maintenance], ["Out of service", REPORT_COLORS.down], ["Free", REPORT_COLORS.free]]);
 
     const crew: Parameters<typeof board>[2] = [];
     let role = "";
