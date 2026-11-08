@@ -26,8 +26,8 @@ export const PAGE_HELP: PageHelp[] = [
   { page: "overview", label: "Overview", about: "What's flying, and every problem with its fix", words: "problems needs attention gaps conflicts home dashboard", guide: "overview", docs: "overview" },
   { page: "aircraft", label: "Fleet", about: "Every tail over time, free windows, and Can we take a job?", words: "aircraft tails helicopters free windows take a job", guide: "fleet", docs: "fleet" },
   { page: "types", label: "Types & equipment", about: "Kinds of aircraft, and the equipment they carry for different work", words: "aircraft types models makes equipment hoist bucket floats medical interior kit", guide: "types", docs: "fleet#types-and-equipment" },
-  { page: "schedule", label: "Schedule", about: "The plan as a Gantt chart, by aircraft, job or person", words: "gantt chart calendar timeline open seats", guide: "schedule", docs: "schedule" },
-  { page: "missions", label: "Jobs", about: "Each customer's work and its seasons", words: "missions customers seasons contracts jobs contact phone email documents files pdf attachments ground duty hangar on call standby", guide: "missions", docs: "missions-and-seasons" },
+  { page: "schedule", label: "Schedule", about: "The plan as a Gantt chart, by aircraft, client or person", words: "gantt chart calendar timeline open seats", guide: "schedule", docs: "schedule" },
+  { page: "missions", label: "Clients", about: "Each customer's work and its jobs", words: "missions customers clients seasons contracts jobs contact phone email documents files pdf attachments ground duty hangar on call standby requirements", guide: "missions", docs: "missions-and-seasons" },
   { page: "people", label: "Crew", about: "Pilots and maintainers, ratings and time off", words: "people pilots maintainers ratings time off leave sick", guide: "crew", docs: "crew" },
   { page: "maintenance", label: "Maintenance", about: "Jobs on a tail, with the maintainers on them", words: "repairs grounded jobs", guide: "maintenance", docs: "maintenance" },
   { page: "training", label: "Qualifications", about: "Qualifications, who's current, and what runs out next", words: "training courses certifications certificates licences licenses medicals check rides expiring due expired qualifications current renewals qualifications nvg", guide: "training", docs: "training" },
@@ -35,7 +35,7 @@ export const PAGE_HELP: PageHelp[] = [
   { page: "balance", label: "Balance", about: "How busy everyone is, and rebalancing the work", words: "workload busy fair rebalance", guide: "balance", docs: "balance" },
   { page: "planner", label: "Crew planner", about: "How few pilots a job takes, and the rotation that does it", words: "how many pilots crew math rotation hitch flight hour limit night", guide: "planner", docs: "crew-planner" },
   { page: "reports", label: "Reports", about: "Fleet use and workload, as PDF and Excel", words: "pdf excel week sheet print teams share", guide: "reports", docs: "reports" },
-  { page: "settings", label: "Settings", about: "Work limits, kinds of contract, your data and more", words: "limits hitches days off flight hours rest backup import export", docs: "settings" },
+  { page: "settings", label: "Settings", about: "Work limits, schedule limitations, your data and more", words: "limits hitches days off flight hours rest backup import export", docs: "settings" },
   { page: "guide", label: "Guide", about: "How everything works, and how to do the everyday jobs", words: "help how do i", docs: "" },
 ];
 
@@ -54,8 +54,8 @@ export const SECTION_DOCS: Record<string, string> = {
 export interface NewPageNote { page: Page; text: string }
 
 export const NEW_PAGE_NOTES: NewPageNote[] = [
-  { page: "types", text: "Your aircraft types are here already, from your tails and crew ratings. Add the equipment you fly with (a hoist, a bucket), tick what each type can carry, then tick what each tail has and what each job needs." },
-  { page: "planner", text: "Put in the job's dates and aircraft, or start from a season, and the answer updates as you type: how few pilots it takes, why, and the rotation. Several jobs adds up the coming jobs against the pilots you have." },
+  { page: "types", text: "Your aircraft types are here already, from your tails and crew ratings. Add the equipment you fly with (a hoist, a bucket), tick what each type can carry, then tick what each tail has and what each client needs." },
+  { page: "planner", text: "Put in the job's dates and aircraft, or start from a job, and the answer updates as you type: how few pilots it takes, why, and the rotation. Several jobs adds up the coming jobs against the pilots you have." },
   { page: "balance", text: "Pick a period to see how busy everyone is. Try other crew sizes for a job, lock what should stay, and press Rebalance. Nothing changes until Apply." },
   { page: "inspections", text: "Add each aircraft type's inspections under Programs, type each tail's hours under Flight hours, then Due shows what's coming and Plan it books it." },
 ];

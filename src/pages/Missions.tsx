@@ -42,9 +42,9 @@ export function Missions({ issues }: { issues: Issue[] }) {
   return (
     <>
       <div className="page-head">
-        <h1>Jobs</h1>
-        <input placeholder="Filter jobs" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 200 }} />
-        <button className="btn primary" onClick={() => open("mission", "new")}><Plus size={16} /> New job…</button>
+        <h1>Clients</h1>
+        <input placeholder="Filter clients" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 200 }} />
+        <button className="btn primary" onClick={() => open("mission", "new")}><Plus size={16} /> New client…</button>
       </div>
       <div className="seg" style={{ marginBottom: 14 }}>
         <button className={show === "active" ? "active" : ""} onClick={() => setShow("active")}>Running or coming up</button>
@@ -52,7 +52,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
       </div>
       {data.workTypes.length > 0 && (
         <div className="row gap-sm wrap" style={{ marginBottom: 14 }}>
-          <button className={`chip pick ${kind === "" ? "on" : ""}`} onClick={() => setKind("")}>Every type of work</button>
+          <button className={`chip pick ${kind === "" ? "on" : ""}`} onClick={() => setKind("")}>Every line of business</button>
           {data.workTypes.map((t) => (
             <button key={t.id} className={`chip pick ${kind === t.id ? "on" : ""}`} onClick={() => setKind(kind === t.id ? "" : t.id)}>
               <span className="swatch" style={{ background: t.color, width: 10, height: 10 }} />{t.name || "Unnamed"}
@@ -61,14 +61,14 @@ export function Missions({ issues }: { issues: Issue[] }) {
         </div>
       )}
       {list.length === 0 ? (
-        <Empty icon={<ClipboardList size={28} />} text={data.missions.length ? "No jobs match." : "Each customer's work is a job, with a season for each stretch of dates."}
-          action={!data.missions.length && <button className="btn primary" onClick={() => open("mission", "new")}>New job…</button>} />
+        <Empty icon={<ClipboardList size={28} />} text={data.missions.length ? "No clients match." : "Each customer's work is a client, with a job for each stretch of dates."}
+          action={!data.missions.length && <button className="btn primary" onClick={() => open("mission", "new")}>New client…</button>} />
       ) : (
         <>
           <div className="table-wrap">
             <table className="table">
               <thead>
-                <tr>{header("name", "Job")}{header("contact", "Contact")}{header("season", "Now or next")}<th>Aircraft</th>{header("crewed", "Crewed", true)}{header("crew", "Crew", true)}<th className="r">Seasons</th></tr>
+                <tr>{header("name", "Client")}{header("contact", "Contact")}{header("season", "Now or next")}<th>Aircraft</th>{header("crewed", "Crewed", true)}{header("crew", "Crew", true)}<th className="r">Jobs</th></tr>
               </thead>
               <tbody>
                 {list.map(({ m, seasons, current, active, crew, cov }) => {
@@ -93,7 +93,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
                             <StatusPill status={current.status} />
                             <ConfirmButton season={{ ...current, name: m.name }} />
                           </span>
-                        ) : <span className="muted">No seasons yet</span>}
+                        ) : <span className="muted">No jobs yet</span>}
                       </td>
                       <td>{m.kind === "ground" ? <span className="pill">Ground duty</span>
                         : <>
@@ -120,7 +120,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
               <div key={m.id} className="list-card" role="button" tabIndex={0} onClick={() => open("mission", m.id)}
                 onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open("mission", m.id); } }}>
                 <span className="row gap-sm"><span className="swatch" style={slotStyle(missionLook(m))} /><b>{m.name}</b></span>
-                <span className="small muted">{current ? `${active ? "" : "Last: "}${fmtDates(current.start, current.end)}` : "No seasons yet"} · {plural(seasons.length, "season")}</span>
+                <span className="small muted">{current ? `${active ? "" : "Last: "}${fmtDates(current.start, current.end)}` : "No jobs yet"} · {plural(seasons.length, "job")}</span>
                 {active && <span className="row gap-sm wrap small"><span className={`pill ${cov === 1 ? "ok" : "danger"}`}>{Math.round(cov * 100)}% crewed</span> {current && <StatusPill status={current.status} />}</span>}
                 {current && <ConfirmButton season={{ ...current, name: m.name }} />}
               </div>

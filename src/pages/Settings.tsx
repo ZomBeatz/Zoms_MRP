@@ -118,7 +118,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           <div className="field" style={{ marginTop: 12 }}>
             <span>Pages in the menu</span>
             <div className="picker-row">
-              {([["aircraft", "Fleet"], ["types", "Types & equipment"], ["schedule", "Schedule"], ["missions", "Jobs"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Qualifications"], ["balance", "Balance"], ["planner", "Crew planner"], ["reports", "Reports"]] as const).map(([pg, label]) => {
+              {([["aircraft", "Fleet"], ["types", "Types & equipment"], ["schedule", "Schedule"], ["missions", "Clients"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Qualifications"], ["balance", "Balance"], ["planner", "Crew planner"], ["reports", "Reports"]] as const).map(([pg, label]) => {
                 const hidden = (data.settings.hiddenPages ?? []).includes(pg);
                 return (
                   <label key={pg} className={`chip pick ${hidden ? "" : "on"}`}>
@@ -131,14 +131,14 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <span className="hint">Untick pages you don't use to keep the menu short. Inspections has its own switch below.</span>
           </div>
           <div className="field" style={{ marginTop: 12 }}>
-            <span>New seasons start with</span>
+            <span>New jobs start with</span>
             <span className="rotation">
               <NumberInput min={0} max={8} aria-label="Pilots at a time" value={sd.pilots} onChange={(pilots) => updateSettings({ seasonDefaults: { ...sd, pilots } })} /> pilots,
               <NumberInput min={0} max={8} aria-label="Maintainers at a time" value={sd.maintainers} onChange={(maintainers) => updateSettings({ seasonDefaults: { ...sd, maintainers } })} /> maintainers,
               rotation <NumberInput min={0} max={90} aria-label="Days on" value={sd.pilotRotation?.on ?? 0} onChange={(on) => updateSettings({ seasonDefaults: { ...sd, pilotRotation: on ? { on, off: sd.pilotRotation?.off ?? 7 } : null } })} /> on
               <NumberInput min={0} max={90} aria-label="Days off" value={sd.pilotRotation?.off ?? 0} onChange={(off) => updateSettings({ seasonDefaults: { ...sd, pilotRotation: sd.pilotRotation ? { ...sd.pilotRotation, off } : null } })} /> off
             </span>
-            <span className="hint">For a job's first season; later seasons start from the one before. Rotation 0 on: the hitch rules below.</span>
+            <span className="hint">For a client's first job; later jobs start from the one before. Rotation 0 on: the hitch rules below.</span>
           </div>
         </section>
 
@@ -151,7 +151,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               Show demo data
             </label>
             <p className="small muted" style={{ margin: "6px 0 0" }}>
-              Fills Zom's MRP with made-up aircraft, crew, qualifications and jobs so you can see how it works. Your own data is kept apart and comes back when you turn this off. <b>Remove demo data</b> takes the demo off this device without touching your own.
+              Fills Zom's MRP with made-up aircraft, crew, qualifications and clients so you can see how it works. Your own data is kept apart and comes back when you turn this off. <b>Remove demo data</b> takes the demo off this device without touching your own.
             </p>
             {hasDemo && (
               <div className="row gap wrap" style={{ marginTop: 10 }}>
@@ -174,13 +174,13 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <Field label="Fewest days off between hitches">
               <NumberInput min={0} max={90} value={rules.minDaysOff} onChange={(minDaysOff) => updateSettings({ rules: { ...rules, minDaysOff } })} />
             </Field>
-            <Field label="Most hours on duty in a day" hint="A season's duty day is set on it. 0 = don't check.">
+            <Field label="Most hours on duty in a day" hint="A job's duty day is set on it. 0 = don't check.">
               <NumberInput min={0} max={24} value={data.settings.maxDutyHours} onChange={(maxDutyHours) => updateSettings({ maxDutyHours })} />
             </Field>
-            <Field label="Rest between duty days" hint="Hours off before the next duty day. A season whose duty day leaves less is flagged. 0 = don't check.">
+            <Field label="Rest between duty days" hint="Hours off before the next duty day. A job whose duty day leaves less is flagged. 0 = don't check.">
               <NumberInput min={0} max={23} value={data.settings.minRestHours} onChange={(minRestHours) => updateSettings({ minRestHours })} />
             </Field>
-            <Field label="Most flight hours" full hint="Per pilot, in any stretch of that many days, such as 100 in 30 and 1,000 in 365. A season's flying is shared by its pilots, or the hours flown typed on a shift. The checks, Fill and the Crew planner keep under all of them.">
+            <Field label="Most flight hours" full hint="Per pilot, in any stretch of that many days, such as 100 in 30 and 1,000 in 365. A job's flying is shared by its pilots, or the hours flown typed on a shift. The checks, Fill and the Crew planner keep under all of them.">
               <FlightLimitsEditor value={data.settings.flightLimits} onChange={(flightLimits) => updateSettings({ flightLimits })} />
             </Field>
             <Field label="Current on a type" hint="Pilots must have flown it within this many days. 0 = don't check.">
@@ -193,27 +193,27 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
         </section>
 
         <section className="panel">
-          <h3><Palette size={16} /> Types of work</h3>
-          <p className="small muted" style={{ marginTop: 0 }}>Lines of business, like fire, medevac or utilities, each with a color. A job of that type gets its own shade of it, so related jobs look alike on the schedule. Changing a color reshades its jobs.</p>
+          <h3><Palette size={16} /> Lines of business</h3>
+          <p className="small muted" style={{ marginTop: 0 }}>Lines of business, like fire, medevac or utilities, each with a color. A client of that type gets its own shade of it, so related clients look alike on the schedule. Changing a color reshades its clients.</p>
           {data.workTypes.map((t) => {
             const n = data.missions.filter((m) => m.workTypeId === t.id).length;
             return (
               <div key={t.id} className="row gap-sm" style={{ marginBottom: 8 }}>
-                <input type="color" aria-label={`Color for ${t.name || "this type of work"}`} value={t.color}
+                <input type="color" aria-label={`Color for ${t.name || "this line of business"}`} value={t.color}
                   onChange={(e) => { const color = e.target.value; change((d) => ({ ...d, workTypes: d.workTypes.map((x) => (x.id === t.id ? { ...x, color } : x)), missions: reshade(d.missions, t.id, color) })); }} />
                 <input value={t.name} placeholder="Fire" style={{ width: 200 }} onChange={(e) => change((d) => ({ ...d, workTypes: d.workTypes.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)) }))} />
                 <span className="row gap-sm">{shadesOf(t.color, 6).map((c) => <span key={c} className="swatch" style={{ background: c, width: 14, height: 14 }} />)}</span>
-                <span className="small muted">{n === 1 ? "1 job" : `${n} jobs`}</span>
-                <button className="icon-btn danger" aria-label={`Remove ${t.name}`} onClick={() => change((d) => ({ ...d, workTypes: d.workTypes.filter((x) => x.id !== t.id), missions: d.missions.map((m) => (m.workTypeId === t.id ? { ...m, workTypeId: null } : m)) }), `Removed ${t.name || "the type of work"}; its jobs keep their colors`)}><Trash2 size={15} /></button>
+                <span className="small muted">{n === 1 ? "1 client" : `${n} clients`}</span>
+                <button className="icon-btn danger" aria-label={`Remove ${t.name}`} onClick={() => change((d) => ({ ...d, workTypes: d.workTypes.filter((x) => x.id !== t.id), missions: d.missions.map((m) => (m.workTypeId === t.id ? { ...m, workTypeId: null } : m)) }), `Removed ${t.name || "the line of business"}; its clients keep their colors`)}><Trash2 size={15} /></button>
               </div>
             );
           })}
-          <button className="btn sm" onClick={() => change((d) => ({ ...d, workTypes: [...d.workTypes, { id: uid(), name: "", color: SWATCHES[d.workTypes.length % 10] }] }))}><Plus size={14} /> Add a type of work</button>
+          <button className="btn sm" onClick={() => change((d) => ({ ...d, workTypes: [...d.workTypes, { id: uid(), name: "", color: SWATCHES[d.workTypes.length % 10] }] }))}><Plus size={14} /> Add a line of business</button>
         </section>
 
         <section className="panel">
-          <h3><ShieldCheck size={16} /> Kinds of contract</h3>
-          <p className="small muted" style={{ marginTop: 0 }}>Different limits for different work, such as EMS and fire. A job that picks one uses its days on and off instead of the ones above (its own limits can still be stricter).</p>
+          <h3><ShieldCheck size={16} /> Schedule limitations</h3>
+          <p className="small muted" style={{ marginTop: 0 }}>Different limits for different work, such as EMS and fire. A client that picks one uses its days on and off instead of the ones above (its own limits can still be stricter).</p>
           {(data.settings.ruleSets ?? []).map((r) => {
             const setRule = (patch: Partial<typeof r>) => updateSettings({ ruleSets: data.settings.ruleSets.map((x) => (x.id === r.id ? { ...x, ...patch } : x)) });
             const used = data.missions.filter((m) => m.ruleSetId === r.id).length;
@@ -225,14 +225,14 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
                   <NumberInput min={0} max={180} aria-label={`${r.name}: fewest days off`} value={r.minDaysOff} onChange={(minDaysOff) => setRule({ minDaysOff })} /> off
                 </span>
                 <span className="small muted">{used ? `${used} ${used === 1 ? "mission" : "missions"}` : "Not used"}</span>
-                <button className="icon-btn" aria-label={`Remove ${r.name || "this kind"}`} title={used ? "Its jobs go back to the limits above" : undefined}
+                <button className="icon-btn" aria-label={`Remove ${r.name || "this kind"}`} title={used ? "Its clients go back to the limits above" : undefined}
                   onClick={() => change((d) => ({ ...d, settings: { ...d.settings, ruleSets: d.settings.ruleSets.filter((x) => x.id !== r.id) }, missions: d.missions.map((m) => (m.ruleSetId === r.id ? { ...m, ruleSetId: null } : m)) }), `Removed “${r.name}”`)}>
                   <Trash2 size={15} />
                 </button>
               </div>
             );
           })}
-          <button className="btn sm" onClick={() => updateSettings({ ruleSets: [...(data.settings.ruleSets ?? []), { id: uid(), name: (data.settings.ruleSets ?? []).length ? "" : "EMS", ...rules }] })}><Plus size={14} /> Add a kind of contract</button>
+          <button className="btn sm" onClick={() => updateSettings({ ruleSets: [...(data.settings.ruleSets ?? []), { id: uid(), name: (data.settings.ruleSets ?? []).length ? "" : "EMS", ...rules }] })}><Plus size={14} /> Add a set of schedule limitations</button>
         </section>
 
         <section className="panel">
@@ -241,7 +241,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <input type="checkbox" checked={!!data.settings.costs} onChange={(e) => updateSettings({ costs: e.target.checked })} />
             Show costs and charges
           </label>
-          <p className="small muted" style={{ margin: "6px 0 0" }}>Day rates on crew, cost per flight hour on aircraft, a charge per day on jobs, and cost and margin in Reports and the Crew planner. Off: they're hidden, and anything already typed in is kept.</p>
+          <p className="small muted" style={{ margin: "6px 0 0" }}>Day rates on crew, cost per flight hour on aircraft, a charge per day on clients, and cost and margin in Reports and the Crew planner. Off: they're hidden, and anything already typed in is kept.</p>
         </section>
 
         <section className="panel">

@@ -93,7 +93,7 @@ export function Reports() {
       <div className="page-head">
         <h1>Reports</h1>
         <div className="row gap-sm">
-          <button className="btn" onClick={() => make("pdf")} disabled={!!making} title="A PDF of this period: the numbers, the fleet and crew boards, jobs, workload, qualifications, maintenance and problems">
+          <button className="btn" onClick={() => make("pdf")} disabled={!!making} title="A PDF of this period: the numbers, the fleet and crew boards, clients, workload, qualifications, maintenance and problems">
             <FileText size={16} /> {making === "pdf" ? "Making the PDF…" : "PDF report"}
           </button>
           <button className="btn" onClick={week} disabled={!!making} title="One page with who's on each day of the week, for the crew room or Teams">
@@ -122,7 +122,7 @@ export function Reports() {
       </div>
 
       <div className="tiles">
-        <div className="tile"><div className="label">Jobs</div><div className="value">{r.byMission.length}</div></div>
+        <div className="tile"><div className="label">Clients</div><div className="value">{r.byMission.length}</div></div>
         <div className="tile"><div className="label">Job days</div><div className="value">{Math.round(r.total)}</div></div>
         <div className="tile"><div className="label">Fully crewed</div><div className={`value ${r.crewedShare < 1 ? "warn" : "ok"}`}>{Math.round(r.crewedShare * 100)}%</div></div>
         <div className="tile"><div className="label">Fleet on jobs</div><div className="value">{Math.round(fleetUse * 100)}%</div></div>
@@ -131,7 +131,7 @@ export function Reports() {
 
       <div className="report-grid">
         <section className="panel">
-          <h3>Days by job</h3>
+          <h3>Days by client</h3>
           {r.byMission.length === 0 ? <p className="muted">No jobs in this period.</p> : (
             <div className="hbars">
               {r.byMission.map(({ m, days }) => (
@@ -188,7 +188,7 @@ export function Reports() {
       {r.missions.length === 0 ? <div className="panel muted">No jobs in this period.</div> : (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Job</th><th>Aircraft</th><th>When</th><th className="r">Days in period</th><th className="r">Crewed</th>
+            <thead><tr><th>Client</th><th>Aircraft</th><th>When</th><th className="r">Days in period</th><th className="r">Crewed</th>
               {costs && <><th className="r" title="Crew days × day rates">Crew</th><th className="r" title="Job days × hours a flying day × cost per hour">Flying</th><th className="r">Cost</th><th className="r">Charged</th><th className="r">Margin</th></>}</tr></thead>
             <tbody>
               {[...r.missions].sort((a, b) => ms(a.start) - ms(b.start)).map((m) => {
