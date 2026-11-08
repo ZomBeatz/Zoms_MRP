@@ -6,6 +6,7 @@ fn main() {
         "save_plan",
         "write_excel",
         "save_download",
+        "write_backup",
         "data_folder",
         "update_mode",
         "backup_before_update",

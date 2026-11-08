@@ -94,6 +94,26 @@ fn write_excel(request: tauri::ipc::Request) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+/// A backup's bytes as the raw request body; the full path (a .json in a folder that exists, picked in
+/// Settings) in `x-path`. Returns where it went.
+#[tauri::command]
+fn write_backup(request: tauri::ipc::Request) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("Expected the file's bytes.".into()) };
+    let path = backup_path(&header(&request, "x-path")?)?;
+    write_atomic(&path, bytes)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Only a .json file, straight in a folder that's there: a backup can't be written anywhere else.
+fn backup_path(path: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(path);
+    let name_ok = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| !n.starts_with('.') && n.ends_with(".json"));
+    if !name_ok || !path.parent().is_some_and(Path::is_dir) {
+        return Err("That backup folder isn't there any more. Pick it again in Settings.".into());
+    }
+    Ok(path)
+}
+
 /// Save a file to the Downloads folder (a backup, an Excel export). Returns where it went.
 #[tauri::command]
 fn save_download(app: AppHandle, request: tauri::ipc::Request) -> Result<String, String> {
@@ -181,7 +201,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![load_plan, save_plan, write_excel, save_download, data_folder, update_mode, backup_before_update])
+        .invoke_handler(tauri::generate_handler![load_plan, save_plan, write_excel, save_download, write_backup, data_folder, update_mode, backup_before_update])
         .run(tauri::generate_context!())
         .expect("error while running Zom's MRP");
 }
@@ -229,6 +249,18 @@ mod tests {
         write_atomic(&p, b"two").unwrap();
         assert_eq!(fs::read_to_string(&p).unwrap(), "two");
         assert!(!dir.join("plan.saving").exists());
+    }
+
+    #[test]
+    fn backups_only_go_in_a_folder_that_is_there() {
+        let dir = std::env::temp_dir().join(format!("mrp-backup-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let ok = dir.join("zoms-mrp-backup-2026-11-08.json");
+        assert_eq!(backup_path(ok.to_str().unwrap()).unwrap(), ok);
+        assert!(backup_path(dir.join("plan.exe").to_str().unwrap()).is_err());
+        assert!(backup_path(dir.join(".json").to_str().unwrap()).is_err());
+        assert!(backup_path(dir.join("missing").join("b.json").to_str().unwrap()).is_err());
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     /// A command the window isn't allowed to call fails only in the installed app (saving to Downloads

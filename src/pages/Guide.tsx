@@ -447,7 +447,7 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
         <p>
           {isServerBuild ? "On the server, everyone signs in to the same plan. Admins add people as Admin, Scheduler (changes the plan) or Viewer (looks only). If two people save at once, the second is told and nothing is overwritten. The server keeps a copy every day."
             : isDesktopApp || !withDemo
-              ? `${isDesktopApp ? "The desktop app keeps the plan in a file on this computer and a copy every day for a month." : "The plan is kept in this browser, on this device."} Settings › Your data makes a backup file you can restore anywhere.`
+              ? `${isDesktopApp ? "The desktop app keeps the plan in a file on this computer and a copy every day for a month." : "The plan is kept in this browser, on this device."} Settings › Your data makes a backup file you can restore anywhere, with attached files inside. ${isDesktopApp ? "Settings › Backups picks the folder backups go in (a synced OneDrive or Teams folder, a USB drive) and can save one there every day." : "In Chrome and Edge it asks where to save it."}`
               : "The demo is kept in this browser, apart from anything else."}
         </p>
         {withDemo && !isOnlineDemo && <p>The demo data is kept apart from your own. Switch it on or off in Settings › Demo data, where <b>Remove demo data</b> takes it off this device.</p>}

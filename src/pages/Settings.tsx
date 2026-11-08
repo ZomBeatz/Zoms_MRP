@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck, Coins, Download, Plus, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
-import { format } from "date-fns";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
 import type { ImportPlan } from "../importer";
@@ -16,7 +15,9 @@ import { ExcelCopySettings } from "./ExcelCopySettings";
 import { FlightLimitsEditor } from "./Planner";
 import { uid } from "../time";
 import { SWATCHES, reshade, shadesOf } from "../look";
-import { listedFiles, packFiles, unpackFiles } from "../docs";
+import { unpackFiles } from "../docs";
+import { backupFolder, saveBackup } from "../backup";
+import { BackupPlace } from "./BackupPlace";
 import { SHORTCUTS } from "./Guide";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
@@ -56,12 +57,18 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
     }
   })();
 
-  // A backup is the plan with its attached files (job documents, certificate scans) inside, so one file brings back everything.
+  // A backup is the plan with its attached files inside, so one file brings back everything. Where it goes
+  // is this device's choice (Backups, below).
   const backup = async () => {
-    const files = await packFiles(demo, listedFiles(data)).catch(() => ({}));
-    const where = await saveFile(`zoms-mrp-backup-${format(new Date(), "yyyy-MM-dd")}.json`, new Blob([JSON.stringify({ ...data, files }, null, 2)], { type: "application/json" }));
-    const n = Object.keys(files).length;
-    showToast(`Saved to Downloads${n ? `, with ${n === 1 ? "1 attached file" : `${n} attached files`}` : ""}`, where ? { label: "Show", run: () => showInFolder(where) } : undefined);
+    try {
+      const { where, files } = await saveBackup(data, demo);
+      if (where === "cancelled") return;
+      const what = `Backup saved${files ? `, with ${files === 1 ? "1 attached file" : `${files} attached files`}` : ""}`;
+      if (where === "picked") showToast(what);
+      else showToast(where ? `${what} in ${backupFolder() ? "the backup folder" : "Downloads"}` : `${what} to Downloads`, where ? { label: "Show", run: () => showInFolder(where) } : undefined);
+    } catch (e) {
+      showToast(`Couldn't save the backup: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
   const restore = async (f: File) => {
     try {
@@ -303,6 +310,8 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             )}
           </div>
         </section>
+
+        {!demo && !isServerBuild && <BackupPlace onBackup={backup} />}
 
         {isDesktopApp && <ExcelCopySettings />}
 
