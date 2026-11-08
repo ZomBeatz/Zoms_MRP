@@ -57,6 +57,8 @@ export interface AircraftType {
   seats: number;
   /** Equipment that can go on this type; a tail of it picks from these. Empty = any equipment. */
   equipmentIds: ID[];
+  /** Qualifications everyone rated on this type needs (a type course, a recurrent check on it). */
+  requiredTrainingIds?: ID[];
   notes: string;
 }
 
@@ -86,6 +88,8 @@ export interface Training {
   name: string;
   /** Months until it has to be renewed. 0 = never expires. */
   validMonths: number;
+  /** A short name for tight spaces ("NVG", "HUET", "293"). */
+  nickname?: string;
   appliesTo: Role | "Both";
   notes: string;
   /** What it is: a course, a certificate or licence, a medical, or a check ride. Missing: a course. */
@@ -168,6 +172,8 @@ export interface WorkType {
   id: ID;
   name: string;
   color: string;
+  /** What its clients' jobs need by default (loaded into a new client, then theirs to change). */
+  defaults?: JobDefaults;
 }
 
 export type MissionStatus = "Planned" | "Confirmed" | "Flying" | "Done" | "Cancelled";
@@ -205,6 +211,8 @@ export interface Mission {
   dayCharge?: number | null;
   /** The kind of contract (a rule set in Settings), whose limits replace Settings' for this mission. */
   ruleSetId?: ID | null;
+  /** Crew numbers and rotations a new job (season) of this client starts with, when it has none before it. */
+  jobDefaults?: Pick<JobDefaults, "pilots" | "maintainers" | "maintainerNeed" | "pilotRotation" | "maintainerRotation" | "dutyHours">;
 }
 
 /** A file attached to a mission. The file itself is kept in the browser's file storage (src/docs.ts), by `id`. */
@@ -243,6 +251,11 @@ export interface Season {
   aircraftIds: ID[];
   /** The aircraft it needs, one line each (type, tail, dates). Missing: one line per tail in `aircraftIds`. */
   slots?: AircraftSlot[];
+  /** This job's own requirements, instead of its client's. Missing: the client's. */
+  requiredTrainingIds?: ID[];
+  requiredEquipmentIds?: ID[];
+  /** This job's own schedule limitations, instead of its client's. Missing: the client's. */
+  ruleSetId?: ID | null;
   /** Pilots working the job at every moment (across all its aircraft). */
   pilotsNeeded: number;
   /** Maintainers on the job at once, when they're needed. 0 = none. */
@@ -365,9 +378,37 @@ export interface Rules {
 export interface FlightLimit { hours: number; days: number }
 
 /** Work limits for a kind of contract, picked on a mission. */
+/**
+ * Schedule limitations: a named set of work limits for a kind of contract (EMS, fire), picked on a client or
+ * a job. Days on and off replace Settings'; the others, when set, replace Settings' too. Empty = Settings'.
+ */
 export interface RuleSet extends Rules {
   id: ID;
   name: string;
+  /** Fewest days in a hitch (a job that needs people for at least a week at a time). */
+  minDaysOn?: number | null;
+  /** Most hours on duty in a day, and fewest hours off between duty days. */
+  maxDutyHours?: number | null;
+  minRestHours?: number | null;
+  /** Most flight hours a pilot flies in a day on these jobs. */
+  maxFlightHoursPerDay?: number | null;
+  /** Most flight hours in any so many days (empty: Settings'). */
+  flightLimits?: FlightLimit[];
+}
+
+/** What a job needs and how it's crewed: set on a line of business and a client, and started from by each new job. */
+export interface JobDefaults {
+  requiredTrainingIds?: ID[];
+  requiredEquipmentIds?: ID[];
+  ruleSetId?: ID | null;
+  pilots?: number;
+  maintainers?: number;
+  maintainerNeed?: MaintainerNeed;
+  pilotRotation?: Rotation | null;
+  maintainerRotation?: Rotation | null;
+  dutyHours?: number | null;
+  /** Ground duty (no aircraft), for a line of business like hangar on-call. */
+  ground?: boolean;
 }
 
 export interface Settings {
