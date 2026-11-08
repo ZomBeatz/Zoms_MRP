@@ -54,7 +54,7 @@ export function People({ issues }: { issues: Issue[] }) {
 
       {tab === "Time off" ? (
         offList.length === 0 ? (
-          <Empty icon={<CalendarOff size={28} />} text="Vacation, training and sick days go here, so nobody gets booked while they're away." action={<button className="btn primary" onClick={() => open("timeOff", "new")}>Add time off…</button>} />
+          <Empty icon={<CalendarOff size={28} />} text="Vacation, qualifications and sick days go here, so nobody gets booked while they're away." action={<button className="btn primary" onClick={() => open("timeOff", "new")}>Add time off…</button>} />
         ) : (
           <div className="table-wrap">
             <table className="table">

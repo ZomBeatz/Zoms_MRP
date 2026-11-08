@@ -21,14 +21,14 @@ export const SHEETS = {
 
 const NOTES: Record<string, string> = {
   Name: "Full name, as people know them.", Role: "Pilot or Maintainer.", "Rated on": "Aircraft types, separated by commas: Bell 412, AS350 B3.",
-  Tail: "The registration, like N412ZM.", Type: "Must match the types people are rated on.", "Pilot seats": "1 or 2.", Status: "Ready, In maintenance, Grounded or Retired. Empty: Ready.",
+  Tail: "The registration, like N412ZM.", Type: "Must match the types people are rated on.", "Pilot seats": "1 or 2.", Status: "Airworthy, In maintenance, AOG or Retired. Empty: Airworthy.",
   "Flight hours": "Total hours on the airframe (optional).", "Hours as of": "The day of that reading.", "Renew every (months)": "0 or empty if it never runs out.",
   For: "Pilots, Maintainers or Both.", Person: "A name from the People sheet (or already in Zom's MRP).", Completed: "The day they did it.", "Runs out": "Empty: worked out from the course.",
 };
 
 const EXAMPLES: Record<keyof typeof SHEETS, Cell[][]> = {
   People: [["Alex Rivera", "Pilot", "Bell 412, AS350 B3", "Fairbanks", "(907) 555-0101", 650], ["Sam Lee", "Maintainer", "Bell 412", "Fairbanks", "", ""]],
-  Aircraft: [["N412ZM", "Bell 412", 2, "Fairbanks", "Ready", 4812.5, "2026-10-01", 1800]],
+  Aircraft: [["N412ZM", "Bell 412", 2, "Fairbanks", "Airworthy", 4812.5, "2026-10-01", 1800]],
   Courses: [["Night vision goggles (NVG)", 12, "Pilots"], ["Hoist rescue", 24, "Both"]],
   Training: [["Alex Rivera", "Night vision goggles (NVG)", "2026-03-14", ""]],
 };
@@ -194,7 +194,7 @@ export function planImport(data: AppData, tables: { name: string; rows: Cell[][]
       const type = text(r.Type);
       if (!type) return skipped.push(`${t.name} row ${i + 2}: ${tail} has no type, so it was skipped.`);
       const statusText = norm(text(r.Status));
-      const status: Aircraft["status"] = statusText.startsWith("inmaint") ? "In maintenance" : statusText.startsWith("ground") ? "Grounded" : statusText.startsWith("retir") ? "Retired" : "Ready";
+      const status: Aircraft["status"] = statusText.startsWith("inmaint") ? "In maintenance" : statusText.startsWith("ground") || statusText.startsWith("aog") ? "AOG" : statusText.startsWith("retir") ? "Retired" : "Airworthy";
       const hours = num(r["Flight hours"]);
       const on = dateOf(r["Hours as of"]) ?? format(new Date(), "yyyy-MM-dd");
       const k = d.aircraft.findIndex((x) => x.tail.toUpperCase() === tail);

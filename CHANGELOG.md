@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.6
+
+The words change: a mission is now a **job**, training is **qualifications**, and maintenance items are **work orders**. Your plan is kept as it was.
+
+**Fleet and aircraft**
+- **Types & equipment** (new page): aircraft types, picked from a list when adding a tail, and the equipment each can carry (hoist, bucket, medical interior…). Each tail ticks what it has, each job what it needs, and a tail booked without it is flagged.
+- Aircraft status means something now: **Airworthy**, **In maintenance** and **AOG** (with the day it went down and is expected back) keep a tail off jobs in between; **Retired** takes it out. Older saves: Ready → Airworthy, Grounded → AOG.
+- Every tail has a **Log**: status changes with why, notes, and its work orders.
+- The Fleet page opens on **Fleet status**: airworthy, in maintenance and AOG at a glance, and each tail's day, next booking and latest log line.
+
+**Jobs**
+- A season says **how many aircraft** it needs, each with a type, the tail when it's known, and its **own dates**.
+- **Ground duty** jobs need no aircraft: hangar on-call, standby, any work on the ground.
+- Customer **phone and email**, and **Documents** (PDFs and pictures show in the app).
+- **Types of work** (Settings): each line of business has a color and its jobs get their own shades of it. 30 colors, your own color, and four more patterns.
+
+**Qualifications and certificates**
+- Certificates, licences, **medicals** and **check rides**, with numbers, issuer, class or ratings, scans, and expiry at the end of the month. One can be needed by every pilot or maintainer, whatever the job.
+- Medicals follow the FAA periods from their class, the exam date and the pilot's **date of birth**, with limitations and special issuance.
+- **Due and expired** (Qualifications) and **Certificates and medicals** (Overview) list what's missing, expired or running out.
+- A certificate can be renewed by courses.
+
+**Settings**
+- **Costs** and **maintenance programs** are off unless you use them.
+- **Backups** hold attached files. The desktop app saves them to a folder you pick, and can save one there every day; Chrome and Edge ask where to save.
+
 ## 0.2.5
 
 Install this version by hand one last time: from here on, the desktop app updates itself.

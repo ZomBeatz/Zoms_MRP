@@ -1,12 +1,14 @@
 import { format } from "date-fns";
 import { validUntil, type AppData, type Mission, type Person, type Season, type Shift } from "./types";
 import { bookings } from "./bookings";
-import { fmtRotation, onRotationFor, seasonTypes } from "./rotation";
+import { downSpan, missingEquipment, statusWords } from "./aircraftTypes";
+import { slotSpan, slotsOf, tailSpan } from "./slots";
+import { fmtRotation, onRotationFor, seasonSeats, seasonTypes } from "./rotation";
 import { rulesFor } from "./limits";
 import { dueList } from "./program";
 import { currencyDays, staleOn } from "./currency";
 import { flightSpans, overLimit } from "./flight";
-import { DAY, dayAt, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
+import { DAY, dateToStart, dayAt, fmtDay, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
  * Everything MRP checks before a mission flies: coverage gaps, double bookings, qualifications,
@@ -127,6 +129,9 @@ export function dutyOf(data: AppData, personId: string) {
   return out.sort((x, y) => x.a - y.a);
 }
 
+/** "Alex hasn't done Hoist rescue", or for a certificate "Alex has no Second class medical on record". */
+const notDone = (name: string, t: { name: string; kind?: string }) => (!t.kind || t.kind === "course" ? `${name} hasn't done ${t.name}` : `${name} has no ${t.name} on record`);
+
 export function findIssues(data: AppData): Issue[] {
   const issues: Issue[] = [];
   const { maxDaysOn, minDaysOff } = data.settings.rules;
@@ -140,24 +145,43 @@ export function findIssues(data: AppData): Issue[] {
   for (const m of missions) {
     const from = ms(m.start), to = ms(m.end);
     if (!(to > from)) {
-      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the mission and fix its times.", at: from, seasonId: m.id });
+      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the job and fix its times.", at: from, seasonId: m.id });
       continue;
     }
-    const tails = m.aircraftIds.map((id) => aircraft.get(id)).filter((a): a is NonNullable<typeof a> => !!a);
-    if (!tails.length && m.status !== "Planned") {
+    const ground = m.kind === "ground";
+    const tails = ground ? [] : m.aircraftIds.map((id) => aircraft.get(id)).filter((a): a is NonNullable<typeof a> => !!a);
+    const lines = ground ? [] : slotsOf(data, m);
+    if (!ground && !lines.length && m.status !== "Planned") {
       // A planned job can wait for its aircraft; once it's confirmed it needs one.
       issues.push({ id: `noac-${m.id}`, severity: "warn", title: `“${m.name}” has no aircraft`, detail: "Pick an aircraft for this job.", at: from, seasonId: m.id });
     }
+    // A confirmed job with aircraft still to pick (the type is known, the tail isn't yet).
+    if (m.status !== "Planned")
+      for (const x of lines.filter((l) => !l.aircraftId)) {
+        const [a, b] = slotSpan(m, x);
+        issues.push({ id: `slot-${m.id}-${x.id}`, severity: "warn", title: `“${m.name}” still needs ${x.type ? `a ${x.type}` : "an aircraft"}`, detail: `${range(a, b)}. Pick the tail.`, at: a, seasonId: m.id });
+      }
     for (const ac of tails) {
-      if (ac.status === "Grounded" || ac.status === "Retired")
-        issues.push({ id: `acstat-${m.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is ${ac.status.toLowerCase()}`, detail: `It's booked for “${m.name}”. Pick another aircraft or change its status.`, at: from, seasonId: m.id, aircraftId: ac.id });
+      // The days this tail is on the job (its own line's dates, or the whole season).
+      const [from, to] = tailSpan(m, ac.id);
+      // Equipment the mission needs (a hoist, a bucket) that this tail doesn't have.
+      const missing = missingEquipment(data, ac, m.requiredEquipmentIds);
+      if (missing.length)
+        issues.push({ id: `equip-${m.id}-${ac.id}`, severity: "warn", title: `${ac.tail} doesn't have the ${missing.map((e) => e.name.toLowerCase()).join(" or ")} “${m.name}” needs`,
+          detail: `Fit it and tick it on ${ac.tail}, or pick an aircraft that has it.`, at: from, seasonId: m.id, aircraftId: ac.id });
+      // Down for maintenance, AOG or retired while it's booked.
+      const out = downSpan(ac);
+      if (out && overlaps(from, to, out[0], out[1])) {
+        const back = ac.backOn && ac.status !== "Retired" ? ` It's expected back ${fmtDay(ms(dateToStart(ac.backOn)))}.` : "";
+        issues.push({ id: `acstat-${m.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is ${statusWords(ac.status)} during “${m.name}”`, detail: `${back ? back.trim() + " " : ""}Pick another aircraft or change its status.`, at: Math.max(from, out[0]), seasonId: m.id, aircraftId: ac.id });
+      }
       for (const j of data.jobs) {
         if (j.aircraftId === ac.id && j.grounds && !j.done && overlaps(from, to, ms(j.start), ms(j.end)))
           issues.push({ id: `acjob-${m.id}-${j.id}`, severity: "danger", title: `${ac.tail} is in maintenance during “${m.name}”`, detail: `“${j.title}”, ${fmtRange(j.start, j.end)}. Move the job or pick another aircraft.`, at: Math.max(from, ms(j.start)), seasonId: m.id, aircraftId: ac.id, jobId: j.id });
       }
       for (const o of missions) {
-        if (o.id > m.id && o.aircraftIds.includes(ac.id) && overlaps(from, to, ms(o.start), ms(o.end)))
-          issues.push({ id: `acdbl-${m.id}-${o.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, ms(o.start)), seasonId: m.id, aircraftId: ac.id, otherSeasonId: o.id });
+        if (o.id > m.id && o.kind !== "ground" && o.aircraftIds.includes(ac.id) && overlaps(from, to, ...tailSpan(o, ac.id)))
+          issues.push({ id: `acdbl-${m.id}-${o.id}-${ac.id}`, severity: "danger", title: `${ac.tail} is booked twice`, detail: `“${m.name}” and “${o.name}” overlap. Pick another aircraft for one of them.`, at: Math.max(from, tailSpan(o, ac.id)[0]), seasonId: m.id, aircraftId: ac.id, otherSeasonId: o.id });
       }
     }
 
@@ -187,7 +211,7 @@ export function findIssues(data: AppData): Issue[] {
       });
 
     if (tails.length) {
-      const seats = tails.reduce((t, a) => t + a.seats, 0);
+      const seats = seasonSeats(data, m);
       const pilotSpans = data.shifts
         .filter((s) => s.seasonId === m.id && people.get(s.personId)?.role === "Pilot")
         .map((s) => [ms(s.start), ms(s.end)] as [number, number]);
@@ -195,6 +219,12 @@ export function findIssues(data: AppData): Issue[] {
       for (const s of crowded)
         issues.push({ id: `seats-${m.id}-${s.a}`, severity: "warn", title: `${plural(s.n, "pilot")} on “${m.name}”, with ${plural(seats, "pilot seat")}`, detail: `${tails.map((a) => a.tail).join(", ")}, ${range(s.a, s.b)}.`, at: s.a, seasonId: m.id });
     }
+  }
+
+  // Down past the day it was expected back: the status needs updating (or the date moved).
+  for (const ac of data.aircraft) {
+    if ((ac.status === "AOG" || ac.status === "In maintenance") && ac.backOn && ms(dateToStart(ac.backOn)) <= dayAt(Date.now(), 0))
+      issues.push({ id: `acback-${ac.id}`, severity: "warn", title: `${ac.tail} was expected back ${fmtDay(ms(dateToStart(ac.backOn)))}`, detail: `It's still ${statusWords(ac.status)}. Mark it airworthy, or move the date.`, at: ms(dateToStart(ac.backOn)), aircraftId: ac.id });
   }
 
   // Shifts: qualifications, outside the mission, time off.
@@ -211,7 +241,7 @@ export function findIssues(data: AppData): Issue[] {
       issues.push({ id: `offrot-${s.id}`, severity: "warn", title: `${p.name} is booked on their days off`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Their rotation is ${fmtRotation(p.rotation)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
     // Maintainers often start before the mission (pre-flight) and stay after; pilots fly inside it.
     if (p.role === "Pilot" && (ms(s.start) < ms(m.start) || ms(s.end) > ms(m.end)))
-      issues.push({ id: `outside-${s.id}`, severity: "warn", title: `${p.name}'s shift runs outside “${m.name}”`, detail: `The shift is ${fmtRange(s.start, s.end)}; the mission is ${fmtRange(m.start, m.end)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
+      issues.push({ id: `outside-${s.id}`, severity: "warn", title: `${p.name}'s shift runs outside “${m.name}”`, detail: `The shift is ${fmtRange(s.start, s.end)}; the job is ${fmtRange(m.start, m.end)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
     if (!(ms(s.end) > ms(s.start)))
       issues.push({ id: `stime-${s.id}`, severity: "danger", title: `${p.name}'s shift ends before it starts`, detail: `On “${m.name}”.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
   }
@@ -221,7 +251,7 @@ export function findIssues(data: AppData): Issue[] {
     for (const pid of j.maintainerIds) {
       const p = people.get(pid);
       if (p && ac && !p.quals.includes(ac.type))
-        issues.push({ id: `jqual-${j.id}-${pid}`, severity: "warn", title: `${p.name} isn't qualified on the ${ac.type}`, detail: `Job “${j.title}” on ${ac.tail}.`, at: ms(j.start), personId: p.id, jobId: j.id, aircraftId: ac.id });
+        issues.push({ id: `jqual-${j.id}-${pid}`, severity: "warn", title: `${p.name} isn't qualified on the ${ac.type}`, detail: `Work order “${j.title}” on ${ac.tail}.`, at: ms(j.start), personId: p.id, jobId: j.id, aircraftId: ac.id });
     }
   }
 
@@ -299,8 +329,8 @@ export function findIssues(data: AppData): Issue[] {
       if (st.state === "ok") continue;
       issues.push({
         id: `train-${s.id}-${tid}`, severity: "danger",
-        title: st.state === "missing" ? `${p.name} hasn't done ${t.name}` : st.state === "expired" ? `${p.name}'s ${t.name} has run out` : `${p.name}'s ${t.name} runs out during “${m.name}”`,
-        detail: `“${m.name}” needs it.${st.expires ? ` It ${st.state === "expired" ? "ran out" : "runs out"} ${fmtDate(st.expires)}.` : ""} Swap them out or record the training.`,
+        title: st.state === "missing" ? notDone(p.name, t) : st.state === "expired" ? `${p.name}'s ${t.name} has run out` : `${p.name}'s ${t.name} runs out during “${m.name}”`,
+        detail: `${t.everyone && !(m.requiredTrainingIds ?? []).includes(tid) ? `Every ${p.role.toLowerCase()} needs it` : `“${m.name}” needs it`}.${st.expires ? ` It ${st.state === "expired" ? "ran out" : "runs out"} ${fmtDate(st.expires)}.` : ""} Swap them out or record the qualification.`,
         at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id, trainingId: tid,
       });
     }
@@ -330,11 +360,11 @@ export function findIssues(data: AppData): Issue[] {
       const booked = p.training.some((r) => r.trainingId === tid && ms(`${r.completed}T00:00`) > now);
       if (booked || done.some((r) => !validUntil(r))) continue;
       const latest = done.map((r) => validUntil(r)!).sort().at(-1);
-      const missions = needers.map((m) => `“${m.name}”`).join(", ");
-      const needs = needers.length === 1 ? "needs" : "need";
+      const missions = needers.length ? needers.map((m) => `“${m.name}”`).join(", ") : p.role === "Pilot" ? "Every pilot" : "Every maintainer";
+      const needs = needers.length > 1 ? "need" : "needs";
       if (!latest || ms(`${latest}T00:00`) <= now)
-        issues.push({ id: `lapsed-${p.id}-${tid}`, severity: "warn", title: latest ? `${p.name}'s ${t.name} has run out` : `${p.name} hasn't done ${t.name}`,
-          detail: `${missions} ${needs} it, so they can't be booked there until it's done.`, at: now, personId: p.id, trainingId: tid });
+        issues.push({ id: `lapsed-${p.id}-${tid}`, severity: "warn", title: latest ? `${p.name}'s ${t.name} has run out` : notDone(p.name, t),
+          detail: `${missions} ${needs} it, so they can't be booked ${needers.length ? "there" : "on any job"} until it's on record.`, at: now, personId: p.id, trainingId: tid });
       else if (ms(`${latest}T00:00`) <= dayAt(now, data.settings.expiryWarningDays))
         issues.push({ id: `renew-${p.id}-${tid}`, severity: "warn", title: `${p.name}'s ${t.name} runs out ${fmtDate(latest)}`,
           detail: `${missions} ${needs} it. Book the renewal before then.`, at: ms(`${latest}T00:00`), personId: p.id, trainingId: tid });
@@ -391,8 +421,9 @@ const fmtDate = (d: string) => format(new Date(`${d}T00:00`), "MMM d, yyyy");
 
 /** The training a mission needs from someone in this role. */
 export function requiredTraining(data: AppData, m: Pick<Mission, "requiredTrainingIds">, role?: Person["role"]): string[] {
-  const ids = [...new Set(m.requiredTrainingIds ?? [])];
-  if (!role) return ids;
+  if (!role) return [...new Set(m.requiredTrainingIds ?? [])];
+  // With a role: also what everyone in it needs, whatever the job (a pilot certificate, a medical).
+  const ids = [...new Set([...(m.requiredTrainingIds ?? []), ...data.trainings.filter((t) => t.everyone).map((t) => t.id)])];
   return ids.filter((id) => {
     const t = data.trainings.find((x) => x.id === id);
     return t && (t.appliesTo === "Both" || t.appliesTo === role);
@@ -412,9 +443,12 @@ export function neededTraining(data: AppData, p: Person): Map<string, Mission[]>
     if (s.personId === p.id && season && active(season) && ms(season.end) > now) theirs.add(season.missionId);
   }
   const need = new Map<string, Mission[]>();
+  // Needed by everyone in their role: no job to name.
+  for (const t of data.trainings) if (t.everyone && (t.appliesTo === "Both" || t.appliesTo === p.role)) need.set(t.id, []);
   for (const m of data.missions) {
     if (!theirs.has(m.id)) continue;
-    for (const t of requiredTraining(data, m, p.role)) need.set(t, [...(need.get(t) ?? []), m]);
+    // The job's own (what everyone needs is already there, with no job to name).
+    for (const t of requiredTraining(data, m, p.role)) if (!data.trainings.find((x) => x.id === t)?.everyone) need.set(t, [...(need.get(t) ?? []), m]);
   }
   return need;
 }

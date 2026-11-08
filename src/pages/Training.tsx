@@ -4,7 +4,8 @@ import { format } from "date-fns";
 import { useStore } from "../store";
 import { neededTraining } from "../coverage";
 import { daysSince } from "../currency";
-import { DAY } from "../time";
+import { DAY, plural, today } from "../time";
+import { KINDS, kindOf, qualificationsDue } from "../certificates";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, Empty } from "../components/ui";
 import { validUntil, type Person, type Training } from "../types";
@@ -14,7 +15,7 @@ import { validUntil, type Person, type Training } from "../types";
  * “Who's current” shows each person against the training they need; everything else reads “Not needed”.
  */
 
-type Tab = "current" | "courses";
+type Tab = "current" | "due" | "courses";
 
 interface Standing { label: string; tone: string; date?: string }
 
@@ -30,9 +31,13 @@ function standing(p: Person, t: Training, warnDays: number): Standing {
   return { label: "Current", tone: "ok", date };
 }
 
+/** Open the Qualifications page on Due and expired next time it draws (from the Overview). */
+let wantDue = false;
+export const showDueTab = () => { wantDue = true; };
+
 export function TrainingPage() {
   const { data, open } = useStore();
-  const [tab, setTab] = useState<Tab>("current");
+  const [tab, setTab] = useState<Tab>(() => { const due = wantDue; wantDue = false; return due ? "due" : "current"; });
   const [kind, setKind] = useState("");
   const warn = data.settings.expiryWarningDays;
   const mission = data.missions.find((m) => m.id === kind);
@@ -52,14 +57,15 @@ export function TrainingPage() {
   return (
     <>
       <div className="page-head">
-        <h1>Training</h1>
+        <h1>Qualifications</h1>
         {data.trainings.length > 0 && data.people.length > 0 && <button className="btn" onClick={() => open("groupTraining", "new")}><Users size={16} /> Record for several people…</button>}
-        <button className="btn primary" onClick={() => open("training", "new")}><Plus size={16} /> Add training…</button>
+        <button className="btn primary" onClick={() => open("training", "new")}><Plus size={16} /> Add qualification…</button>
       </div>
       <div className="row gap wrap" style={{ marginBottom: 14 }}>
         <div className="seg">
           <button className={tab === "current" ? "active" : ""} onClick={() => setTab("current")}>Who's current</button>
-          <button className={tab === "courses" ? "active" : ""} onClick={() => setTab("courses")}>Courses <span className="chip">{data.trainings.length}</span></button>
+          <button className={tab === "due" ? "active" : ""} onClick={() => setTab("due")}>Due and expired</button>
+          <button className={tab === "courses" ? "active" : ""} onClick={() => setTab("courses")}>Qualifications <span className="chip">{data.trainings.length}</span></button>
         </div>
         {tab === "current" && (
           <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Show crew for">
@@ -69,16 +75,18 @@ export function TrainingPage() {
         )}
       </div>
 
+      {tab === "due" && <DueAndExpired />}
+
       {tab === "current" && (
         data.trainings.length === 0 || rows.length === 0 ? (
-          <Empty icon={<GraduationCap size={28} />} text={mission ? "Nobody works this mission yet. Pick its crew in the mission." : "Add training courses, set which missions need them, then record who has done what."}
-            action={<button className="btn primary" onClick={() => (mission ? open("mission", mission.id) : open("training", "new"))}>{mission ? "Open the mission…" : "Add training…"}</button>} />
+          <Empty icon={<GraduationCap size={28} />} text={mission ? "Nobody works this job yet. Pick its crew in the job." : "Add qualifications, set which jobs need them, then record who has done what."}
+            action={<button className="btn primary" onClick={() => (mission ? open("mission", mission.id) : open("training", "new"))}>{mission ? "Open the job…" : "Add qualification…"}</button>} />
         ) : (
           <>
             <NeedsTraining rows={rows} warn={warn} />
             <p className="small muted" style={{ marginTop: 0 }}>
-              {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their missions need. "}
-              People need only the training their missions ask for. Tap a person to record training or change what they work on.
+              {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their jobs need. "}
+              People need only the qualifications their jobs ask for. Tap a person to record qualifications or change what they work on.
             </p>
             <div className="table-wrap">
               <table className="table">
@@ -103,7 +111,7 @@ export function TrainingPage() {
                         if (!need) return <td key={t.id}>{has ? <span className="small muted">Has it</span> : <span className="small muted">Not needed</span>}</td>;
                         const s = standing(p, t, warn);
                         return (
-                          <td key={t.id} title={`Needed for ${need.map((m) => m.name).join(", ")}`}>
+                          <td key={t.id} title={need.length ? `Needed for ${need.map((m) => m.name).join(", ")}` : `Every ${p.role.toLowerCase()} needs it`}>
                             <span className={`pill ${s.tone}`}>{s.label}</span>
                             {s.date && s.tone !== "ok" && <div className="small muted">{s.date}</div>}
                           </td>
@@ -125,7 +133,7 @@ export function TrainingPage() {
                       const s = standing(p, t, warn);
                       return <span key={id} className={`pill ${s.tone}`}>{t.name}: {s.label}</span>;
                     })}
-                    {needs.size === 0 && <span className="small muted">No training needed</span>}
+                    {needs.size === 0 && <span className="small muted">No qualifications needed</span>}
                   </span>
                 </button>
               ))}
@@ -136,11 +144,11 @@ export function TrainingPage() {
 
       {tab === "courses" && (
         data.trainings.length === 0 ? (
-          <Empty icon={<GraduationCap size={28} />} text="Courses and certifications some missions need, like NVG or mountain flying." action={<button className="btn primary" onClick={() => open("training", "new")}>Add training…</button>} />
+          <Empty icon={<GraduationCap size={28} />} text="Qualifications and certifications some jobs need, like NVG or mountain flying." action={<button className="btn primary" onClick={() => open("training", "new")}>Add qualification…</button>} />
         ) : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Training</th><th>For</th><th className="r">Renew every</th><th>Missions that need it</th><th className="r">Need it</th><th className="r">Current</th></tr></thead>
+              <thead><tr><th>Qualification</th><th>Kind</th><th>For</th><th className="r">Renew every</th><th>Who needs it</th><th className="r">Need it</th><th className="r">Current</th></tr></thead>
               <tbody>
                 {data.trainings.map((t) => {
                   const missions = data.missions.filter((m) => m.requiredTrainingIds.includes(t.id));
@@ -149,9 +157,10 @@ export function TrainingPage() {
                   return (
                     <tr key={t.id} onClick={() => open("training", t.id)}>
                       <td className="name">{t.name}</td>
+                      <td className="small">{KINDS[kindOf(t)]}</td>
                       <td>{t.appliesTo === "Both" ? "Pilots and maintainers" : `${t.appliesTo}s`}</td>
-                      <td className="r">{t.validMonths ? `${t.validMonths} months` : "Never runs out"}</td>
-                      <td>{missions.length ? missions.map((m) => m.name).join(", ") : <span className="muted">None</span>}</td>
+                      <td className="r">{t.validMonths ? `${t.validMonths} months${t.endOfMonth ? ", to month end" : ""}` : "Never runs out"}</td>
+                      <td>{t.everyone ? <b>{t.appliesTo === "Both" ? "Everyone" : `Every ${t.appliesTo.toLowerCase()}`}</b> : missions.length ? missions.map((m) => m.name).join(", ") : <span className="muted">None</span>}</td>
                       <td className="r">{needing.length}</td>
                       <td className="r">{needing.length ? <span className={`pill ${current === needing.length ? "ok" : "warn"}`}>{current} of {needing.length}</span> : <span className="muted">None</span>}</td>
                     </tr>
@@ -195,7 +204,7 @@ function NeedsTraining({ rows, warn }: { rows: { p: Person; needs: Map<string, {
         const t = data.trainings.find((x) => x.id === id);
         if (!t) return [];
         const st = standing(p, t, warn);
-        return st.tone === "ok" ? [] : [{ t, st, for: missions.map((m) => m.name).join(", ") }];
+        return st.tone === "ok" ? [] : [{ t, st, for: missions.map((m) => m.name).join(", ") || `every ${p.role.toLowerCase()}` }];
       }),
     }))
     .map((x) => ({
@@ -208,8 +217,8 @@ function NeedsTraining({ rows, warn }: { rows: { p: Person; needs: Map<string, {
 
   if (!list.length) return null;
   return (
-    <section className="panel needs-training">
-      <h3>Needs training <span className="chip">{list.length}</span></h3>
+    <section className="panel needs-qualifications">
+      <h3>Needs qualifications <span className="chip">{list.length}</span></h3>
       <div className="needs-list">
         {list.map(({ p, items, stale }) => (
           <div key={p.id} className="needs-person">
@@ -230,5 +239,63 @@ function NeedsTraining({ rows, warn }: { rows: { p: Person; needs: Map<string, {
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * Every certificate, medical, check ride and course across the crew that's missing, expired or running out,
+ * soonest first, with its number and files: the list to work through before anyone's grounded by paperwork.
+ */
+function DueAndExpired() {
+  const { data, open } = useStore();
+  const [days, setDays] = useState(90);
+  const [kind, setKind] = useState<"" | NonNullable<Training["kind"]>>("");
+  const [all, setAll] = useState(false);
+  const rows = useMemo(() => qualificationsDue(data, days), [data, days])
+    .filter((r) => (all || r.needed) && r.state !== "ok")
+    .filter((r) => !kind || kindOf(r.training) === kind);
+  const tone = { missing: "danger", expired: "danger", soon: "warn", ok: "ok" } as const;
+  const label = { missing: "Not on record", expired: "Expired", soon: "Runs out", ok: "Current" } as const;
+  const day = (iso: string) => format(new Date(`${iso}T00:00`), "MMM d, yyyy");
+  const left = (iso: string) => Math.round((new Date(`${iso}T00:00`).getTime() - today().getTime()) / DAY);
+  return (
+    <>
+      <div className="row gap-sm wrap" style={{ marginBottom: 12 }}>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="How far ahead">
+          {[30, 60, 90, 180, 365].map((n) => <option key={n} value={n}>Running out in the next {n} days</option>)}
+        </select>
+        <button className={`chip pick ${kind === "" ? "on" : ""}`} onClick={() => setKind("")}>Every kind</button>
+        {Object.entries(KINDS).map(([k, l]) => (
+          <button key={k} className={`chip pick ${kind === k ? "on" : ""}`} onClick={() => setKind(kind === k ? "" : (k as NonNullable<Training["kind"]>))}>{l}</button>
+        ))}
+        <label className="check small"><input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> Include ones nobody needs</label>
+      </div>
+      {rows.length === 0 ? (
+        <Empty icon={<GraduationCap size={28} />} text={`Nothing missing, expired or running out in the next ${days} days.`} />
+      ) : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead><tr><th>Person</th><th>Qualification</th><th>Number</th><th>Where it stands</th><th>Needed for</th><th className="r">Files</th></tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.person.id}-${r.training.id}`} onClick={() => open("person", r.person.id, undefined, { tab: "training", spot: `training:${r.training.id}` })}>
+                  <td className="name"><span className="row gap-sm"><Avatar person={r.person} />{r.person.name}</span></td>
+                  <td>{r.training.name} <span className="small muted">· {KINDS[kindOf(r.training)]}</span></td>
+                  <td className="small mono">{r.record?.number || <span className="muted">–</span>}</td>
+                  <td>
+                    <span className={`pill ${tone[r.state]}`}>{label[r.state]}{r.until && r.state !== "missing" ? ` ${day(r.until)}` : ""}</span>
+                    {r.until && r.state === "soon" && <span className="small muted"> in {plural(left(r.until), "day")}</span>}
+                    {r.record?.extendedTo && <span className="pill accent" title={r.record.extensionNote}>Extended</span>}
+                  </td>
+                  <td className="small">{!r.needed ? <span className="muted">Not needed</span> : r.jobs.length ? r.jobs.join(", ") : `Every ${r.person.role.toLowerCase()}`}</td>
+                  <td className="r small">{r.record?.documents?.length || <span className="muted">–</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="small muted">Tap a row to record the renewal, attach the new certificate or extend it. A renewal already on record (done ahead of time) counts.</p>
+    </>
   );
 }

@@ -1,6 +1,8 @@
 import { addMonths, format } from "date-fns";
-import type { Aircraft, AppData, Booking, MaintenanceJob, Mission, Pattern, Person, ProgramItem, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
+import type { Aircraft, AircraftType, AppData, Booking, Equipment, MaintenanceJob, Mission, Pattern, Person, ProgramItem, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
 import { booking } from "./bookings";
+import { shadeAt } from "./look";
+import { expiryFor, medicalExpiry } from "./certificates";
 import { onRotationFor } from "./rotation";
 import { DAY, dayAt, overlaps, toWhen, today } from "./time";
 
@@ -20,13 +22,17 @@ export const defaultSettings = (): Settings => ({
   weekStart: 1,
   hiddenPages: [],
   seasonDefaults: { pilots: 1, maintainers: 0, pilotRotation: null, dutyHours: null },
+  costs: false,
   currencySymbol: "$",
-  maintenance: { enabled: true, autoPlan: false, hoursPerDay: 3, dueSoonDays: 30 },
+  maintenance: { enabled: false, autoPlan: false, hoursPerDay: 3, dueSoonDays: 30 },
 });
 
 export const emptyData = (): AppData => ({
   version: 1,
   aircraft: [],
+  aircraftTypes: [],
+  equipment: [],
+  workTypes: [],
   trainings: [],
   people: [],
   missions: [],
@@ -77,10 +83,18 @@ export function sampleData(settings = defaultSettings()): AppData {
   const tArctic = course("Arctic survival", 24, "Both");
   const tCold = course("Cold weather maintenance", 24, "Maintainer");
   const tFuel = course("Fuel and hazmat handling", 24, "Maintainer");
-  const trainings = [tMtn, tFire, tWater, tNvg, tHoist, tArctic, tCold, tFuel];
+  // Certificates, medicals and check rides: everyone in the role needs them, whatever the job.
+  const cert = (name: string, kind: Training["kind"], validMonths: number, appliesTo: Training["appliesTo"], more: Partial<Training> = {}): Training =>
+    ({ ...course(name, validMonths, appliesTo), kind, everyone: true, ...more });
+  const cPilot = cert("Commercial pilot certificate", "certificate", 0, "Pilot");
+  const cMedical = cert("Medical certificate", "medical", 12, "Pilot", { endOfMonth: true, privileges: "commercial" });
+  const cCheck = cert("Part 135 competency check", "check", 12, "Pilot", { endOfMonth: true });
+  const cMechanic = cert("Mechanic certificate (A&P)", "certificate", 0, "Maintainer");
+  const cHazmat = cert("Hazmat handler card", "certificate", 24, "Maintainer", { everyone: false, renewedBy: [tFuel.id] });
+  const trainings = [tMtn, tFire, tWater, tNvg, tHoist, tArctic, tCold, tFuel, cPilot, cMedical, cCheck, cMechanic, cHazmat];
 
   // ---- fleet: twelve tails, three of each type
-  const ac = (tail: string, type: string, seats: number, base: string): Aircraft => ({ id: `a-${tail}`, tail, type, seats, base, status: "Ready", notes: "" });
+  const ac = (tail: string, type: string, seats: number, base: string): Aircraft => ({ id: `a-${tail}`, tail, type, seats, base, status: "Airworthy", notes: "" });
   const B412 = "Bell 412", AW = "AW139", AS = "AS350 B3", B407 = "Bell 407";
   const n412 = ac("N412AK", B412, 2, "Anchorage");
   const n413 = ac("N413AK", B412, 2, "Fairbanks");
@@ -95,6 +109,22 @@ export function sampleData(settings = defaultSettings()): AppData {
   const n408 = ac("N408AK", B407, 1, "Anchorage");
   const n409 = ac("N409AK", B407, 1, "Sitka");
   const aircraft = [n412, n413, n414, n139, n140, n141, n350, n351, n352, n407, n408, n409];
+
+  // ---- equipment, the types it fits, and what each tail has. Sitka's Bell 407 has no floats yet, on purpose.
+  const gear = (name: string): Equipment => ({ id: `e-${name.toLowerCase().replace(/\W+/g, "-")}`, name, notes: "" });
+  const eHoist = gear("Rescue hoist"), eBucket = gear("Fire bucket"), eMed = gear("Medical interior"), eHook = gear("Cargo hook"), eFloats = gear("Emergency floats");
+  const equipment = [eHoist, eBucket, eMed, eHook, eFloats];
+  const kind = (name: string, seats: number, fits: Equipment[]): AircraftType => ({ id: `ty-${name.toLowerCase().replace(/\W+/g, "-")}`, name, seats, equipmentIds: fits.map((e) => e.id), notes: "" });
+  const aircraftTypes = [
+    kind(B412, 2, [eHoist, eBucket, eHook, eFloats]), kind(AW, 2, [eHoist, eMed, eFloats]),
+    kind(AS, 1, [eBucket, eHook]), kind(B407, 1, [eHook, eFloats, eMed]),
+  ];
+  const fit = (tails: Aircraft[], ...items: Equipment[]) => { for (const a of tails) a.equipmentIds = [...(a.equipmentIds ?? []), ...items.map((e) => e.id)]; };
+  fit([n412, n413, n414, n350, n351, n352, n407, n408, n409], eHook);
+  fit([n413, n350], eBucket);
+  fit([n139, n140, n141], eMed, eFloats);
+  fit([n139], eHoist);
+  fit([n407], eFloats);
 
   // ---- crew: 34 pilots, 12 maintainers
   const person = (name: string, role: Person["role"], quals: string[], base: string): Person =>
@@ -155,6 +185,10 @@ export function sampleData(settings = defaultSettings()): AppData {
   interface Contract {
     name: string; contact: string; color: string; pattern: Pattern; tails: Aircraft[]; pilots: number; maint: number;
     training: Training[]; location: string; crew: Person[];
+    /** Equipment its aircraft need. */
+    needs?: Equipment[];
+    /** Ground duty: no aircraft (hangar on-call). */
+    ground?: boolean;
     /** The seasons in a given year: [first day, midnight after the last day, label]. */
     seasons: (y: number) => [number, number, string][];
   }
@@ -165,7 +199,7 @@ export function sampleData(settings = defaultSettings()): AppData {
     parts.map(([sm, sd, em, ed, label]): [number, number, string] => [date(y, sm, sd), date(y, em, ed + 1), `${label} ${y}`]);
   const contracts: Contract[] = [
     // One job on two aircraft: the Bell 412 for the bucket and the AS350 for initial attack, three pilots at a time.
-    { name: "Interior Fire Service", contact: "Fire dispatch, (907) 555-0142", color: "#c2410c", pattern: "stripes", tails: [n413, n350], pilots: 3, maint: 1, training: [tMtn, tFire],
+    { name: "Interior Fire Service", contact: "Fire dispatch, (907) 555-0142", color: "#c2410c", pattern: "stripes", tails: [n413, n350], pilots: 3, maint: 1, training: [tMtn, tFire], needs: [eBucket],
       location: "Fairbanks and Interior fire zones", crew: [P.maya, P.jamie, P.priya, P.tess, P.eli, P.theo, P.owen, P.dana, P.mia, P.kofi, P.jordan, P.casey, P.luke, P.taylor, P.drew, P.omar], seasons: season(5, 15, 9, 15) },
     { name: "North Slope Energy", contact: "Logistics desk, (907) 555-0177", color: "#0f766e", pattern: "solid", tails: [n412], pilots: 2, maint: 1, training: [tArctic, tCold],
       location: "Deadhorse", crew: [P.wes, P.elena, P.kofi, P.alex, P.sam, P.owen, P.quinn, P.ivy, P.dana, P.sofia, P.paul, P.drew, P.ben, P.omar, P.lena], seasons: winter(11, 15, 4, 30) },
@@ -177,11 +211,11 @@ export function sampleData(settings = defaultSettings()): AppData {
       location: "Denali backcountry", crew: [P.ivy, P.nora, P.jamie, P.owen, P.theo], seasons: season(6, 10, 8, 25) },
     { name: "Kenai Electric line patrol", contact: "Line crew lead, (907) 555-0163", color: "#854d0e", pattern: "dashes", tails: [n413], pilots: 1, maint: 0, training: [tMtn],
       location: "Kenai Peninsula", crew: [P.maya, P.priya, P.tess, P.eli, P.theo], seasons: season(1, 10, 3, 31) },
-    { name: "Mat-Su Medevac", contact: "Flight desk, (907) 555-0150", color: "#be123c", pattern: "solid", tails: [n139], pilots: 2, maint: 1, training: [tNvg, tHoist],
+    { name: "Mat-Su Medevac", contact: "Flight desk, (907) 555-0150", color: "#be123c", pattern: "solid", tails: [n139], pilots: 2, maint: 1, training: [tNvg, tHoist], needs: [eMed, eHoist],
       location: "Palmer", crew: [P.riley, P.quinn, P.marcus, P.paul, P.liam, P.alex, P.dana, P.hana, P.leah, P.kai, P.taylor, P.aiden, P.lena], seasons: season(1, 5, 12, 20) },
-    { name: "YK Delta Health", contact: "Transport desk, (907) 555-0188", color: "#1e3a8a", pattern: "zigzag", tails: [n140], pilots: 2, maint: 0, training: [tNvg, tArctic, tWater],
+    { name: "YK Delta Health", contact: "Transport desk, (907) 555-0188", color: "#1e3a8a", pattern: "zigzag", tails: [n140], pilots: 2, maint: 0, training: [tNvg, tArctic, tWater], needs: [eMed],
       location: "Bethel and villages", crew: [P.hana, P.marcus, P.sofia, P.priya, P.sam, P.jamie], seasons: season(1, 5, 12, 20) },
-    { name: "Nome Regional Medevac", contact: "Dispatch, (907) 555-0193", color: "#9f1239", pattern: "stripes", tails: [n141], pilots: 2, maint: 0, training: [tNvg, tArctic, tWater],
+    { name: "Nome Regional Medevac", contact: "Dispatch, (907) 555-0193", color: "#9f1239", pattern: "stripes", tails: [n141], pilots: 2, maint: 0, training: [tNvg, tArctic, tWater], needs: [eMed],
       location: "Nome and Seward Peninsula", crew: [P.leah, P.noah, P.nora, P.ivy, P.sofia, P.paul, P.liam, P.kofi], seasons: season(1, 5, 12, 20) },
     { name: "Tanana Wildlife Survey", contact: "Field biologist, (907) 555-0124", color: "#15803d", pattern: "dots", tails: [n350], pilots: 1, maint: 0, training: [],
       location: "Tanana Flats", crew: [P.jordan, P.casey, P.marcus, P.luke], seasons: named([4, 1, 5, 10, "spring"], [9, 20, 10, 31, "fall"]) },
@@ -195,13 +229,16 @@ export function sampleData(settings = defaultSettings()): AppData {
       location: "Bristol Bay", crew: [P.grace, P.ruben, P.victor, P.iris], seasons: season(6, 10, 8, 20) },
     { name: "Bristol Bay hunting charters", contact: "Lodge office, (907) 555-0158", color: "#78350f", pattern: "solid", tails: [n352], pilots: 1, maint: 0, training: [],
       location: "Dillingham", crew: [P.ruben, P.grace, P.iris], seasons: season(9, 1, 10, 15) },
-    { name: "Kodiak Fisheries Patrol", contact: "Patrol office, (907) 555-0156", color: "#0e7490", pattern: "dashes", tails: [n407], pilots: 1, maint: 0, training: [tWater],
+    { name: "Kodiak Fisheries Patrol", contact: "Patrol office, (907) 555-0156", color: "#0e7490", pattern: "dashes", tails: [n407], pilots: 1, maint: 0, training: [tWater], needs: [eFloats],
       location: "Kodiak Island", crew: [P.tess, P.sam, P.ezra, P.casey, P.iris], seasons: season(6, 1, 9, 30) },
-    { name: "Sitka Search and Rescue support", contact: "SAR coordinator, (907) 555-0115", color: "#b91c1c", pattern: "dots", tails: [n409], pilots: 1, maint: 0, training: [tWater],
+    { name: "Sitka Search and Rescue support", contact: "SAR coordinator, (907) 555-0115", color: "#b91c1c", pattern: "dots", tails: [n409], pilots: 1, maint: 0, training: [tWater], needs: [eFloats],
       location: "Sitka Sound", crew: [P.ana, P.victor, P.grace, P.iris], seasons: season(1, 5, 12, 20) },
     { name: "Chugach Power line patrol", contact: "Grid operations, (907) 555-0170", color: "#9d174d", pattern: "solid", tails: [n408], pilots: 1, maint: 0, training: [],
       location: "Anchorage to Seward", crew: [P.jordan, P.casey, P.tess, P.sam, P.victor, P.luke],
       seasons: (y) => [3, 6, 9, 12].map((m): [number, number, string] => [date(y, m, 1), date(y, m, 22), format(date(y, m, 1), "MMM yyyy")]) },
+    // Ground duty: a maintainer on call in the hangar every day of the year for a state contract.
+    { name: "State hangar on-call", contact: "Facilities desk, (907) 555-0107", color: "#475569", pattern: "dots", tails: [], pilots: 0, maint: 1, training: [tFuel], ground: true,
+      location: "Anchorage hangar", crew: [P.drew, P.kai, P.rosa, P.sasha, P.felix], seasons: season(1, 1, 12, 31) },
     { name: "Kachemak Bay film shoot", contact: "Production office, (907) 555-0102", color: "#c026d3", pattern: "stripes", tails: [n408], pilots: 1, maint: 0, training: [tWater],
       location: "Homer", crew: [P.casey, P.victor, P.ana], seasons: season(7, 1, 7, 12) },
   ];
@@ -212,9 +249,12 @@ export function sampleData(settings = defaultSettings()): AppData {
   const seasons: Season[] = [];
   const contractOf = new Map<string, Contract>(); // by mission id and by season id
   for (const c of contracts) {
+    // "Fire dispatch, (907) 555-0142": who, and their phone; the email is made up from the customer's name.
+    const [who, phone] = c.contact.split(", ");
     const mission: Mission = {
-      id: `m-${missionList.length + 1}`, name: c.name, contact: c.contact, location: c.location, notes: "",
-      requiredTrainingIds: c.training.map((t) => t.id), color: c.color, pattern: c.pattern,
+      id: `m-${missionList.length + 1}`, name: c.name, contact: who, phone: phone ?? "", email: `${who.toLowerCase().replace(/\W+/g, ".")}@${c.name.split(" ")[0].toLowerCase()}.example.com`,
+      location: c.location, notes: "", ...(c.ground ? { kind: "ground" as const } : {}),
+      requiredTrainingIds: c.training.map((t) => t.id), requiredEquipmentIds: (c.needs ?? []).map((e) => e.id), color: c.color, pattern: c.pattern,
     };
     missionList.push(mission);
     contractOf.set(mission.id, c);
@@ -233,6 +273,29 @@ export function sampleData(settings = defaultSettings()): AppData {
         seasons.push(season);
         contractOf.set(season.id, c);
       }
+  }
+  // ---- types of work: each customer's job is a shade of its line of business's color.
+  const kinds: [string, string, string[]][] = [
+    ["Fire", "#c2410c", ["Interior Fire Service"]],
+    ["Medevac and SAR", "#be123c", ["Mat-Su Medevac", "YK Delta Health", "Nome Regional Medevac", "Sitka Search and Rescue support"]],
+    ["Energy and utilities", "#0f766e", ["North Slope Energy", "Prudhoe pipeline patrol", "Kenai Electric line patrol", "Chugach Power line patrol"]],
+    ["Survey and research", "#a16207", ["Alaska Range Survey", "Denali Park research", "Tanana Wildlife Survey", "Copper River seismic survey", "Bristol Bay Fisheries Survey", "Kodiak Fisheries Patrol"]],
+    ["Tours and charters", "#2563eb", ["Juneau Icefield Tours", "Southeast Avalanche Program", "Bristol Bay hunting charters", "Kachemak Bay film shoot"]],
+    ["Ground duty", "#475569", ["State hangar on-call"]],
+  ];
+  const workTypes = kinds.map(([name, color], i) => ({ id: `wt-${i + 1}`, name, color }));
+  kinds.forEach(([, color, names], i) => names.forEach((n, k) => {
+    const m = missionList.find((x) => x.name === n);
+    if (m) Object.assign(m, { workTypeId: workTypes[i].id, color: shadeAt(color, k) });
+  }));
+
+  // The coming fire season wants a third aircraft, a Bell 412 for July and August only, its tail not picked yet.
+  for (const x of seasons.filter((y) => missionList.find((m) => m.id === y.missionId)?.name === "Interior Fire Service" && y.status === "Planned")) {
+    const y0 = new Date(x.start).getFullYear();
+    x.slots = [
+      ...x.aircraftIds.map((id) => ({ id: `${x.id}-${id}`, type: aircraft.find((a) => a.id === id)!.type, aircraftId: id })),
+      { id: `${x.id}-extra`, type: B412, aircraftId: null, start: toWhen(date(y0, 7, 1)), end: toWhen(date(y0, 9, 1)) },
+    ];
   }
   seasons.sort((x, y) => x.start.localeCompare(y.start));
   // The seasons with their mission's details, for the steps below.
@@ -259,6 +322,41 @@ export function sampleData(settings = defaultSettings()): AppData {
       if (next < windowTo && !unbooked.has(`${p.id}:${t.id}`)) p.training.push(rec(next));
     }
   }
+  // Certificate records, from their own seeded numbers so the rest of the demo comes out as before.
+  const rc = seeded(4242);
+  const num = () => String(1_000_000 + Math.floor(rc() * 8_999_999));
+  people.forEach((p, i) => {
+    if (p.role === "Pilot") {
+      // Born 27 to 58 years ago, so the medical rules that depend on age have something to go on.
+      p.born = iso(dayAt(t0, -Math.floor((27 + rc() * 31) * 365.25)));
+      p.training.push({ trainingId: cPilot.id, completed: iso(dayAt(t0, -400 - Math.floor(rc() * 3000))), expires: null, number: num(), issuedBy: "FAA", grade: "Commercial, rotorcraft-helicopter, instrument helicopter" });
+      // A few hold first class medicals; two have limitations, and one flies on a special issuance.
+      const medical = (completed: string): TrainingRecord => {
+        const r: TrainingRecord = { trainingId: cMedical.id, completed, medicalClass: i % 7 === 0 ? 1 : 2, expires: null, issuedBy: "Dr. Okafor, AME", number: num() };
+        if (i % 9 === 4) r.limitations = "Must wear corrective lenses";
+        if (p === P.marcus) { r.limitations = "Valid only with annual cardiac evaluation"; r.specialIssuanceUntil = iso(dayAt(new Date(`${completed}T00:00`).getTime(), 420)); }
+        return { ...r, expires: medicalExpiry(r, p.born, cMedical.privileges) };
+      };
+      for (const c of [cMedical, cCheck]) {
+        // Done 1 to 11 months ago; the next one booked two weeks before it runs out. On purpose, Elena's
+        // check ride runs out within a few weeks with nothing booked yet.
+        const late = c === cCheck && p === P.elena;
+        const done = late ? iso(dayAt(t0, -350)) : iso(dayAt(t0, -30 - Math.floor(rc() * 300)));
+        const make = (completed: string): TrainingRecord => (c === cMedical ? medical(completed) : { trainingId: c.id, completed, expires: expiryFor(c, completed), issuedBy: "Check airman J. Reyes" });
+        const rec = make(done);
+        // The one before it, so the past year is covered too.
+        const before = format(addMonths(new Date(`${rec.completed}T00:00`), 1 - c.validMonths), "yyyy-MM-dd");
+        p.training.push({ ...make(before), number: rec.number }, rec);
+        const next = dayAt(new Date(`${rec.expires}T00:00`).getTime(), -14);
+        if (!late && next < windowTo) p.training.push(make(iso(next)));
+      }
+    } else {
+      p.training.push({ trainingId: cMechanic.id, completed: iso(dayAt(t0, -500 - i * 97)), expires: null, number: num(), issuedBy: "FAA", grade: "Airframe and powerplant" });
+      // The hazmat card is renewed by the fuel and hazmat course: one record for each time they did it.
+      for (const r of p.training.filter((x) => x.trainingId === tFuel.id)) p.training.push({ trainingId: cHazmat.id, completed: r.completed, expires: expiryFor(cHazmat, r.completed), renewedFrom: tFuel.id });
+    }
+  });
+
   const trainedFor = (p: Person, m: Booking, a: number, b: number) =>
     m.requiredTrainingIds.every((id) => {
       const t = trainings.find((x) => x.id === id)!;
@@ -339,7 +437,7 @@ export function sampleData(settings = defaultSettings()): AppData {
     for (const role of ["Pilot", "Maintainer"] as const) {
       const need = role === "Pilot" ? m.pilotsNeeded : m.maintainersNeeded;
       const pick = people
-        .filter((p) => p.role === role && types.some((t) => p.quals.includes(t)) && trainedFor(p, m, h, he) && free(p, h, he) && onRotationFor(p, h, he))
+        .filter((p) => p.role === role && (!types.length || types.some((t) => p.quals.includes(t))) && trainedFor(p, m, h, he) && free(p, h, he) && onRotationFor(p, h, he))
         .sort((x, y) => Number(regulars.includes(y)) - Number(regulars.includes(x)) || worked.get(x.id)! - worked.get(y.id)! || x.name.localeCompare(y.name))
         .slice(0, need);
       for (const p of pick) {
@@ -365,5 +463,17 @@ export function sampleData(settings = defaultSettings()): AppData {
     a.hoursPerDay = 1.2;
   }
 
-  return { version: 1, aircraft, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, ignored: [], settings };
+  // ---- status and logs: one tail AOG waiting on a part, one in for planned work, and a few log lines.
+  const ymd = (n: number) => iso(dayAt(t0, n));
+  let logId = 0;
+  const log = (a: Aircraft, on: number, kind: "status" | "note", text: string) => (a.log = [...(a.log ?? []), { id: `lg-${++logId}`, on: ymd(on), kind, text }]);
+  for (const a of aircraft) log(a, -360, "status", "Added to the fleet, airworthy.");
+  Object.assign(n352, { status: "AOG", statusSince: ymd(-3), backOn: ymd(12) });
+  log(n352, -3, "status", `Airworthy → AOG. Expected back ${format(dayAt(t0, 12), "MMM d, yyyy")}. Main rotor damper leaking, part on order.`);
+  Object.assign(n408, { status: "In maintenance", statusSince: ymd(-1), backOn: ymd(5) });
+  log(n408, -1, "status", `Airworthy → In maintenance. Expected back ${format(dayAt(t0, 5), "MMM d, yyyy")}. Avionics upgrade.`);
+  log(n412, -40, "note", "Bird strike on approach to Anchorage. Inspected, no damage.");
+  log(n139, -12, "note", "Hoist cable replaced, load tested.");
+
+  return { version: 1, aircraft, aircraftTypes, equipment, workTypes, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, ignored: [], settings };
 }

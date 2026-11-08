@@ -6,7 +6,21 @@ export type ID = string;
  */
 export type When = string;
 
-export type AircraftStatus = "Ready" | "In maintenance" | "Grounded" | "Retired";
+/**
+ * Airworthy: free to fly. In maintenance: down for planned work. AOG (aircraft on ground): down for something
+ * unplanned, like a part on order. Both keep it off missions from `statusSince` until `backOn`.
+ * Retired: out of the fleet for good.
+ */
+export type AircraftStatus = "Airworthy" | "In maintenance" | "AOG" | "Retired";
+
+/** One line in a tail's log: a status change (written when it's saved) or a note someone added. */
+export interface AircraftLogEntry {
+  id: ID;
+  /** The day it happened ("2026-11-04"). */
+  on: string;
+  kind: "status" | "note";
+  text: string;
+}
 
 export interface Aircraft {
   id: ID;
@@ -14,6 +28,12 @@ export interface Aircraft {
   type: string;          // "Bell 412"
   base: string;          // "North pad"
   status: AircraftStatus;
+  /** The day it went into maintenance or AOG ("2026-11-04"). Empty: as long as anyone knows. */
+  statusSince?: string | null;
+  /** The day it's expected to fly again, when it's down. Empty: not known yet. */
+  backOn?: string | null;
+  /** What happened to it, newest last. */
+  log?: AircraftLogEntry[];
   seats: number;         // pilot seats in the cockpit (1 or 2)
   notes: string;
   /** The last flight-hours reading: total hours on the airframe as of a day ("2026-11-04"). */
@@ -22,6 +42,29 @@ export interface Aircraft {
   hoursPerDay?: number | null;
   /** What a flight hour costs (fuel, parts, reserves), for cost per mission. */
   hourCost?: number | null;
+  /** Equipment this tail has or can be fitted with (a hoist, a bucket), from the equipment list. */
+  equipmentIds?: ID[];
+}
+
+/**
+ * A kind of aircraft ("Bell 412"), set up once under Types & equipment and picked on each tail. Tails,
+ * crew ratings and maintenance programs refer to it by name, so renaming a type renames it everywhere.
+ */
+export interface AircraftType {
+  id: ID;
+  name: string;
+  /** Pilot seats a new tail of this type starts with. */
+  seats: number;
+  /** Equipment that can go on this type; a tail of it picks from these. Empty = any equipment. */
+  equipmentIds: ID[];
+  notes: string;
+}
+
+/** Something an aircraft carries for a kind of work: a rescue hoist, a fire bucket, a stretcher kit. */
+export interface Equipment {
+  id: ID;
+  name: string;
+  notes: string;
 }
 
 export type Role = "Pilot" | "Maintainer";
@@ -45,7 +88,23 @@ export interface Training {
   validMonths: number;
   appliesTo: Role | "Both";
   notes: string;
+  /** What it is: a course, a certificate or licence, a medical, or a check ride. Missing: a course. */
+  kind?: "course" | "certificate" | "medical" | "check";
+  /** Everyone it applies to needs it, whatever job they're on (a pilot certificate, a medical). */
+  everyone?: boolean;
+  /** It runs out at the end of the month it falls due in, not on the day (medicals, check rides). */
+  endOfMonth?: boolean;
+  /** Courses that renew it: recording one of them records this too, on the same day. */
+  renewedBy?: ID[];
+  /**
+   * For a medical: the privileges the work needs, which sets how long each class lasts (src/certificates.ts).
+   * Missing: commercial. "atp" is supported for airline transport privileges.
+   */
+  privileges?: Privileges;
 }
+
+/** Pilot privileges a medical has to cover: airline transport (first class), commercial (second), private (third). */
+export type Privileges = "atp" | "commercial" | "private";
 
 /** One person's completed training. Dates are "2026-03-14". */
 export interface TrainingRecord {
@@ -59,6 +118,18 @@ export interface TrainingRecord {
    */
   extendedTo?: string | null;
   extensionNote?: string;
+  /** For a certificate: its number, who issued it, and its class or ratings ("Commercial, rotorcraft-helicopter"). */
+  number?: string;
+  issuedBy?: string;
+  grade?: string;
+  /** Scans of it (the files are kept in this device's file storage, like a job's documents). */
+  documents?: MissionDocument[];
+  /** Recorded because a course that renews it was recorded. */
+  renewedFrom?: ID;
+  /** For a medical: its class (1, 2 or 3), limitations on it, and a special issuance's own end date. */
+  medicalClass?: 1 | 2 | 3;
+  limitations?: string;
+  specialIssuanceUntil?: string | null;
 }
 
 /** The day a record really runs out: its extension if it has one and it's later, else its own date. */
@@ -80,6 +151,8 @@ export interface Person {
   limits?: Limits;
   /** What a day on duty costs (pay, per diem), for cost per mission. */
   dayRate?: number | null;
+  /** Date of birth ("1984-06-02"), for how long a medical lasts (it depends on age at the exam). */
+  born?: string | null;
   /** The last day they flew each type outside this plan ("Bell 412" → "2026-10-02"), for currency. */
   flew?: Record<string, string>;
   base: string;
@@ -88,7 +161,14 @@ export interface Person {
 }
 
 /** How a slot is filled on the schedule, on top of its color (so colors aren't the only difference). */
-export type Pattern = "solid" | "stripes" | "dots" | "grid" | "dashes" | "zigzag";
+export type Pattern = "solid" | "stripes" | "dots" | "grid" | "dashes" | "zigzag" | "crosshatch" | "pinstripes" | "checks" | "rings";
+
+/** A line of business ("Fire", "Medevac") with a base color; each job in it is a shade of that color. */
+export interface WorkType {
+  id: ID;
+  name: string;
+  color: string;
+}
 
 export type MissionStatus = "Planned" | "Confirmed" | "Flying" | "Done" | "Cancelled";
 
@@ -99,11 +179,22 @@ export type MissionStatus = "Planned" | "Confirmed" | "Flying" | "Done" | "Cance
 export interface Mission {
   id: ID;
   name: string;
-  /** Who to call at the customer. */
+  /** Who to call at the customer (a name). */
   contact: string;
+  /** The customer contact's phone and email. */
+  phone?: string;
+  email?: string;
+  /** Flying (aircraft and pilots) or ground duty: hangar on-call, standby, anything without an aircraft. */
+  kind?: "flight" | "ground";
+  /** Files about this customer's work (contracts, task orders), kept on this device. */
+  documents?: MissionDocument[];
   location: string;
   /** Training everyone on this mission needs (NVG, mountain flying…). */
   requiredTrainingIds: ID[];
+  /** Equipment every aircraft on this mission needs (a hoist for rescue, a bucket for fire). */
+  requiredEquipmentIds?: ID[];
+  /** Its type of work (line of business), whose color it's a shade of. Empty: none. */
+  workTypeId?: ID | null;
   /** How its slots look on the schedule. */
   color: string;
   pattern: Pattern;
@@ -116,6 +207,30 @@ export interface Mission {
   ruleSetId?: ID | null;
 }
 
+/** A file attached to a mission. The file itself is kept in the browser's file storage (src/docs.ts), by `id`. */
+export interface MissionDocument {
+  id: ID;
+  name: string;
+  /** Its type ("application/pdf"). */
+  type: string;
+  size: number;
+  /** The day it was added ("2026-11-08"). */
+  added: string;
+}
+
+/**
+ * One aircraft a season needs: its type, the tail once it's picked, and its own dates when it doesn't
+ * fly the whole season (empty = the season's). `Season.aircraftIds` lists the picked tails.
+ */
+export interface AircraftSlot {
+  id: ID;
+  /** The type it needs ("Bell 412"). Empty: any type. */
+  type: string;
+  aircraftId: ID | null;
+  start?: When | null;
+  end?: When | null;
+}
+
 /**
  * One stretch of dates a mission is flown: a fire season, a year of medevac standby. It can have
  * several aircraft, picked when they're known. Crew numbers are for the whole job at any time.
@@ -126,6 +241,8 @@ export interface Season {
   start: When;
   end: When;
   aircraftIds: ID[];
+  /** The aircraft it needs, one line each (type, tail, dates). Missing: one line per tail in `aircraftIds`. */
+  slots?: AircraftSlot[];
   /** Pilots working the job at every moment (across all its aircraft). */
   pilotsNeeded: number;
   /** Maintainers on the job at once, when they're needed. 0 = none. */
@@ -156,7 +273,7 @@ export interface MaintainerNeed {
  * A season together with its mission's details, which is what the schedule, the fleet and the checks
  * work with (see `bookings` in src/bookings.ts). Its `id` is the season's.
  */
-export type Booking = Season & Pick<Mission, "name" | "contact" | "location" | "requiredTrainingIds" | "color" | "pattern">;
+export type Booking = Season & Pick<Mission, "name" | "contact" | "location" | "requiredTrainingIds" | "requiredEquipmentIds" | "color" | "pattern" | "kind">;
 
 /** One person covering part of a season. Pilots rotate by adding several of these. */
 export interface Shift {
@@ -280,6 +397,8 @@ export interface Settings {
   hiddenPages: Page[];
   /** What a new season starts with when its mission has none before it. */
   seasonDefaults: { pilots: number; maintainers: number; pilotRotation: Rotation | null; dutyHours: number | null };
+  /** Show costs and charges (day rates, cost per flight hour, margins). Off until someone needs them. */
+  costs: boolean;
   /** Shown before amounts ($, €, £, kr). */
   currencySymbol: string;
   /** Maintenance programs and flight hours (off for anyone who tracks them in another system). */
@@ -297,6 +416,12 @@ export interface Settings {
 export interface AppData {
   version: 1;
   aircraft: Aircraft[];
+  /** Kinds of aircraft, picked on each tail. */
+  aircraftTypes: AircraftType[];
+  /** Equipment aircraft can carry and missions can need. */
+  equipment: Equipment[];
+  /** Types of work (lines of business), each a color its jobs are shades of. */
+  workTypes: WorkType[];
   trainings: Training[];
   people: Person[];
   missions: Mission[];
@@ -311,4 +436,4 @@ export interface AppData {
   settings: Settings;
 }
 
-export type Page = "overview" | "schedule" | "missions" | "aircraft" | "people" | "maintenance" | "training" | "inspections" | "balance" | "planner" | "reports" | "settings" | "guide";
+export type Page = "overview" | "schedule" | "missions" | "aircraft" | "types" | "people" | "maintenance" | "training" | "inspections" | "balance" | "planner" | "reports" | "settings" | "guide";

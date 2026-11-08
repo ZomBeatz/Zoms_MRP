@@ -1,3 +1,5 @@
+import { openSlots } from "../slots";
+import { seasonTails } from "../rotation";
 import { useState } from "react";
 import { ClipboardList, Plus } from "lucide-react";
 import { byId, useStore } from "../store";
@@ -16,6 +18,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
   const { data, open } = useStore();
   const [show, setShow] = useState<"active" | "all">("active");
   const [q, setQ] = useState("");
+  const [kind, setKind] = useState("");
   const aircraft = byId(data.aircraft);
   const { header, sorted } = useSort<"name" | "contact" | "season" | "crewed" | "crew">("season");
   const now = Date.now();
@@ -31,6 +34,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
       return { m, seasons, current, active, crew, cov: current && active ? missionCoverage(data, current).covered : 1 };
     })
     .filter((r) => show === "all" || r.active || r.seasons.length === 0)
+    .filter((r) => !kind || r.m.workTypeId === kind)
     .filter((r) => !q || `${r.m.name} ${r.m.contact} ${r.m.location}`.toLowerCase().includes(q.toLowerCase()));
   const list = sorted(rows, (r, k) =>
     k === "name" ? r.m.name : k === "contact" ? r.m.contact : k === "season" ? (r.current ? (r.active ? ms(r.current.start) : Infinity) : Infinity) : k === "crewed" ? r.cov : r.crew);
@@ -38,23 +42,33 @@ export function Missions({ issues }: { issues: Issue[] }) {
   return (
     <>
       <div className="page-head">
-        <h1>Missions</h1>
-        <input placeholder="Filter missions" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 200 }} />
-        <button className="btn primary" onClick={() => open("mission", "new")}><Plus size={16} /> New mission…</button>
+        <h1>Jobs</h1>
+        <input placeholder="Filter jobs" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 200 }} />
+        <button className="btn primary" onClick={() => open("mission", "new")}><Plus size={16} /> New job…</button>
       </div>
       <div className="seg" style={{ marginBottom: 14 }}>
         <button className={show === "active" ? "active" : ""} onClick={() => setShow("active")}>Running or coming up</button>
         <button className={show === "all" ? "active" : ""} onClick={() => setShow("all")}>All <span className="chip">{data.missions.length}</span></button>
       </div>
+      {data.workTypes.length > 0 && (
+        <div className="row gap-sm wrap" style={{ marginBottom: 14 }}>
+          <button className={`chip pick ${kind === "" ? "on" : ""}`} onClick={() => setKind("")}>Every type of work</button>
+          {data.workTypes.map((t) => (
+            <button key={t.id} className={`chip pick ${kind === t.id ? "on" : ""}`} onClick={() => setKind(kind === t.id ? "" : t.id)}>
+              <span className="swatch" style={{ background: t.color, width: 10, height: 10 }} />{t.name || "Unnamed"}
+            </button>
+          ))}
+        </div>
+      )}
       {list.length === 0 ? (
-        <Empty icon={<ClipboardList size={28} />} text={data.missions.length ? "No missions match." : "Each customer's work is a mission, with a season for each stretch of dates."}
-          action={!data.missions.length && <button className="btn primary" onClick={() => open("mission", "new")}>New mission…</button>} />
+        <Empty icon={<ClipboardList size={28} />} text={data.missions.length ? "No jobs match." : "Each customer's work is a job, with a season for each stretch of dates."}
+          action={!data.missions.length && <button className="btn primary" onClick={() => open("mission", "new")}>New job…</button>} />
       ) : (
         <>
           <div className="table-wrap">
             <table className="table">
               <thead>
-                <tr>{header("name", "Mission")}{header("contact", "Contact")}{header("season", "Now or next")}<th>Aircraft</th>{header("crewed", "Crewed", true)}{header("crew", "Crew", true)}<th className="r">Seasons</th></tr>
+                <tr>{header("name", "Job")}{header("contact", "Contact")}{header("season", "Now or next")}<th>Aircraft</th>{header("crewed", "Crewed", true)}{header("crew", "Crew", true)}<th className="r">Seasons</th></tr>
               </thead>
               <tbody>
                 {list.map(({ m, seasons, current, active, crew, cov }) => {
@@ -62,7 +76,16 @@ export function Missions({ issues }: { issues: Issue[] }) {
                   return (
                     <tr key={m.id} onClick={() => open("mission", m.id)}>
                       <td className="name"><span className="row gap-sm"><span className="swatch" style={slotStyle(missionLook(m))} />{m.name}</span></td>
-                      <td>{m.contact || <span className="muted">None</span>}</td>
+                      <td>
+                        {m.contact || (!m.phone && !m.email) ? <div>{m.contact || <span className="muted">None</span>}</div> : null}
+                        {(m.phone || m.email) && (
+                          <div className="small" onClick={(e) => e.stopPropagation()}>
+                            {m.phone && <a href={`tel:${m.phone.replace(/[^\d+]/g, "")}`}>{m.phone}</a>}
+                            {m.phone && m.email && " · "}
+                            {m.email && <a href={`mailto:${m.email.trim()}`}>{m.email}</a>}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         {current ? (
                           <span className="row gap-sm wrap">
@@ -72,7 +95,12 @@ export function Missions({ issues }: { issues: Issue[] }) {
                           </span>
                         ) : <span className="muted">No seasons yet</span>}
                       </td>
-                      <td>{tails.length ? tails.map((x) => <span key={x.id} style={{ marginRight: 8 }}><b>{x.tail}</b> <span className="muted small">{x.type}</span></span>) : current ? <span className="pill warn">No aircraft</span> : null}</td>
+                      <td>{m.kind === "ground" ? <span className="pill">Ground duty</span>
+                        : <>
+                          {tails.map((x) => <span key={x.id} style={{ marginRight: 8 }}><b>{x.tail}</b> <span className="muted small">{x.type}</span></span>)}
+                          {current && openSlots(data, current).length > 0 && <span className="pill warn">{seasonTails(data, { aircraftIds: [], slots: current.slots })}</span>}
+                          {current && !tails.length && !openSlots(data, current).length && <span className="pill warn">No aircraft</span>}
+                        </>}</td>
                       <td className="r">
                         {!active ? <span className="muted">Not running</span>
                           : problems.has(current!.id) && cov === 1 ? <span className="pill danger">Conflict</span>

@@ -8,7 +8,7 @@ const d = (n: number) => `2030-11-${String(n).padStart(2, "0")}T00:00`;
 
 function plan() {
   const data = emptyData();
-  data.aircraft = [{ id: "a", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "", hourCost: 1000, hoursPerDay: 2 }];
+  data.aircraft = [{ id: "a", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "", hourCost: 1000, hoursPerDay: 2 }];
   data.missions = [{ id: "m", name: "Fire", contact: "", location: "", requiredTrainingIds: [], color: "#c2410c", pattern: "solid", notes: "", dayCharge: 9000 }];
   data.seasons = [{ id: "s", missionId: "m", start: d(1), end: d(11), aircraftIds: ["a"], pilotsNeeded: 1, maintainersNeeded: 0, pilotRotation: null, maintainerRotation: null, status: "Confirmed", notes: "" }];
   data.people = [{ id: "p", name: "Ann", role: "Pilot", quals: ["Bell 412"], training: [], missionIds: [], rotation: null, base: "", phone: "", notes: "", dayRate: 800 }];

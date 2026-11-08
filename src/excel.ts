@@ -61,7 +61,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
         const tally = new Map<string, { n: number; label: string; color: string }>();
         for (const u of uses) {
           const key = u.kind === "mission" ? u.mission.missionId : u.kind;
-          const label = u.kind === "mission" ? u.mission.name : u.kind === "maintenance" ? "Maintenance" : u.kind === "down" ? "Grounded" : "Free";
+          const label = u.kind === "mission" ? u.mission.name : u.kind === "maintenance" ? "Maintenance" : u.kind === "down" ? u.status : "Free";
           const color = u.kind === "mission" ? u.mission.color : u.kind === "maintenance" ? "#7a5a33" : u.kind === "down" ? "#5b6375" : "#dcfce7";
           tally.set(key, { n: (tally.get(key)?.n ?? 0) + 1, label, color });
         }
@@ -80,7 +80,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
   {
     const ws = sheet("Fleet use", [
       { header: "Tail", key: "tail", width: 11 }, { header: "Type", key: "type", width: 11 }, { header: "Base", key: "base", width: 14 },
-      { header: "Status", key: "status", width: 14 }, { header: "Mission days", key: "mission", width: 13 }, { header: "Maintenance days", key: "maint", width: 17 },
+      { header: "Status", key: "status", width: 14 }, { header: "Job days", key: "mission", width: 13 }, { header: "Maintenance days", key: "maint", width: 17 },
       { header: "Free days", key: "free", width: 11 }, { header: "Booked", key: "use", width: 9, pct: true }, { header: "Next free from", key: "nextFree", width: 15, date: true },
     ]);
     for (const t of fleetUse(data, t0, dayAt(t0, 90))) {
@@ -94,7 +94,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
   // ---- Seasons: every mission's dates, aircraft and how well each is crewed.
   {
     const ws = sheet("Seasons", [
-      { header: "Mission", key: "name", width: 30 }, { header: "Contact", key: "contact", width: 30 }, { header: "First day", key: "start", width: 13, date: true },
+      { header: "Job", key: "name", width: 30 }, { header: "Contact", key: "contact", width: 30 }, { header: "First day", key: "start", width: 13, date: true },
       { header: "Last day", key: "end", width: 13, date: true }, { header: "Days", key: "days", width: 7 }, { header: "Aircraft", key: "tail", width: 11 },
       { header: "Status", key: "status", width: 11 }, { header: "Pilots on board", key: "pilots", width: 15 }, { header: "Fully crewed", key: "crewed", width: 13, pct: true },
     ]);
@@ -111,7 +111,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
   // ---- Crew roster: every shift, earliest first.
   {
     const ws = sheet("Crew roster", [
-      { header: "Person", key: "person", width: 20 }, { header: "Role", key: "role", width: 11 }, { header: "Mission", key: "mission", width: 30 },
+      { header: "Person", key: "person", width: 20 }, { header: "Role", key: "role", width: 11 }, { header: "Job", key: "mission", width: 30 },
       { header: "Aircraft", key: "tail", width: 11 }, { header: "First day", key: "start", width: 13, date: true }, { header: "Last day", key: "end", width: 13, date: true },
       { header: "Days", key: "days", width: 7 },
     ]);
@@ -126,8 +126,8 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
 
   // ---- Training: what each person needs for the missions they work, and where they stand.
   {
-    const ws = sheet("Training", [
-      { header: "Person", key: "person", width: 20 }, { header: "Role", key: "role", width: 11 }, { header: "Training", key: "training", width: 28 },
+    const ws = sheet("Qualifications", [
+      { header: "Person", key: "person", width: 20 }, { header: "Role", key: "role", width: 11 }, { header: "Qualifications", key: "training", width: 28 },
       { header: "Needed for", key: "for", width: 40 }, { header: "Runs out", key: "expires", width: 13, date: true }, { header: "Standing", key: "standing", width: 14 },
     ]);
     const soon = addMonths(t0, 1).getTime();
@@ -137,7 +137,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
         if (!t) continue;
         const st = trainingStatus(p, tid, t0, t0 + 1);
         const standing = st.state === "ok" ? (st.expires && ms(`${st.expires}T00:00`) < soon ? "Runs out soon" : "Current") : st.state === "missing" ? "Not done" : "Ran out";
-        const row = ws.addRow({ person: p.name, role: p.role, training: t.name, for: missions.map((m) => m.name).join(", "), expires: st.expires ? new Date(`${st.expires}T00:00`) : null, standing });
+        const row = ws.addRow({ person: p.name, role: p.role, training: t.name, for: missions.map((m) => m.name).join(", ") || `Every ${p.role.toLowerCase()}`, expires: st.expires ? new Date(`${st.expires}T00:00`) : null, standing });
         const tone = standing === "Current" ? "#dcfce7" : standing === "Runs out soon" ? "#fef3c7" : "#fee2e2";
         row.getCell(6).fill = fill(tone);
       }
