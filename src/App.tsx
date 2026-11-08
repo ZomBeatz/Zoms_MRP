@@ -112,11 +112,7 @@ export default function App() {
   useEffect(() => {
     if (!started) return;
     const d = useStore.getState();
-    const keep = new Set([
-      ...d.data.missions.flatMap((m) => (m.documents ?? []).map((x) => x.id)),
-      ...d.data.people.flatMap((p) => p.training.flatMap((r) => (r.documents ?? []).map((x) => x.id))),
-    ]);
-    void import("./docs").then((m) => m.sweepFiles(d.demo, keep)).catch(() => {});
+    void import("./docs").then((m) => m.sweepFiles(d.demo, new Set(m.listedFiles(d.data)))).catch(() => {});
     // Only once, as the app opens: switching to or from the demo swaps the plan, and a sweep then could
     // run with one plan's list against the other's files.
   }, [started]);

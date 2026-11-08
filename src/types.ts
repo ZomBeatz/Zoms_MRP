@@ -96,7 +96,15 @@ export interface Training {
   endOfMonth?: boolean;
   /** Courses that renew it: recording one of them records this too, on the same day. */
   renewedBy?: ID[];
+  /**
+   * For a medical: the privileges the work needs, which sets how long each class lasts (src/certificates.ts).
+   * Missing: commercial. "atp" is supported for airline transport privileges.
+   */
+  privileges?: Privileges;
 }
+
+/** Pilot privileges a medical has to cover: airline transport (first class), commercial (second), private (third). */
+export type Privileges = "atp" | "commercial" | "private";
 
 /** One person's completed training. Dates are "2026-03-14". */
 export interface TrainingRecord {
@@ -118,6 +126,10 @@ export interface TrainingRecord {
   documents?: MissionDocument[];
   /** Recorded because a course that renews it was recorded. */
   renewedFrom?: ID;
+  /** For a medical: its class (1, 2 or 3), limitations on it, and a special issuance's own end date. */
+  medicalClass?: 1 | 2 | 3;
+  limitations?: string;
+  specialIssuanceUntil?: string | null;
 }
 
 /** The day a record really runs out: its extension if it has one and it's later, else its own date. */
@@ -139,6 +151,8 @@ export interface Person {
   limits?: Limits;
   /** What a day on duty costs (pay, per diem), for cost per mission. */
   dayRate?: number | null;
+  /** Date of birth ("1984-06-02"), for how long a medical lasts (it depends on age at the exam). */
+  born?: string | null;
   /** The last day they flew each type outside this plan ("Bell 412" → "2026-10-02"), for currency. */
   flew?: Record<string, string>;
   base: string;

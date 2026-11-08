@@ -16,6 +16,7 @@ import { ExcelCopySettings } from "./ExcelCopySettings";
 import { FlightLimitsEditor } from "./Planner";
 import { uid } from "../time";
 import { SWATCHES, reshade, shadesOf } from "../look";
+import { listedFiles, packFiles, unpackFiles } from "../docs";
 import { SHORTCUTS } from "./Guide";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
@@ -55,14 +56,19 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
     }
   })();
 
+  // A backup is the plan with its attached files (job documents, certificate scans) inside, so one file brings back everything.
   const backup = async () => {
-    const where = await saveFile(`zoms-mrp-backup-${format(new Date(), "yyyy-MM-dd")}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-    showToast("Saved to Downloads", where ? { label: "Show", run: () => showInFolder(where) } : undefined);
+    const files = await packFiles(demo, listedFiles(data)).catch(() => ({}));
+    const where = await saveFile(`zoms-mrp-backup-${format(new Date(), "yyyy-MM-dd")}.json`, new Blob([JSON.stringify({ ...data, files }, null, 2)], { type: "application/json" }));
+    const n = Object.keys(files).length;
+    showToast(`Saved to Downloads${n ? `, with ${n === 1 ? "1 attached file" : `${n} attached files`}` : ""}`, where ? { label: "Show", run: () => showInFolder(where) } : undefined);
   };
   const restore = async (f: File) => {
     try {
       const raw = JSON.parse(await f.text());
       if (!Array.isArray(raw.missions) || !Array.isArray(raw.aircraft)) throw new Error();
+      if (raw.files && typeof raw.files === "object") await unpackFiles(demo, raw.files).catch(() => showToast("Some attached files couldn't be put back (not enough room on this device)."));
+      delete raw.files;
       const d = migrate(raw); // backups from older versions open too
       change(() => ({ ...d, settings: restoredSettings(data.settings, d.settings) }), `Restored “${f.name}”`);
     } catch {
@@ -265,8 +271,8 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               : isServerBuild
                 ? "The team's plan is on the server, which keeps a copy every day. You can also save one here."
                 : isDesktopApp
-                  ? "Everything is saved on this computer. Save a backup now and then."
-                  : "Everything is saved on this computer, in this browser. Save a backup now and then."}
+                  ? "Everything is saved on this computer. Save a backup now and then; it holds attached files too."
+                  : "Everything is saved on this computer, in this browser. Save a backup now and then; it holds attached files too."}
           </p>
           {isDesktopApp && !demo && folder && (
             <p className="small muted" style={{ marginTop: 0, wordBreak: "break-all" }}>Saved in <code>{folder}</code></p>
