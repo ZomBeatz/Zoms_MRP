@@ -25,7 +25,8 @@ jobs:
             args: "--bundles nsis"
           - platform: macos-latest
             name: macos
-            args: "--target universal-apple-darwin --bundles dmg"
+            # The .app bundle as well: the updater installs the Mac app from its .app.tar.gz.
+            args: "--target universal-apple-darwin --bundles app,dmg"
           - platform: ubuntu-22.04
             name: linux
             args: "--bundles deb,rpm,appimage"
@@ -112,8 +113,16 @@ jobs:
             if (sig !== pub) { console.log("::error::TAURI_UPDATER_PUBKEY is not the public half of TAURI_SIGNING_PRIVATE_KEY (README, Updates)."); process.exit(1); }
             console.log(`::notice::Updater key works (key ID ${pub}).`);
           ' "$RUNNER_TEMP/key-check.txt.sig"
-          node -e 'require("fs").writeFileSync("src-tauri/tauri.updater.conf.json", JSON.stringify({ bundle: { createUpdaterArtifacts: true }, plugins: { updater: { pubkey: process.env.PUBKEY.trim() } } }))'
-          echo "UPDATER_ARGS=--config src-tauri/tauri.updater.conf.json" >> "$GITHUB_ENV"
+          # Into tauri.conf.json itself (on this runner only), not a --config file: tauri-action reads that file
+          # to know which update files to look for and to write latest.json, and it can't see a --config file.
+          # With a separate file it looked for the old .tar.gz files, found no signature, and skipped
+          # latest.json, so installed apps found nothing to update to (0.2.5 and 0.2.6).
+          node -e '
+            const f = "src-tauri/tauri.conf.json", c = JSON.parse(require("fs").readFileSync(f, "utf8"));
+            c.bundle.createUpdaterArtifacts = true;
+            c.plugins.updater.pubkey = process.env.PUBKEY.trim();
+            require("fs").writeFileSync(f, JSON.stringify(c, null, 2));
+          '
 
       # Running again for the same tag (to sign the Mac app, say) replaces this system's files in the
       # draft release instead of failing because they're already there.
@@ -140,7 +149,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          args: ${{ matrix.args }} ${{ env.UPDATER_ARGS }}
+          args: ${{ matrix.args }}
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: "Zom's MRP ${{ github.ref_name }}"
           releaseBody: "Installers for Windows, macOS (Apple silicon and Intel, macOS 10.15 or later) and Linux. The server is the Docker image ghcr.io/zombeatz/zoms-mrp-server; see the README."
