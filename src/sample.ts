@@ -1,6 +1,7 @@
 import { addMonths, format } from "date-fns";
 import type { Aircraft, AircraftType, AppData, Booking, Equipment, MaintenanceJob, Mission, Pattern, Person, ProgramItem, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
 import { booking } from "./bookings";
+import { shadeAt } from "./look";
 import { onRotationFor } from "./rotation";
 import { DAY, dayAt, overlaps, toWhen, today } from "./time";
 
@@ -30,6 +31,7 @@ export const emptyData = (): AppData => ({
   aircraft: [],
   aircraftTypes: [],
   equipment: [],
+  workTypes: [],
   trainings: [],
   people: [],
   missions: [],
@@ -263,6 +265,21 @@ export function sampleData(settings = defaultSettings()): AppData {
         contractOf.set(season.id, c);
       }
   }
+  // ---- types of work: each customer's job is a shade of its line of business's color.
+  const kinds: [string, string, string[]][] = [
+    ["Fire", "#c2410c", ["Interior Fire Service"]],
+    ["Medevac and SAR", "#be123c", ["Mat-Su Medevac", "YK Delta Health", "Nome Regional Medevac", "Sitka Search and Rescue support"]],
+    ["Energy and utilities", "#0f766e", ["North Slope Energy", "Prudhoe pipeline patrol", "Kenai Electric line patrol", "Chugach Power line patrol"]],
+    ["Survey and research", "#a16207", ["Alaska Range Survey", "Denali Park research", "Tanana Wildlife Survey", "Copper River seismic survey", "Bristol Bay Fisheries Survey", "Kodiak Fisheries Patrol"]],
+    ["Tours and charters", "#2563eb", ["Juneau Icefield Tours", "Southeast Avalanche Program", "Bristol Bay hunting charters", "Kachemak Bay film shoot"]],
+    ["Ground duty", "#475569", ["State hangar on-call"]],
+  ];
+  const workTypes = kinds.map(([name, color], i) => ({ id: `wt-${i + 1}`, name, color }));
+  kinds.forEach(([, color, names], i) => names.forEach((n, k) => {
+    const m = missionList.find((x) => x.name === n);
+    if (m) Object.assign(m, { workTypeId: workTypes[i].id, color: shadeAt(color, k) });
+  }));
+
   // The coming fire season wants a third aircraft, a Bell 412 for July and August only, its tail not picked yet.
   for (const x of seasons.filter((y) => missionList.find((m) => m.id === y.missionId)?.name === "Interior Fire Service" && y.status === "Planned")) {
     const y0 = new Date(x.start).getFullYear();
@@ -414,5 +431,5 @@ export function sampleData(settings = defaultSettings()): AppData {
   log(n412, -40, "note", "Bird strike on approach to Anchorage. Inspected, no damage.");
   log(n139, -12, "note", "Hoist cable replaced, load tested.");
 
-  return { version: 1, aircraft, aircraftTypes, equipment, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, ignored: [], settings };
+  return { version: 1, aircraft, aircraftTypes, equipment, workTypes, trainings, people, missions: missionList, seasons, shifts, jobs, timeOff, programs, ignored: [], settings };
 }

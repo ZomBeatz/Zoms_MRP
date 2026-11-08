@@ -52,7 +52,7 @@ type Section = { heading?: string; rows: Row[] };
 
 const VIEWS: { id: Settings["scheduleGroup"]; label: string }[] = [
   { id: "aircraft", label: "Aircraft" },
-  { id: "missions", label: "Missions" },
+  { id: "missions", label: "Jobs" },
   { id: "people", label: "Crew" },
 ];
 
@@ -152,7 +152,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
       const role = data.people.find((p) => p.id === s.personId)?.role ?? "Pilot";
       const c = whoCanCover(r.data, role, ms(s.start), ms(s.end), seasonTypes(data, b), [s.id], m ? requiredTraining(data, m, role) : [], b.missionId).find((x) => x.person.id === t.target);
       if (!c || !c.ok) {
-        const why = !c ? `isn't a ${role.toLowerCase()}` : !c.qualified ? "isn't rated on the aircraft" : !c.trained ? "isn't current on the training" : !c.current ? "hasn't flown the type lately" : c.off ? "has time off then" : !c.onRotation ? "is off rotation then" : "is booked elsewhere then";
+        const why = !c ? `isn't a ${role.toLowerCase()}` : !c.qualified ? "isn't rated on the aircraft" : !c.trained ? "isn't current on the qualifications" : !c.current ? "hasn't flown the type lately" : c.off ? "has time off then" : !c.onRotation ? "is off rotation then" : "is booked elsewhere then";
         useStore.getState().showToast(`${who(t.target)} can't take it: ${who(t.target).split(" ")[0]} ${why}.`);
         return;
       }
@@ -189,7 +189,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
         data-person={r.personId}
         className={`g-lane ${r.sub ? "sub" : ""} ${trimming?.edge === "move" && trimming.engaged && trimming.target && trimming.target === r.personId ? "drop" : ""}`}
         style={{ height }}
-        title={r.addDefaults ? "Drag to move through time. Tap empty space to add a mission here." : "Drag to move through time."}
+        title={r.addDefaults ? "Drag to move through time. Tap empty space to add a job here." : "Drag to move through time."}
         onClick={(e) => {
           if (justDragged.current || !r.addDefaults || e.target !== e.currentTarget) return;
           const day = tl.dayAtX(e.clientX, e.currentTarget.getBoundingClientRect());
@@ -255,8 +255,8 @@ export function Schedule({ issues }: { issues: Issue[] }) {
       <div className="sched-bar">
         <TimelineControls tl={tl} />
         <span className="grow" />
-        <select value={missionId} onChange={(e) => setMissionId(e.target.value)} aria-label="Show one mission" style={{ maxWidth: 240 }}>
-          <option value="">All missions</option>
+        <select value={missionId} onChange={(e) => setMissionId(e.target.value)} aria-label="Show one job" style={{ maxWidth: 240 }}>
+          <option value="">All jobs</option>
           {[...data.missions].sort((a, b) => a.name.localeCompare(b.name)).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </div>
@@ -267,7 +267,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
           <TimeHead tl={tl} />
           {shown.length === 0 && (
             <div style={{ gridColumn: "1 / -1" }} className="empty">
-              <p>{missionId ? "Nothing for this mission in these dates." : emptyText(view)}</p>
+              <p>{missionId ? "Nothing for this job in these dates." : emptyText(view)}</p>
               {!missionId && <button className="btn primary" onClick={() => open(view === "aircraft" ? "aircraft" : view === "people" ? "person" : "mission", "new")}>{addText(view)}</button>}
             </div>
           )}
@@ -296,9 +296,9 @@ export function Schedule({ issues }: { issues: Issue[] }) {
 
 
 const emptyText = (v: Settings["scheduleGroup"]) =>
-  ({ missions: "No missions in these days.", aircraft: "No aircraft yet.", people: "No crew yet." })[v];
+  ({ missions: "No jobs in these days.", aircraft: "No aircraft yet.", people: "No crew yet." })[v];
 const addText = (v: Settings["scheduleGroup"]) =>
-  ({ missions: "New mission…", aircraft: "Add aircraft…", people: "Add a person…" })[v];
+  ({ missions: "New job…", aircraft: "Add aircraft…", people: "Add a person…" })[v];
 
 
 function Legend({ data, view }: { data: AppData; view: Settings["scheduleGroup"] }) {
@@ -506,7 +506,7 @@ function buildRows(
     return [
       ...seats,
       { heading: `On ${chosen.name}`, rows: onIt.sort(byRoleThenName).map(personRow) },
-      { heading: "Rated and current, not on this mission", rows: qualified.sort(byRoleThenName).map(personRow) },
+      { heading: "Rated and current, not on this job", rows: qualified.sort(byRoleThenName).map(personRow) },
     ];
   }
   return [

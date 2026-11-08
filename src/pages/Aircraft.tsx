@@ -113,7 +113,7 @@ export function AircraftPage() {
                               const what = open_ ? `from ${format(fa, "MMM d")} on` : since ? `until ${format(dayAt(fb, -1), "MMM d")}` : fmtDates(toWhen(fa), toWhen(fb));
                               return (
                                 <button key={`f${fa}`} className="slot free-run" style={{ left: `${pct(fa)}%`, width: `calc(${pct(fb) - pct(fa)}% - 2px)` }}
-                                  title={`${a.tail} is free ${what}. Tap to book a mission then.`}
+                                  title={`${a.tail} is free ${what}. Tap to book a job then.`}
                                   onClick={() => !tl.justDragged.current && open("season", "new", { aircraftIds: [a.id], start: toWhen(Math.max(fa, t0)), end: toWhen(fb > Math.max(fa, t0) && !open_ ? fb : dayAt(Math.max(fa, t0), 14)) })}>
                                   <span className="t">Free</span>
                                   <span className="s">{open_ ? `from ${fa === t0 ? "today" : format(fa, "MMM d")} on` : since ? `until ${format(dayAt(fb, -1), "MMM d")}` : `${plural(Math.round((fb - fa) / 86_400_000), "day")}${fa === t0 ? " from today" : `, ${format(fa, "MMM d")} to ${format(dayAt(fb, -1), "MMM d")}`}`}</span>
@@ -174,9 +174,9 @@ export function AircraftPage() {
             <span><span className="swatch" style={{ background: "color-mix(in srgb, var(--zb-warn) 22%, var(--zb-surface))", border: "1px dashed var(--zb-warn)" }} />Maintenance (grounded)</span>
             <span><span className="swatch" style={{ background: "var(--zb-surface-3)", border: "1px dashed var(--zb-text-2)" }} />Check (still flies)</span>
             <span><span className="swatch" style={{ background: "var(--zb-orange)", width: 3 }} />Today</span>
-            <span><span className="swatch" style={{ background: "color-mix(in srgb, var(--zb-danger) 22%, var(--zb-surface))", outline: "2px solid var(--zb-danger)" }} />Maintenance during a mission</span>
+            <span><span className="swatch" style={{ background: "color-mix(in srgb, var(--zb-danger) 22%, var(--zb-surface))", outline: "2px solid var(--zb-danger)" }} />Maintenance during a job</span>
             <span><span className="swatch" style={{ background: "repeating-linear-gradient(45deg, var(--zb-surface-3) 0 4px, var(--zb-surface) 4px 8px)" }} />In maintenance, AOG</span>
-            <span className="muted">Missions show in their own colors. Free windows count from today. Tap a free block to book it.</span>
+            <span className="muted">Jobs show in their own colors. Free windows count from today. Tap a free block to book it.</span>
           </div>
           </>}
           {retired.length > 0 && <p className="small muted">Retired: {retired.map((a) => a.tail).join(", ")}.</p>}
@@ -218,7 +218,7 @@ function FleetStatus() {
         <div className="tile"><div className="label">Airworthy</div><div className="value ok">{count("Airworthy")} <span className="muted small">of {live.length}</span></div></div>
         <div className="tile"><div className="label">In maintenance</div><div className={`value ${count("In maintenance") ? "warn" : ""}`}>{count("In maintenance")}</div></div>
         <div className="tile"><div className="label">AOG</div><div className={`value ${count("AOG") ? "danger" : ""}`}>{count("AOG")}</div></div>
-        <div className="tile"><div className="label">Flying a mission today</div><div className="value">{live.filter((a) => now.get(a.id)?.kind === "mission").length}</div></div>
+        <div className="tile"><div className="label">Flying a job today</div><div className="value">{live.filter((a) => now.get(a.id)?.kind === "mission").length}</div></div>
       </div>
       <div className="table-wrap">
         <table className="table">
@@ -255,7 +255,7 @@ function FleetStatus() {
           </button>
         ))}
       </div>
-      <p className="small muted">In maintenance and AOG keep a tail off every mission from the day it went down until it's expected back; missions booked on it then show under Needs attention. Tap a tail to change its status or read its log.</p>
+      <p className="small muted">In maintenance and AOG keep a tail off every job from the day it went down until it's expected back; jobs booked on it then show under Needs attention. Tap a tail to change its status or read its log.</p>
     </>
   );
 }

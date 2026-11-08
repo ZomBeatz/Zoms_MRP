@@ -142,7 +142,7 @@ export function findIssues(data: AppData): Issue[] {
   for (const m of missions) {
     const from = ms(m.start), to = ms(m.end);
     if (!(to > from)) {
-      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the mission and fix its times.", at: from, seasonId: m.id });
+      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the job and fix its times.", at: from, seasonId: m.id });
       continue;
     }
     const ground = m.kind === "ground";
@@ -238,7 +238,7 @@ export function findIssues(data: AppData): Issue[] {
       issues.push({ id: `offrot-${s.id}`, severity: "warn", title: `${p.name} is booked on their days off`, detail: `Shift on “${m.name}”, ${fmtRange(s.start, s.end)}. Their rotation is ${fmtRotation(p.rotation)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
     // Maintainers often start before the mission (pre-flight) and stay after; pilots fly inside it.
     if (p.role === "Pilot" && (ms(s.start) < ms(m.start) || ms(s.end) > ms(m.end)))
-      issues.push({ id: `outside-${s.id}`, severity: "warn", title: `${p.name}'s shift runs outside “${m.name}”`, detail: `The shift is ${fmtRange(s.start, s.end)}; the mission is ${fmtRange(m.start, m.end)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
+      issues.push({ id: `outside-${s.id}`, severity: "warn", title: `${p.name}'s shift runs outside “${m.name}”`, detail: `The shift is ${fmtRange(s.start, s.end)}; the job is ${fmtRange(m.start, m.end)}.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
     if (!(ms(s.end) > ms(s.start)))
       issues.push({ id: `stime-${s.id}`, severity: "danger", title: `${p.name}'s shift ends before it starts`, detail: `On “${m.name}”.`, at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id });
   }
@@ -248,7 +248,7 @@ export function findIssues(data: AppData): Issue[] {
     for (const pid of j.maintainerIds) {
       const p = people.get(pid);
       if (p && ac && !p.quals.includes(ac.type))
-        issues.push({ id: `jqual-${j.id}-${pid}`, severity: "warn", title: `${p.name} isn't qualified on the ${ac.type}`, detail: `Job “${j.title}” on ${ac.tail}.`, at: ms(j.start), personId: p.id, jobId: j.id, aircraftId: ac.id });
+        issues.push({ id: `jqual-${j.id}-${pid}`, severity: "warn", title: `${p.name} isn't qualified on the ${ac.type}`, detail: `Work order “${j.title}” on ${ac.tail}.`, at: ms(j.start), personId: p.id, jobId: j.id, aircraftId: ac.id });
     }
   }
 
@@ -327,7 +327,7 @@ export function findIssues(data: AppData): Issue[] {
       issues.push({
         id: `train-${s.id}-${tid}`, severity: "danger",
         title: st.state === "missing" ? `${p.name} hasn't done ${t.name}` : st.state === "expired" ? `${p.name}'s ${t.name} has run out` : `${p.name}'s ${t.name} runs out during “${m.name}”`,
-        detail: `“${m.name}” needs it.${st.expires ? ` It ${st.state === "expired" ? "ran out" : "runs out"} ${fmtDate(st.expires)}.` : ""} Swap them out or record the training.`,
+        detail: `“${m.name}” needs it.${st.expires ? ` It ${st.state === "expired" ? "ran out" : "runs out"} ${fmtDate(st.expires)}.` : ""} Swap them out or record the qualification.`,
         at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id, trainingId: tid,
       });
     }

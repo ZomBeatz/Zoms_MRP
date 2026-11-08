@@ -17,16 +17,16 @@ export function Maintenance() {
     <>
       <div className="page-head">
         <h1>Maintenance</h1>
-        <button className="btn primary" onClick={() => open("job", "new")}><Plus size={16} /> New job…</button>
+        <button className="btn primary" onClick={() => open("job", "new")}><Plus size={16} /> New work order…</button>
       </div>
-      <label className="check small" style={{ marginBottom: 14 }}><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show finished jobs</label>
+      <label className="check small" style={{ marginBottom: 14 }}><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show finished work orders</label>
       {list.length === 0 ? (
-        <Empty icon={<Wrench size={28} />} text="Inspections and repairs go here, with the maintainers working on them." action={<button className="btn primary" onClick={() => open("job", "new")}>New job…</button>} />
+        <Empty icon={<Wrench size={28} />} text="Inspections and repairs go here, with the maintainers working on them." action={<button className="btn primary" onClick={() => open("job", "new")}>New work order…</button>} />
       ) : (
         <>
           <div className="table-wrap">
             <table className="table">
-              <thead><tr>{header("title", "Job")}{header("aircraft", "Aircraft")}{header("kind", "Kind")}{header("start", "When")}<th>Maintainers</th><th>Status</th></tr></thead>
+              <thead><tr>{header("title", "Work order")}{header("aircraft", "Aircraft")}{header("kind", "Kind")}{header("start", "When")}<th>Maintainers</th><th>Status</th></tr></thead>
               <tbody>
                 {list.map((j) => {
                   const ac = aircraft.get(j.aircraftId);

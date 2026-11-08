@@ -37,10 +37,10 @@ const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "aircraft", label: "Fleet", icon: Plane },
   { page: "types", label: "Types & equipment", icon: Package },
   { page: "schedule", label: "Schedule", icon: CalendarRange },
-  { page: "missions", label: "Missions", icon: ClipboardList },
+  { page: "missions", label: "Jobs", icon: ClipboardList },
   { page: "people", label: "Crew", icon: Users },
   { page: "maintenance", label: "Maintenance", icon: Wrench },
-  { page: "training", label: "Training", icon: GraduationCap },
+  { page: "training", label: "Qualifications", icon: GraduationCap },
   { page: "inspections", label: "Inspections", icon: ClipboardCheck },
   { page: "balance", label: "Balance", icon: Scale },
   { page: "planner", label: "Crew planner", icon: Calculator },
@@ -141,7 +141,7 @@ export default function App() {
         <button className="icon-btn" aria-label="Find" onClick={() => setFinding(true)}>
           <Search size={20} />
         </button>
-        <button className="icon-btn" aria-label="New mission" onClick={() => open("mission", "new")}>
+        <button className="icon-btn" aria-label="New job" onClick={() => open("mission", "new")}>
           <Plus size={20} />
         </button>
       </div>
@@ -158,9 +158,9 @@ export default function App() {
             </button>
           )}
         </div>
-        <button className="btn primary big" onClick={() => open("mission", "new")} title="New mission (N)">
+        <button className="btn primary big" onClick={() => open("mission", "new")} title="New job (N)">
           <Plus size={16} />
-          {(!collapsed || drawer) && "New mission"}
+          {(!collapsed || drawer) && "New job"}
         </button>
         <button className="nav-item find-item" onClick={() => setFinding(true)} title={collapsed ? "Find (Ctrl K)" : "Find anything (Ctrl or ⌘ K)"}>
           <Search size={16} />

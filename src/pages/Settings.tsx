@@ -15,6 +15,7 @@ import { ServerSettings } from "./ServerSettings";
 import { ExcelCopySettings } from "./ExcelCopySettings";
 import { FlightLimitsEditor } from "./Planner";
 import { uid } from "../time";
+import { SWATCHES, reshade, shadesOf } from "../look";
 import { SHORTCUTS } from "./Guide";
 
 export function SettingsPage({ onHelp }: { onHelp: () => void }) {
@@ -97,14 +98,14 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
                 {([[1, "Monday"], [0, "Sunday"]] as const).map(([v, l]) => <button key={v} className={(data.settings.weekStart ?? 1) === v ? "active" : ""} onClick={() => updateSettings({ weekStart: v })}>{l}</button>)}
               </div>
             </div>
-            <Field label="Currency symbol" hint="Before amounts in cost per mission.">
+            <Field label="Currency symbol" hint="Before amounts in cost per job.">
               <input value={data.settings.currencySymbol ?? "$"} maxLength={4} style={{ width: 80 }} onChange={(e) => updateSettings({ currencySymbol: e.target.value })} />
             </Field>
           </div>
           <div className="field" style={{ marginTop: 12 }}>
             <span>Pages in the menu</span>
             <div className="picker-row">
-              {([["aircraft", "Fleet"], ["types", "Types & equipment"], ["schedule", "Schedule"], ["missions", "Missions"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Training"], ["balance", "Balance"], ["planner", "Crew planner"], ["reports", "Reports"]] as const).map(([pg, label]) => {
+              {([["aircraft", "Fleet"], ["types", "Types & equipment"], ["schedule", "Schedule"], ["missions", "Jobs"], ["people", "Crew"], ["maintenance", "Maintenance"], ["training", "Qualifications"], ["balance", "Balance"], ["planner", "Crew planner"], ["reports", "Reports"]] as const).map(([pg, label]) => {
                 const hidden = (data.settings.hiddenPages ?? []).includes(pg);
                 return (
                   <label key={pg} className={`chip pick ${hidden ? "" : "on"}`}>
@@ -124,7 +125,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               rotation <NumberInput min={0} max={90} aria-label="Days on" value={sd.pilotRotation?.on ?? 0} onChange={(on) => updateSettings({ seasonDefaults: { ...sd, pilotRotation: on ? { on, off: sd.pilotRotation?.off ?? 7 } : null } })} /> on
               <NumberInput min={0} max={90} aria-label="Days off" value={sd.pilotRotation?.off ?? 0} onChange={(off) => updateSettings({ seasonDefaults: { ...sd, pilotRotation: sd.pilotRotation ? { ...sd.pilotRotation, off } : null } })} /> off
             </span>
-            <span className="hint">For a mission's first season; later seasons start from the one before. Rotation 0 on: the hitch rules below.</span>
+            <span className="hint">For a job's first season; later seasons start from the one before. Rotation 0 on: the hitch rules below.</span>
           </div>
         </section>
 
@@ -137,7 +138,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               Show demo data
             </label>
             <p className="small muted" style={{ margin: "6px 0 0" }}>
-              Fills Zom's MRP with made-up aircraft, crew, training and missions so you can see how it works. Your own data is kept apart and comes back when you turn this off. <b>Remove demo data</b> takes the demo off this device without touching your own.
+              Fills Zom's MRP with made-up aircraft, crew, qualifications and jobs so you can see how it works. Your own data is kept apart and comes back when you turn this off. <b>Remove demo data</b> takes the demo off this device without touching your own.
             </p>
             {hasDemo && (
               <div className="row gap wrap" style={{ marginTop: 10 }}>
@@ -154,7 +155,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           <h3><ShieldCheck size={16} /> Hitches and days off</h3>
           <p className="small muted" style={{ marginTop: 0 }}>Zom's MRP warns you when someone goes over these. Assignments with fewer days off between them count as one hitch.</p>
           <div className="form-grid">
-            <Field label="Most days on in a row" hint="Missions, on call and maintenance all count.">
+            <Field label="Most days on in a row" hint="Jobs, on call and maintenance all count.">
               <NumberInput min={1} max={365} value={rules.maxDaysOn} onChange={(maxDaysOn) => updateSettings({ rules: { ...rules, maxDaysOn } })} />
             </Field>
             <Field label="Fewest days off between hitches">
@@ -172,15 +173,34 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <Field label="Current on a type" hint="Pilots must have flown it within this many days. 0 = don't check.">
               <NumberInput min={0} max={730} value={data.settings.currencyDays} onChange={(currencyDays) => updateSettings({ currencyDays })} />
             </Field>
-            <Field label="Warn before training runs out" hint="Days ahead.">
+            <Field label="Warn before a qualification runs out" hint="Days ahead.">
               <NumberInput min={0} max={365} value={data.settings.expiryWarningDays} onChange={(expiryWarningDays) => updateSettings({ expiryWarningDays })} />
             </Field>
           </div>
         </section>
 
         <section className="panel">
+          <h3><Palette size={16} /> Types of work</h3>
+          <p className="small muted" style={{ marginTop: 0 }}>Lines of business, like fire, medevac or utilities, each with a color. A job of that type gets its own shade of it, so related jobs look alike on the schedule. Changing a color reshades its jobs.</p>
+          {data.workTypes.map((t) => {
+            const n = data.missions.filter((m) => m.workTypeId === t.id).length;
+            return (
+              <div key={t.id} className="row gap-sm" style={{ marginBottom: 8 }}>
+                <input type="color" aria-label={`Color for ${t.name || "this type of work"}`} value={t.color}
+                  onChange={(e) => { const color = e.target.value; change((d) => ({ ...d, workTypes: d.workTypes.map((x) => (x.id === t.id ? { ...x, color } : x)), missions: reshade(d.missions, t.id, color) })); }} />
+                <input value={t.name} placeholder="Fire" style={{ width: 200 }} onChange={(e) => change((d) => ({ ...d, workTypes: d.workTypes.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)) }))} />
+                <span className="row gap-sm">{shadesOf(t.color, 6).map((c) => <span key={c} className="swatch" style={{ background: c, width: 14, height: 14 }} />)}</span>
+                <span className="small muted">{n === 1 ? "1 job" : `${n} jobs`}</span>
+                <button className="icon-btn danger" aria-label={`Remove ${t.name}`} onClick={() => change((d) => ({ ...d, workTypes: d.workTypes.filter((x) => x.id !== t.id), missions: d.missions.map((m) => (m.workTypeId === t.id ? { ...m, workTypeId: null } : m)) }), `Removed ${t.name || "the type of work"}; its jobs keep their colors`)}><Trash2 size={15} /></button>
+              </div>
+            );
+          })}
+          <button className="btn sm" onClick={() => change((d) => ({ ...d, workTypes: [...d.workTypes, { id: uid(), name: "", color: SWATCHES[d.workTypes.length % 10] }] }))}><Plus size={14} /> Add a type of work</button>
+        </section>
+
+        <section className="panel">
           <h3><ShieldCheck size={16} /> Kinds of contract</h3>
-          <p className="small muted" style={{ marginTop: 0 }}>Different limits for different work, such as EMS and fire. A mission that picks one uses its days on and off instead of the ones above (its own limits can still be stricter).</p>
+          <p className="small muted" style={{ marginTop: 0 }}>Different limits for different work, such as EMS and fire. A job that picks one uses its days on and off instead of the ones above (its own limits can still be stricter).</p>
           {(data.settings.ruleSets ?? []).map((r) => {
             const setRule = (patch: Partial<typeof r>) => updateSettings({ ruleSets: data.settings.ruleSets.map((x) => (x.id === r.id ? { ...x, ...patch } : x)) });
             const used = data.missions.filter((m) => m.ruleSetId === r.id).length;
@@ -192,7 +212,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
                   <NumberInput min={0} max={180} aria-label={`${r.name}: fewest days off`} value={r.minDaysOff} onChange={(minDaysOff) => setRule({ minDaysOff })} /> off
                 </span>
                 <span className="small muted">{used ? `${used} ${used === 1 ? "mission" : "missions"}` : "Not used"}</span>
-                <button className="icon-btn" aria-label={`Remove ${r.name || "this kind"}`} title={used ? "Its missions go back to the limits above" : undefined}
+                <button className="icon-btn" aria-label={`Remove ${r.name || "this kind"}`} title={used ? "Its jobs go back to the limits above" : undefined}
                   onClick={() => change((d) => ({ ...d, settings: { ...d.settings, ruleSets: d.settings.ruleSets.filter((x) => x.id !== r.id) }, missions: d.missions.map((m) => (m.ruleSetId === r.id ? { ...m, ruleSetId: null } : m)) }), `Removed “${r.name}”`)}>
                   <Trash2 size={15} />
                 </button>
@@ -208,7 +228,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <input type="checkbox" checked={!!data.settings.costs} onChange={(e) => updateSettings({ costs: e.target.checked })} />
             Show costs and charges
           </label>
-          <p className="small muted" style={{ margin: "6px 0 0" }}>Day rates on crew, cost per flight hour on aircraft, a charge per day on missions, and cost and margin in Reports and the Crew planner. Off: they're hidden, and anything already typed in is kept.</p>
+          <p className="small muted" style={{ margin: "6px 0 0" }}>Day rates on crew, cost per flight hour on aircraft, a charge per day on jobs, and cost and margin in Reports and the Crew planner. Off: they're hidden, and anything already typed in is kept.</p>
         </section>
 
         <section className="panel">
@@ -226,7 +246,7 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
               </label>
               <p className="small muted" style={{ margin: "4px 0 0" }}>When the app opens, inspections overdue or due soon are booked in their tail's best free days before they're due. You still pick who does them.</p>
               <div className="form-grid" style={{ marginTop: 10 }}>
-                <Field label="Flight hours on a mission day" hint="An aircraft can have its own on its form.">
+                <Field label="Flight hours on a job day" hint="An aircraft can have its own on its form.">
                   <NumberInput min={1} max={24} value={mx.hoursPerDay} onChange={(hoursPerDay) => updateSettings({ maintenance: { ...mx, hoursPerDay } })} />
                 </Field>
                 <Field label="Due soon" hint="Days ahead.">
@@ -309,8 +329,8 @@ function ClearAllDialog({ onBackup, onClose, onClear }: { onBackup: () => void; 
   const ready = typed.trim().toUpperCase() === "DELETE";
   const counts: [number, string, string][] = [
     [data.aircraft.length, "aircraft", "aircraft"], [data.people.length, "person", "people"], [data.missions.length, "mission", "missions"],
-    [data.seasons.length, "season", "seasons"], [data.shifts.length, "shift", "shifts"], [data.jobs.length, "maintenance job", "maintenance jobs"],
-    [data.trainings.length, "training course", "training courses"], [data.timeOff.length, "time-off entry", "time-off entries"],
+    [data.seasons.length, "season", "seasons"], [data.shifts.length, "shift", "shifts"], [data.jobs.length, "work order", "work orders"],
+    [data.trainings.length, "qualification", "qualifications"], [data.timeOff.length, "time-off entry", "time-off entries"],
   ];
   const what = counts.filter(([n]) => n > 0).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`).join(", ");
   return (
@@ -339,7 +359,7 @@ function ImportDialog({ name, plan, onClose, onImport }: { name: string; plan: I
   const { added, updated, skipped } = plan;
   const parts = (o: Record<string, number>, words: Record<string, [string, string]>) =>
     Object.entries(o).filter(([, n]) => n).map(([k, n]) => `${n} ${n === 1 ? words[k][0] : words[k][1]}`).join(", ");
-  const words = { people: ["person", "people"], aircraft: ["aircraft", "aircraft"], courses: ["course", "courses"], records: ["training record", "training records"] } as Record<string, [string, string]>;
+  const words = { people: ["person", "people"], aircraft: ["aircraft", "aircraft"], courses: ["qualification", "qualifications"], records: ["qualification record", "qualification records"] } as Record<string, [string, string]>;
   const adds = parts(added, words), updates = parts(updated, words);
   const nothing = !adds && !updates;
   return (

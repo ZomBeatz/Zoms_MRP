@@ -58,6 +58,7 @@ export function migrate(raw: any): AppData {
 
   // 0.2.6: aircraft types and equipment are lists of their own. Types start from every name already in use
   // (tails, crew ratings, maintenance programs), with the seats of the first tail of each.
+  d.workTypes = d.workTypes ?? [];
   d.equipment = (d.equipment ?? []).map((e) => ({ ...e, notes: e.notes ?? "" }));
   d.aircraft = (d.aircraft ?? []).map((a) => ({ ...a, equipmentIds: a.equipmentIds ?? [] }));
   // 0.2.6: statuses are Airworthy, In maintenance, AOG and Retired, and each tail keeps a log.

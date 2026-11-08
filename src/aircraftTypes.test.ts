@@ -61,3 +61,19 @@ describe("aircraft types", () => {
     expect(missingEquipment(d, { equipmentIds: ["bucket"] }, ["hoist", "bucket"]).map((e) => e.name)).toEqual(["Hoist"]);
   });
 });
+
+describe("types of work", () => {
+  it("gives each job of a type its own shade of the type's color", async () => {
+    const { nextShade, reshade, shadeAt, shadesOf } = await import("./look");
+    const shades = shadesOf("#c2410c", 8);
+    expect(new Set(shades).size).toBe(8);
+    expect(shades[0]).toBe("#c2410c");
+    for (const c of shades) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+    const d = emptyData();
+    d.workTypes = [{ id: "fire", name: "Fire", color: "#c2410c" }];
+    const job = (id: string, color: string) => ({ id, name: id, contact: "", location: "", requiredTrainingIds: [], color, pattern: "solid" as const, notes: "", workTypeId: "fire" });
+    d.missions = [job("a", shadeAt("#c2410c", 0)), job("b", shadeAt("#c2410c", 1))];
+    expect(nextShade(d, "fire")).toBe(shadeAt("#c2410c", 2));
+    expect(reshade(d.missions, "fire", "#2563eb").map((m) => m.color)).toEqual([shadeAt("#2563eb", 0), shadeAt("#2563eb", 1)]);
+  });
+});

@@ -131,7 +131,14 @@ export interface Person {
 }
 
 /** How a slot is filled on the schedule, on top of its color (so colors aren't the only difference). */
-export type Pattern = "solid" | "stripes" | "dots" | "grid" | "dashes" | "zigzag";
+export type Pattern = "solid" | "stripes" | "dots" | "grid" | "dashes" | "zigzag" | "crosshatch" | "pinstripes" | "checks" | "rings";
+
+/** A line of business ("Fire", "Medevac") with a base color; each job in it is a shade of that color. */
+export interface WorkType {
+  id: ID;
+  name: string;
+  color: string;
+}
 
 export type MissionStatus = "Planned" | "Confirmed" | "Flying" | "Done" | "Cancelled";
 
@@ -156,6 +163,8 @@ export interface Mission {
   requiredTrainingIds: ID[];
   /** Equipment every aircraft on this mission needs (a hoist for rescue, a bucket for fire). */
   requiredEquipmentIds?: ID[];
+  /** Its type of work (line of business), whose color it's a shade of. Empty: none. */
+  workTypeId?: ID | null;
   /** How its slots look on the schedule. */
   color: string;
   pattern: Pattern;
@@ -381,6 +390,8 @@ export interface AppData {
   aircraftTypes: AircraftType[];
   /** Equipment aircraft can carry and missions can need. */
   equipment: Equipment[];
+  /** Types of work (lines of business), each a color its jobs are shades of. */
+  workTypes: WorkType[];
   trainings: Training[];
   people: Person[];
   missions: Mission[];
