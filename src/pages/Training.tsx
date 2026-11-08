@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { GraduationCap, Plus, Users } from "lucide-react";
+import { BookMarked, GraduationCap, Plus, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useStore } from "../store";
 import { neededTraining } from "../coverage";
 import { daysSince } from "../currency";
 import { DAY, plural, today } from "../time";
 import { KINDS, kindOf, qualificationsDue } from "../certificates";
+import { QUALIFICATIONS, addQualifications, existingQual, qualLabel } from "../library";
 import { missionLook, slotStyle } from "../look";
 import { Avatar, Empty } from "../components/ui";
 import { validUntil, type Person, type Training } from "../types";
@@ -38,6 +39,7 @@ export const showDueTab = () => { wantDue = true; };
 export function TrainingPage() {
   const { data, open } = useStore();
   const [tab, setTab] = useState<Tab>(() => { const due = wantDue; wantDue = false; return due ? "due" : "current"; });
+  const [library, setLibrary] = useState(false);
   const [kind, setKind] = useState("");
   const warn = data.settings.expiryWarningDays;
   const mission = data.missions.find((m) => m.id === kind);
@@ -59,8 +61,11 @@ export function TrainingPage() {
       <div className="page-head">
         <h1>Qualifications</h1>
         {data.trainings.length > 0 && data.people.length > 0 && <button className="btn" onClick={() => open("groupTraining", "new")}><Users size={16} /> Record for several people…</button>}
+        <button className="btn" onClick={() => setLibrary(!library)}><BookMarked size={16} /> Library…</button>
         <button className="btn primary" onClick={() => open("training", "new")}><Plus size={16} /> Add qualification…</button>
       </div>
+      {library && <QualLibrary onClose={() => setLibrary(false)} />}
+      <MinimumForEveryone />
       <div className="row gap wrap" style={{ marginBottom: 14 }}>
         <div className="seg">
           <button className={tab === "current" ? "active" : ""} onClick={() => setTab("current")}>Who's current</button>
@@ -91,7 +96,7 @@ export function TrainingPage() {
             <div className="table-wrap">
               <table className="table">
                 <thead>
-                  <tr><th>Person</th><th>Works on</th>{columns.map((t) => <th key={t.id}>{t.name}</th>)}</tr>
+                  <tr><th>Person</th><th>Works on</th>{columns.map((t) => <th key={t.id} title={t.name}>{qualLabel(t, true)}</th>)}</tr>
                 </thead>
                 <tbody>
                   {rows.map(({ p, needs }) => (
@@ -297,5 +302,62 @@ function DueAndExpired() {
       )}
       <p className="small muted">Tap a row to record the renewal, attach the new certificate or extend it. A renewal already on record (done ahead of time) counts.</p>
     </>
+  );
+}
+
+/** Prebuilt qualifications to add in one go, each with its nickname, kind and renewal (all editable after). */
+function QualLibrary({ onClose }: { onClose: () => void }) {
+  const { data, change } = useStore();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const groups: [string, (q: (typeof QUALIFICATIONS)[number]) => boolean][] = [
+    ["For every pilot", (q) => !!q.everyone && q.appliesTo === "Pilot"],
+    ["Checks", (q) => q.kind === "check" && !q.everyone],
+    ["Courses and certificates for pilots", (q) => !q.everyone && q.kind !== "check" && q.appliesTo === "Pilot"],
+    ["For pilots and maintainers", (q) => q.appliesTo === "Both"],
+    ["For maintainers", (q) => q.appliesTo === "Maintainer"],
+  ];
+  return (
+    <section className="panel" style={{ marginBottom: 14 }}>
+      <h3><BookMarked size={16} /> Library</h3>
+      <p className="small muted" style={{ marginTop: 0 }}>Common qualifications for a helicopter operator, with nicknames, how often they're renewed and who needs them. Starting points: check each against your operations specifications and change anything after adding it. Ones you already have are ticked.</p>
+      {groups.map(([title, test]) => (
+        <div key={title} className="field" style={{ marginBottom: 8 }}>
+          <span>{title}</span>
+          <div className="picker-row">
+            {QUALIFICATIONS.filter(test).map((q) => {
+              const there = !!existingQual(data, q);
+              return (
+                <label key={q.key} className={`chip pick ${picked.has(q.key) || there ? "on" : ""}`} title={`${q.name}: ${q.validMonths ? `every ${q.validMonths} months${q.endOfMonth ? ", to the end of the month" : ""}` : "never runs out"}`}>
+                  <input type="checkbox" disabled={there} checked={picked.has(q.key) || there} onChange={() => setPicked((s) => { const x = new Set(s); if (x.has(q.key)) x.delete(q.key); else x.add(q.key); return x; })} />
+                  {q.nickname} <span className="small muted">{q.name}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <div className="row gap-sm">
+        <button className="btn sm primary" disabled={!picked.size} onClick={() => { const keys = [...picked]; change((d) => addQualifications(d, keys).data, `Added ${keys.length === 1 ? "1 qualification" : `${keys.length} qualifications`}`); onClose(); }}>Add {picked.size || ""}</button>
+        <button className="btn sm ghost" onClick={onClose}>Close</button>
+      </div>
+    </section>
+  );
+}
+
+/** What every pilot and every maintainer needs, whatever the job: the minimum to be booked at all. */
+function MinimumForEveryone() {
+  const { data, open } = useStore();
+  const rows = (["Pilot", "Maintainer"] as const).map((role) => ({ role, list: data.trainings.filter((t) => t.everyone && (t.appliesTo === role || t.appliesTo === "Both")) }));
+  if (!data.trainings.length) return null;
+  return (
+    <div className="panel" style={{ marginBottom: 14, padding: "10px 14px" }}>
+      {rows.map(({ role, list }) => (
+        <div key={role} className="row gap-sm wrap" style={{ margin: "2px 0" }}>
+          <b className="small" style={{ minWidth: 150 }}>Every {role.toLowerCase()} needs</b>
+          {list.length ? list.map((t) => <button key={t.id} className="chip" title={t.name} onClick={() => open("training", t.id)}>{qualLabel(t, true)}</button>)
+            : <span className="small muted">Nothing yet. Open a qualification and tick “Every {role.toLowerCase()} needs it”.</span>}
+        </div>
+      ))}
+    </div>
   );
 }
