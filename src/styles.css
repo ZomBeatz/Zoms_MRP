@@ -805,3 +805,13 @@ body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
 .rule-set { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
 .rule-set > input { width: 140px; }
 .rule-set .rotation input { width: 64px; }
+
+/* Settings › Lines of business and Schedule limitations */
+.line-of-business { border-bottom: 1px solid var(--zb-border); padding: 8px 0; }
+.line-of-business:last-of-type { border-bottom: none; }
+.lob-defaults { margin: 10px 0 4px 34px; padding: 12px; background: var(--zb-surface-2); border-radius: var(--zb-radius-sm); }
+.rule-set-card { border: 1px solid var(--zb-border); border-radius: var(--zb-radius-sm); padding: 10px 12px; margin-bottom: 10px; display: grid; gap: 8px; }
+.limits-grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; align-items: center; font-size: 0.92em; }
+.limits-grid > span:nth-child(odd) { color: var(--zb-text-2); }
+.panel.inset { background: var(--zb-surface-2); box-shadow: none; }
+@media (max-width: 520px) { .limits-grid { grid-template-columns: 1fr; } .lob-defaults { margin-left: 0; } }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClipboardCheck, Coins, Download, Plus, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
+import { ClipboardCheck, Coins, Download, SlidersHorizontal, FileSpreadsheet, FlaskConical, FolderOpen, Keyboard, Palette, Trash2, ShieldCheck, Upload, Info, Database } from "lucide-react";
 import { useStore } from "../store";
 import { Dialog, Field, NumberInput } from "../components/ui";
 import type { ImportPlan } from "../importer";
@@ -13,8 +13,7 @@ import { DEMO_KEY } from "../backends";
 import { ServerSettings } from "./ServerSettings";
 import { ExcelCopySettings } from "./ExcelCopySettings";
 import { FlightLimitsEditor } from "./Planner";
-import { uid } from "../time";
-import { SWATCHES, reshade, shadesOf } from "../look";
+import { LinesOfBusiness, ScheduleLimitations } from "./BusinessSettings";
 import { unpackFiles } from "../docs";
 import { backupFolder, saveBackup } from "../backup";
 import { BackupPlace } from "./BackupPlace";
@@ -192,48 +191,9 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
           </div>
         </section>
 
-        <section className="panel">
-          <h3><Palette size={16} /> Lines of business</h3>
-          <p className="small muted" style={{ marginTop: 0 }}>Lines of business, like fire, medevac or utilities, each with a color. A client of that type gets its own shade of it, so related clients look alike on the schedule. Changing a color reshades its clients.</p>
-          {data.workTypes.map((t) => {
-            const n = data.missions.filter((m) => m.workTypeId === t.id).length;
-            return (
-              <div key={t.id} className="row gap-sm" style={{ marginBottom: 8 }}>
-                <input type="color" aria-label={`Color for ${t.name || "this line of business"}`} value={t.color}
-                  onChange={(e) => { const color = e.target.value; change((d) => ({ ...d, workTypes: d.workTypes.map((x) => (x.id === t.id ? { ...x, color } : x)), missions: reshade(d.missions, t.id, color) })); }} />
-                <input value={t.name} placeholder="Fire" style={{ width: 200 }} onChange={(e) => change((d) => ({ ...d, workTypes: d.workTypes.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)) }))} />
-                <span className="row gap-sm">{shadesOf(t.color, 6).map((c) => <span key={c} className="swatch" style={{ background: c, width: 14, height: 14 }} />)}</span>
-                <span className="small muted">{n === 1 ? "1 client" : `${n} clients`}</span>
-                <button className="icon-btn danger" aria-label={`Remove ${t.name}`} onClick={() => change((d) => ({ ...d, workTypes: d.workTypes.filter((x) => x.id !== t.id), missions: d.missions.map((m) => (m.workTypeId === t.id ? { ...m, workTypeId: null } : m)) }), `Removed ${t.name || "the line of business"}; its clients keep their colors`)}><Trash2 size={15} /></button>
-              </div>
-            );
-          })}
-          <button className="btn sm" onClick={() => change((d) => ({ ...d, workTypes: [...d.workTypes, { id: uid(), name: "", color: SWATCHES[d.workTypes.length % 10] }] }))}><Plus size={14} /> Add a line of business</button>
-        </section>
+        <LinesOfBusiness />
 
-        <section className="panel">
-          <h3><ShieldCheck size={16} /> Schedule limitations</h3>
-          <p className="small muted" style={{ marginTop: 0 }}>Different limits for different work, such as EMS and fire. A client that picks one uses its days on and off instead of the ones above (its own limits can still be stricter).</p>
-          {(data.settings.ruleSets ?? []).map((r) => {
-            const setRule = (patch: Partial<typeof r>) => updateSettings({ ruleSets: data.settings.ruleSets.map((x) => (x.id === r.id ? { ...x, ...patch } : x)) });
-            const used = data.missions.filter((m) => m.ruleSetId === r.id).length;
-            return (
-              <div key={r.id} className="rule-set">
-                <input aria-label="Name" value={r.name} placeholder="EMS" onChange={(e) => setRule({ name: e.target.value })} />
-                <span className="rotation">
-                  <NumberInput min={1} max={365} aria-label={`${r.name}: most days on`} value={r.maxDaysOn} onChange={(maxDaysOn) => setRule({ maxDaysOn })} /> days on,
-                  <NumberInput min={0} max={180} aria-label={`${r.name}: fewest days off`} value={r.minDaysOff} onChange={(minDaysOff) => setRule({ minDaysOff })} /> off
-                </span>
-                <span className="small muted">{used ? `${used} ${used === 1 ? "mission" : "missions"}` : "Not used"}</span>
-                <button className="icon-btn" aria-label={`Remove ${r.name || "this kind"}`} title={used ? "Its clients go back to the limits above" : undefined}
-                  onClick={() => change((d) => ({ ...d, settings: { ...d.settings, ruleSets: d.settings.ruleSets.filter((x) => x.id !== r.id) }, missions: d.missions.map((m) => (m.ruleSetId === r.id ? { ...m, ruleSetId: null } : m)) }), `Removed “${r.name}”`)}>
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            );
-          })}
-          <button className="btn sm" onClick={() => updateSettings({ ruleSets: [...(data.settings.ruleSets ?? []), { id: uid(), name: (data.settings.ruleSets ?? []).length ? "" : "EMS", ...rules }] })}><Plus size={14} /> Add a set of schedule limitations</button>
-        </section>
+        <ScheduleLimitations fallback={rules} />
 
         <section className="panel">
           <h3><Coins size={16} /> Costs</h3>

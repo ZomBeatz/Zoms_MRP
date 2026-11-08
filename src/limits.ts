@@ -71,3 +71,11 @@ export function jobLimits(data: AppData, season?: Pick<Season, "missionId" | "ru
     flightLimits: (set?.flightLimits?.length ? set.flightLimits : st.flightLimits ?? []).filter((l) => l.hours > 0 && l.days > 0),
   };
 }
+
+/** "14 on, 2 off · duty 14 h · 8 flight h a day · 42 h in 6 days" */
+export const fmtRuleSet = (r: RuleSet) => [
+  `${r.minDaysOn ? `${r.minDaysOn} to ` : ""}${r.maxDaysOn} on, ${r.minDaysOff} off`,
+  r.maxDutyHours ? `duty ${r.maxDutyHours} h` : "", r.minRestHours ? `rest ${r.minRestHours} h` : "",
+  r.maxFlightHoursPerDay ? `${r.maxFlightHoursPerDay} flight h a day` : "", ...(r.flightLimits ?? []).map((l) => `${l.hours} h in ${l.days} days`),
+].filter(Boolean).join(" · ");
+

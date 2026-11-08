@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Calculator, Check, CopyPlus, Download, FileText, Plus, Trash2, Upload, Wand2 } from "lucide-react";
 import { fileSize, getFile, putFile, viewable } from "./docs";
+import { qualLabel } from "./library";
 import { KINDS, PRIVILEGES, ageOn, everyoneWord, expiryFor, kindOf, medicalExpiry, medicalStages, refreshMedicals, withRenewals } from "./certificates";
 import { isServerBuild } from "./platform";
 import { planSeason } from "./pages/Planner";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
 import { keepForm, keptForm, useStore } from "./store";
-import { dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
+import { typeTraining, dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
 import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, overlaps, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
@@ -15,7 +16,7 @@ import { SWATCHES, missionLook, nextShade, shadesOf, slotStyle } from "./look";
 import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useDirty, useGuardedClose, useSpot } from "./components/ui";
 import { bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
-import { baseRules, rulesFor, seasonRules, stricter } from "./limits";
+import { baseRules, fmtRuleSet, jobLimits, rulesFor, seasonRules, stricter } from "./limits";
 import { flightHours } from "./program";
 import { daysSince } from "./currency";
 import { ConfirmButton, IssueList } from "./pages/Overview";
@@ -112,7 +113,8 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
   const existing = data.missions.find((m) => m.id === id);
   const isNew = !existing;
   const [kept] = useState(() => keptForm<{ tab: string; m: Mission; pool: Set<string> }>());
-  const [tab, setTab] = useState(kept.tab ?? fix.tab ?? "details");
+  // Qualifications and equipment were their own tabs; they're the Job requirements tab now.
+  const [tab, setTab] = useState(() => { const t = kept.tab ?? fix.tab ?? "details"; return t === "training" || t === "equipment" ? "requirements" : t; });
   const [m, setM] = useState<Mission>(() => kept.m ?? existing ?? {
     id: uid(), name: "", contact: "", location: "", notes: "",
     requiredTrainingIds: (defaults.requiredTrainingIds as string[] | undefined) ?? [],
@@ -144,6 +146,23 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
   };
   useKeep({ tab, m, pool });
   const set = (patch: Partial<Mission>) => setM((x) => ({ ...x, ...patch }));
+  const line = data.workTypes.find((w) => w.id === m.workTypeId);
+  /** Load a line of business's job requirements into this client (and a new client's first job). */
+  const useLine = (lineId: string) => {
+    const d = data.workTypes.find((w) => w.id === lineId)?.defaults;
+    if (!d) return;
+    set({
+      requiredTrainingIds: d.requiredTrainingIds ?? [], requiredEquipmentIds: d.requiredEquipmentIds ?? [], ruleSetId: d.ruleSetId ?? null,
+      kind: d.ground ? "ground" : "flight",
+      jobDefaults: { pilots: d.pilots, maintainers: d.maintainers, maintainerNeed: d.maintainerNeed, pilotRotation: d.pilotRotation, maintainerRotation: d.maintainerRotation, dutyHours: d.dutyHours },
+    });
+    if (isNew) setFirst((x) => ({
+      ...x, ...(d.ground ? { slots: [], aircraftIds: [] } : {}),
+      pilotsNeeded: d.pilots ?? x.pilotsNeeded, maintainersNeeded: d.maintainers ?? x.maintainersNeeded, maintainerNeed: d.maintainerNeed ?? x.maintainerNeed,
+      pilotRotation: d.pilotRotation !== undefined ? d.pilotRotation : x.pilotRotation, maintainerRotation: d.maintainerRotation !== undefined ? d.maintainerRotation : x.maintainerRotation,
+      dutyHours: d.dutyHours !== undefined ? d.dutyHours : x.dutyHours,
+    }));
+  };
   const setF = (patch: Partial<Season>) => setFirst((x) => ({ ...x, ...patch }));
   const seasons = seasonsOf(data, m.id);
   const firstBad = isNew && !(ms(first.end) > ms(first.start));
@@ -237,8 +256,7 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
       tabs={[
         { key: "details", label: "Details", alert: !m.name.trim() && tab !== "details" },
         { key: "seasons", label: isNew ? "First job" : <>Jobs <span className="chip">{seasons.length}</span></>, alert: firstBad },
-        { key: "training", label: <>Qualifications <span className="chip">{m.requiredTrainingIds.length}</span></> },
-        ...(m.kind === "ground" ? [] : [{ key: "equipment", label: <>Equipment <span className="chip">{(m.requiredEquipmentIds ?? []).length}</span></> }]),
+        { key: "requirements", label: <>Job requirements <span className="chip">{m.requiredTrainingIds.length + (m.kind === "ground" ? 0 : (m.requiredEquipmentIds ?? []).length)}</span></> },
         { key: "documents", label: <>Documents <span className="chip">{(m.documents ?? []).length}</span></> },
         { key: "crew", label: <>Crew <span className="chip">{pool.size}</span></> },
         ...(isNew ? [] : [{ key: "rotations", label: "Rotations" }]),
@@ -262,11 +280,17 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
             <span className="hint">{m.kind === "ground" ? "No aircraft: someone on call in the hangar, standby, or any other work on the ground. Its jobs are dates and how many people, filled like any other." : "Aircraft and their crew."}</span>
           </div>
           <Field label="Line of business" full hint={data.workTypes.length ? "Its color is a shade of the type's, so clients of one kind look alike." : "Set up lines of business (fire, medevac…) in Settings › Lines of business, each with its own color."}>
-            <select value={m.workTypeId ?? ""} onChange={(e) => { const id = e.target.value || null; set(id ? { workTypeId: id, color: nextShade(data, id, m.id) } : { workTypeId: null }); }}>
+            <select value={m.workTypeId ?? ""} onChange={(e) => { const id = e.target.value || null; set(id ? { workTypeId: id, color: nextShade(data, id, m.id) } : { workTypeId: null }); if (id && isNew) useLine(id); }}>
               <option value="">None</option>
               {data.workTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </Field>
+          {line?.defaults && (
+            <div className="full small muted" style={{ marginTop: -6 }}>
+              {isNew ? <>Its job requirements are loaded (Job requirements tab); change any of them for this client. </> : null}
+              <button type="button" className="link" onClick={() => { useLine(line.id); setTab("requirements"); }}>{isNew ? "Load them again" : `Use ${line.name}'s job requirements`}</button>
+            </div>
+          )}
           <Field label="Customer contact"><input value={m.contact} placeholder="Name" onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="Location"><input value={m.location} onChange={(e) => set({ location: e.target.value })} /></Field>
           <Field label="Phone"><input type="tel" value={m.phone ?? ""} placeholder="(907) 555-0142" onChange={(e) => set({ phone: e.target.value })} /></Field>
@@ -279,15 +303,6 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
               {m.email && <a className="btn sm" href={`mailto:${m.email.trim()}`}>Email {m.contact || m.email}</a>}
             </div>
           )}
-          {(data.settings.ruleSets ?? []).length > 0 && (
-            <Field label="Schedule limitations" hint="Its days on and off replace Settings' for this client (Settings › Schedule limitations).">
-              <select value={m.ruleSetId ?? ""} onChange={(e) => set({ ruleSetId: e.target.value || null })}>
-                <option value="">Settings' limits</option>
-                {data.settings.ruleSets.map((r) => <option key={r.id} value={r.id}>{r.name || "Unnamed"} · {r.maxDaysOn} on, {r.minDaysOff} off</option>)}
-              </select>
-            </Field>
-          )}
-          <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this client" applies={stricter(baseRules(data, m), m.limits)} />
           {data.settings.costs && (
             <Field label="Charge per day" hint="What the customer pays for a day, for the margin in Reports. Optional.">
               <input type="number" inputMode="decimal" min={0} value={m.dayCharge ?? ""} placeholder="0" onChange={(e) => set({ dayCharge: e.target.value === "" ? null : Number(e.target.value) })} />
@@ -357,37 +372,30 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
         </>
       ))}
 
-      {tab === "training" && (
-        <>
-          <p className="form-note" style={{ marginTop: 0, marginBottom: 12 }}>Everyone on this client's jobs needs these, current for their whole hitch. Nobody else does.</p>
-          <div className="picker-row">
-            {data.trainings.map((t) => (
-              <Pick key={t.id} on={m.requiredTrainingIds.includes(t.id)} onToggle={() => set({ requiredTrainingIds: toggled(m.requiredTrainingIds, t.id) })}>{t.name}</Pick>
-            ))}
-            {data.trainings.length === 0 && <span className="muted">No qualifications set up yet. Add qualifications under Qualifications.</span>}
-          </div>
-        </>
-      )}
-
-      {tab === "equipment" && (
-        <>
-          <p className="form-note" style={{ marginTop: 0, marginBottom: 12 }}>Every aircraft on this client's jobs needs these. A tail booked on it without them shows as a problem.</p>
-          <div className="picker-row" data-spot="equipment">
-            {data.equipment.map((e) => (
-              <Pick key={e.id} on={(m.requiredEquipmentIds ?? []).includes(e.id)} onToggle={() => set({ requiredEquipmentIds: toggled(m.requiredEquipmentIds ?? [], e.id) })}>{e.name}</Pick>
-            ))}
-            {data.equipment.length === 0 && <span className="muted">No equipment set up yet. Add it under Types & equipment.</span>}
-          </div>
+      {tab === "requirements" && (
+        <div className="form-grid">
+          <p className="form-note full" style={{ margin: 0 }}>What this client's jobs need. Each new job starts with these, and any job can have its own instead (its Job requirements tab).</p>
+          <RequirementPicks trainingIds={m.requiredTrainingIds} equipmentIds={m.requiredEquipmentIds ?? []} ground={m.kind === "ground"}
+            onChange={(p) => set({ ...(p.trainingIds ? { requiredTrainingIds: p.trainingIds } : {}), ...(p.equipmentIds ? { requiredEquipmentIds: p.equipmentIds } : {}) })} />
           {(() => {
-            const short = (isNew ? [first] : seasons.filter((x) => ms(x.end) > now && x.status !== "Cancelled"))
+            const short = (isNew ? [first] : seasons.filter((x) => ms(x.end) > now && x.status !== "Cancelled" && !x.requiredEquipmentIds))
               .flatMap((x) => x.aircraftIds).map((id) => data.aircraft.find((a) => a.id === id)).filter((a) => !!a)
               .filter((a, i, all) => all.indexOf(a) === i)
               .map((a) => ({ a, missing: missingEquipment(data, a, m.requiredEquipmentIds) })).filter((x) => x.missing.length);
             return short.length > 0 && (
-              <p className="form-note">Missing now: {short.map((x) => `${x.a.tail} has no ${x.missing.map((e) => e.name.toLowerCase()).join(" or ")}`).join("; ")}.</p>
+              <p className="form-note full" style={{ margin: 0 }}>Missing now: {short.map((x) => `${x.a.tail} has no ${x.missing.map((e) => e.name.toLowerCase()).join(" or ")}`).join("; ")}.</p>
             );
           })()}
-        </>
+          <ScheduleLimitsPick value={m.ruleSetId ?? null} onChange={(ruleSetId) => set({ ruleSetId })} inherit={null} />
+          <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this client" applies={stricter(baseRules(data, m), m.limits)} />
+          {!isNew && (
+            <div className="full">
+              <h4 className="form-section">A new job starts with</h4>
+              <JobDefaultsField value={m.jobDefaults ?? {}} ground={m.kind === "ground"} onChange={(jobDefaults) => set({ jobDefaults })} />
+              <span className="hint">Empty: the job before it, or Settings' new-job numbers.</span>
+            </div>
+          )}
+        </div>
       )}
 
       {tab === "documents" && <MissionDocuments docs={m.documents ?? []} onChange={(documents) => set({ documents })} />}
@@ -697,6 +705,73 @@ function AircraftLines({ season, onChange, spot, needs }: { season: Season; onCh
   );
 }
 
+/** Qualifications and equipment a client's (or one job's) jobs need, with a note of what everyone needs anyway. */
+export function RequirementPicks({ trainingIds, equipmentIds, ground, onChange }: {
+  trainingIds: string[]; equipmentIds: string[]; ground?: boolean; onChange: (p: { trainingIds?: string[]; equipmentIds?: string[] }) => void;
+}) {
+  const data = useStore((s) => s.data);
+  const everyone = data.trainings.filter((t) => t.everyone);
+  const pickable = data.trainings.filter((t) => !t.everyone).sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <>
+      <div className="field full" data-spot="qualifications">
+        <span>Qualifications</span>
+        <div className="picker-row">
+          {pickable.map((t) => (
+            <Pick key={t.id} on={trainingIds.includes(t.id)} onToggle={() => onChange({ trainingIds: toggled(trainingIds, t.id) })} title={`${KINDS[kindOf(t)]}, ${t.appliesTo === "Both" ? "pilots and maintainers" : `${t.appliesTo.toLowerCase()}s`}`}>
+              {qualLabel(t)}
+            </Pick>
+          ))}
+          {pickable.length === 0 && <span className="muted small">None to pick yet. Add them on the Qualifications page (there's a library of common ones).</span>}
+        </div>
+        {everyone.length > 0 && <span className="hint">Needed on every job anyway: {everyone.map((t) => qualLabel(t, true)).join(", ")}.</span>}
+      </div>
+      {!ground && (
+        <div className="field full" data-spot="equipment">
+          <span>Equipment on the aircraft</span>
+          <div className="picker-row">
+            {data.equipment.map((e) => <Pick key={e.id} on={equipmentIds.includes(e.id)} onToggle={() => onChange({ equipmentIds: toggled(equipmentIds, e.id) })}>{e.name}</Pick>)}
+            {data.equipment.length === 0 && <span className="muted small">No equipment set up yet. Add it under Types & equipment.</span>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Which schedule limitations apply: Settings' (or, for one job, its client's) or a named set. */
+export function ScheduleLimitsPick({ value, onChange, inherit }: { value: string | null; onChange: (id: string | null) => void; inherit: { name: string } | null }) {
+  const data = useStore((s) => s.data);
+  const sets = data.settings.ruleSets ?? [];
+  const chosen = sets.find((r) => r.id === value);
+  return (
+    <Field label="Schedule limitations" full hint={chosen ? fmtRuleSet(chosen) : sets.length ? undefined : "Set up named limits for kinds of contract (fire, EMS) in Settings › Schedule limitations."}>
+      <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
+        <option value="">{inherit ? `Same as the client (${inherit.name})` : "Settings' limits"}</option>
+        {sets.map((r) => <option key={r.id} value={r.id}>{r.name || "Unnamed"}</option>)}
+      </select>
+    </Field>
+  );
+}
+
+/** Crew numbers and rotations a new job starts with. */
+export function JobDefaultsField({ value, ground, onChange }: { value: NonNullable<Mission["jobDefaults"]>; ground?: boolean; onChange: (v: NonNullable<Mission["jobDefaults"]>) => void }) {
+  const set = (p: Partial<NonNullable<Mission["jobDefaults"]>>) => onChange({ ...value, ...p });
+  return (
+    <div className="form-grid">
+      <div className="pair full">
+        {!ground && <div className="field"><span>Pilots at a time</span><Stepper label="pilots" value={value.pilots ?? 0} onChange={(pilots) => set({ pilots })} /></div>}
+        <div className="field"><span>Maintainers at a time</span><Stepper label="maintainers" value={value.maintainers ?? 0} onChange={(maintainers) => set({ maintainers })} /></div>
+      </div>
+      {!ground && <RotationField label="Pilot rotation" value={value.pilotRotation ?? null} onChange={(pilotRotation) => set({ pilotRotation })} />}
+      <RotationField label="Maintainer rotation" value={value.maintainerRotation ?? null} onChange={(maintainerRotation) => set({ maintainerRotation })} />
+      <Field label="Hours on duty in a day">
+        <input type="number" inputMode="decimal" min={0} max={24} value={value.dutyHours ?? ""} placeholder="–" onChange={(e) => set({ dutyHours: e.target.value === "" ? null : Number(e.target.value) })} />
+      </Field>
+    </div>
+  );
+}
+
 /** Pilots and maintainers the job needs at any time, across all its aircraft. */
 function CrewSize({ season, onChange }: { season: Season; onChange: (patch: Partial<Season>) => void }) {
   return (
@@ -824,20 +899,26 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   const existing = data.seasons.find((x) => x.id === id);
   const isNew = !existing;
   const [kept] = useState(() => keptForm<{ tab: string; season: Season; shifts: Shift[] }>());
-  const [season, setSeason] = useState<Season>(() => {
-    if (kept.season) return kept.season;
-    if (existing) return existing;
-    const missionId = (defaults.missionId as string) ?? data.missions[0]?.id ?? "";
+  /**
+   * A new job for a client starts from its latest job (same aircraft, crew numbers and rotations), else the
+   * client's "A new job starts with", else Settings'.
+   */
+  const startFor = (missionId: string, keep: Partial<Season> = {}): Season => {
     const sd = data.settings.seasonDefaults ?? { pilots: 1, maintainers: 0, pilotRotation: null, dutyHours: null };
-    // A new season starts from the mission's latest one: same aircraft, crew numbers and rotations.
+    const jd = data.missions.find((x) => x.id === missionId)?.jobDefaults ?? {};
     const last = seasonsOf(data, missionId).at(-1);
     return {
       id: uid(), missionId, start: toWhen(tomorrow()), end: toWhen(dayAt(tomorrow(), 30)),
-      aircraftIds: last?.aircraftIds ?? [], ...(last?.slots ? { slots: last.slots.map((x) => ({ ...x, id: uid(), start: null, end: null })) } : {}), pilotsNeeded: last?.pilotsNeeded ?? sd.pilots, maintainersNeeded: last?.maintainersNeeded ?? sd.maintainers, maintainerNeed: last?.maintainerNeed,
-      pilotRotation: last?.pilotRotation ?? sd.pilotRotation, maintainerRotation: last?.maintainerRotation ?? null, dutyHours: last?.dutyHours ?? sd.dutyHours,
-      status: "Planned", notes: "", ...(defaults as Partial<Season>),
+      aircraftIds: last?.aircraftIds ?? [], ...(last?.slots ? { slots: last.slots.map((x) => ({ ...x, id: uid(), start: null, end: null })) } : {}),
+      pilotsNeeded: last?.pilotsNeeded ?? jd.pilots ?? sd.pilots, maintainersNeeded: last?.maintainersNeeded ?? jd.maintainers ?? sd.maintainers, maintainerNeed: last?.maintainerNeed ?? jd.maintainerNeed,
+      pilotRotation: last ? last.pilotRotation : jd.pilotRotation !== undefined ? jd.pilotRotation : sd.pilotRotation,
+      maintainerRotation: last ? last.maintainerRotation : jd.maintainerRotation ?? null, dutyHours: last ? last.dutyHours : jd.dutyHours !== undefined ? jd.dutyHours : sd.dutyHours,
+      ...(last?.requiredTrainingIds ? { requiredTrainingIds: last.requiredTrainingIds } : {}), ...(last?.requiredEquipmentIds ? { requiredEquipmentIds: last.requiredEquipmentIds } : {}),
+      ...(last?.ruleSetId ? { ruleSetId: last.ruleSetId } : {}),
+      status: "Planned", notes: "", ...keep,
     };
-  });
+  };
+  const [season, setSeason] = useState<Season>(() => kept.season ?? existing ?? startFor((defaults.missionId as string) ?? data.missions[0]?.id ?? "", defaults as Partial<Season>));
   // Open on the crew, where most of the work is, unless the season is new.
   const [tab, setTab] = useState(() => kept.tab ?? fix.tab ?? (isNew ? "details" : existing!.pilotsNeeded > 0 ? "pilots" : existing!.maintainersNeeded > 0 ? "maintainers" : "details"));
   const [shifts, setShifts] = useState<Shift[]>(() => kept.shifts ?? data.shifts.filter((s) => s.seasonId === id));
@@ -1053,7 +1134,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
         {crewedPill}
       </>}
       tabs={[
-        { key: "details", label: "Details", alert: timeError },
+        { key: "details", label: "Job requirements", alert: timeError },
         { key: "pilots", label: <>Pilots <span className="chip">{season.pilotsNeeded}</span></>, alert: gapsAlert("Pilot") },
         { key: "maintainers", label: <>Maintainers <span className="chip">{season.maintainersNeeded}</span></>, alert: gapsAlert("Maintainer") },
         ...(issues.length ? [{ key: "problems", label: <>Problems <span className="chip">{issues.length}</span></>, alert: issues.some((i) => i.severity === "danger") }] : []),
@@ -1064,7 +1145,8 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
       {(tab === "details" || (tab === "problems" && !issues.length)) && (
         <div className="form-grid">
           <Field label="Client" full>
-            <select value={season.missionId} onChange={(e) => (e.target.value === NEW_CLIENT ? open("mission", "new") : set({ missionId: e.target.value }))} disabled={!isNew}>
+            <select value={season.missionId} onChange={(e) => (e.target.value === NEW_CLIENT ? open("mission", "new")
+              : setSeason((x) => ({ ...startFor(e.target.value, { start: x.start, end: x.end, status: x.status, notes: x.notes }), id: x.id })))} disabled={!isNew}>
               {data.missions.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
               {isNew && <option value={NEW_CLIENT}>New client…</option>}
             </select>
@@ -1075,9 +1157,36 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           <CrewSize season={season} onChange={set} />
           <RotationField label="Pilot rotation" value={season.pilotRotation} onChange={(pilotRotation) => set({ pilotRotation })} />
           <RotationField label="Maintainer rotation" value={season.maintainerRotation} onChange={(maintainerRotation) => set({ maintainerRotation })} />
+          {mission && (
+            <div className="full">
+              <h4 className="form-section">Qualifications and equipment</h4>
+              <label className="check">
+                <input type="checkbox" checked={!season.requiredTrainingIds && !season.requiredEquipmentIds}
+                  onChange={(e) => set(e.target.checked ? { requiredTrainingIds: undefined, requiredEquipmentIds: undefined } : { requiredTrainingIds: [...mission.requiredTrainingIds], requiredEquipmentIds: [...(mission.requiredEquipmentIds ?? [])] })} />
+                Same as the client
+              </label>
+              {!season.requiredTrainingIds && !season.requiredEquipmentIds ? (
+                <p className="small muted" style={{ margin: "4px 0 0" }}>
+                  {[...mission.requiredTrainingIds.map((id) => data.trainings.find((t) => t.id === id)).filter((t) => !!t).map((t) => qualLabel(t, true)),
+                    ...(mission.kind === "ground" ? [] : (mission.requiredEquipmentIds ?? []).map((id) => data.equipment.find((e) => e.id === id)?.name).filter(Boolean))].join(", ") || "Nothing beyond what everyone needs."}
+                  {" "}<button type="button" className="link" onClick={() => open("mission", mission.id, undefined, { tab: "requirements" })}>Change the client's…</button>
+                </p>
+              ) : (
+                <div className="form-grid" style={{ marginTop: 6 }}>
+                  <RequirementPicks trainingIds={season.requiredTrainingIds ?? []} equipmentIds={season.requiredEquipmentIds ?? []} ground={mission.kind === "ground"}
+                    onChange={(p) => set({ ...(p.trainingIds ? { requiredTrainingIds: p.trainingIds } : {}), ...(p.equipmentIds ? { requiredEquipmentIds: p.equipmentIds } : {}) })} />
+                </div>
+              )}
+              {typeTraining(data, seasonTypes(data, season)).length > 0 && (
+                <p className="small muted" style={{ margin: "6px 0 0" }}>Its aircraft types also need {typeTraining(data, seasonTypes(data, season)).map((id) => data.trainings.find((t) => t.id === id)).filter((t) => !!t).map((t) => qualLabel(t, true)).join(", ")}.</p>
+              )}
+            </div>
+          )}
+          <ScheduleLimitsPick value={season.ruleSetId ?? null} onChange={(ruleSetId) => set({ ruleSetId: ruleSetId ?? undefined })}
+            inherit={{ name: data.settings.ruleSets?.find((r) => r.id === mission?.ruleSetId)?.name ?? "Settings' limits" }} />
           <LimitsField value={season.limits} onChange={(limits) => set({ limits })} who="this job" canOverride applies={seasonRules(data, season)} />
-          {data.settings.maxDutyHours > 0 && (
-            <Field label="Hours on duty in a day" spot="duty" hint={`The most is ${data.settings.maxDutyHours} (Settings). Empty if you don't track it.`}>
+          {jobLimits(data, season).maxDutyHours > 0 && (
+            <Field label="Hours on duty in a day" spot="duty" hint={`The most is ${jobLimits(data, season).maxDutyHours}. Empty if you don't track it.`}>
               <input type="number" inputMode="decimal" min={0} max={24} value={season.dutyHours ?? ""} placeholder="—" onChange={(e) => set({ dutyHours: e.target.value === "" ? null : Number(e.target.value) })} />
             </Field>
           )}
@@ -1446,6 +1555,14 @@ function AircraftTypeDialog({ id }: Props) {
             {data.equipment.length === 0 && <span className="small muted">No equipment set up yet. Add it on the Equipment tab.</span>}
           </div>
           <span className="hint">Its tails pick from these. None ticked: any equipment.</span>
+        </div>
+        <div className="field full" data-spot="qualifications">
+          <span>Qualifications for {name ? `the ${name}` : "this type"}</span>
+          <div className="picker-row">
+            {data.trainings.filter((x) => !x.everyone).map((x) => <Pick key={x.id} on={(t.requiredTrainingIds ?? []).includes(x.id)} onToggle={() => set({ requiredTrainingIds: toggled(t.requiredTrainingIds ?? [], x.id) })}>{qualLabel(x)}</Pick>)}
+            {data.trainings.length === 0 && <span className="small muted">No qualifications set up yet.</span>}
+          </div>
+          <span className="hint">Everyone rated on this type needs these (a type course, a recurrent check on it), and so does anyone booked on a job flying it.</span>
         </div>
         <div className="field full" data-spot="rated">
           <span>Crew rated on {name ? `the ${name}` : "this type"}</span>
@@ -2170,7 +2287,8 @@ function TrainingDialog({ id }: Props) {
         onSave={() => { upsert("trainings", t); if (!existing) showToast(`Added “${t.name}”`); close(); }}
         onDelete={() => { remove("trainings", t.id, `Deleted “${t.name}”${holders ? ` and ${plural(holders, "record")}` : ""}`); close(); }} />}>
       <div className="form-grid">
-        <Field label="Name" full><input autoFocus={autoFocusBox} value={t.name} placeholder="Night vision goggles (NVG)" onChange={(e) => set({ name: e.target.value })} /></Field>
+        <Field label="Name"><input autoFocus={autoFocusBox} value={t.name} placeholder="Night vision goggles" onChange={(e) => set({ name: e.target.value })} /></Field>
+        <Field label="Nickname" hint="A short name for tight spaces, like NVG or 293. Optional."><input value={t.nickname ?? ""} placeholder="NVG" maxLength={12} onChange={(e) => set({ nickname: e.target.value })} /></Field>
         {kindOf(t) === "medical" ? (
           <Field label="Privileges the work needs" hint="How long each class lasts follows from this and the pilot's age at the exam (FAA rules), to the end of the month.">
             <select value={t.privileges === "private" ? "private" : t.privileges ?? "commercial"} onChange={(e) => set({ privileges: e.target.value as Training["privileges"], validMonths: 12, endOfMonth: true })}>
