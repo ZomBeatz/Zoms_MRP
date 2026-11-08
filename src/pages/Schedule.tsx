@@ -150,7 +150,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
       const b = bookings(data).find((x) => x.id === s.seasonId)!;
       const m = data.missions.find((x) => x.id === b.missionId);
       const role = data.people.find((p) => p.id === s.personId)?.role ?? "Pilot";
-      const c = whoCanCover(r.data, role, ms(s.start), ms(s.end), seasonTypes(data, b), [s.id], m ? requiredTraining(data, m, role) : [], b.missionId).find((x) => x.person.id === t.target);
+      const c = whoCanCover(r.data, role, ms(s.start), ms(s.end), seasonTypes(data, b), [s.id], m ? requiredTraining(data, b, role) : [], b.missionId).find((x) => x.person.id === t.target);
       if (!c || !c.ok) {
         const why = !c ? `isn't a ${role.toLowerCase()}` : !c.qualified ? "isn't rated on the aircraft" : !c.trained ? "isn't current on the qualifications" : !c.current ? "hasn't flown the type lately" : c.off ? "has time off then" : !c.onRotation ? "is off rotation then" : "is booked elsewhere then";
         useStore.getState().showToast(`${who(t.target)} can't take it: ${who(t.target).split(" ")[0]} ${why}.`);

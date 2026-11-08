@@ -89,7 +89,7 @@ export function Missions({ issues }: { issues: Issue[] }) {
                       <td>
                         {current ? (
                           <span className="row gap-sm wrap">
-                            <button className="link" onClick={(e) => { e.stopPropagation(); open("season", current.id); }}>{fmtDates(current.start, current.end)}</button>
+                            <button className="link row gap-sm" onClick={(e) => { e.stopPropagation(); open("season", current.id); }}><span className="swatch" style={{ ...slotStyle(missionLook(m)), width: 10, height: 10 }} />{fmtDates(current.start, current.end)}</button>
                             <StatusPill status={current.status} />
                             <ConfirmButton season={{ ...current, name: m.name }} />
                           </span>

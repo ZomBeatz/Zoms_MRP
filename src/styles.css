@@ -815,3 +815,6 @@ body:has(.slot.trimming) { cursor: ew-resize; user-select: none; }
 .limits-grid > span:nth-child(odd) { color: var(--zb-text-2); }
 .panel.inset { background: var(--zb-surface-2); box-shadow: none; }
 @media (max-width: 520px) { .limits-grid { grid-template-columns: 1fr; } .lob-defaults { margin-left: 0; } }
+.link-plain { background: none; border: 0; padding: 0; color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.who-line { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.who-line .grow { min-width: 220px; }

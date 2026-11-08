@@ -235,7 +235,7 @@ function FleetStatus() {
                       <td><StatusPill status={a.status} /></td>
                       <td className="small">{downFor(a) ?? <span className="muted">–</span>}</td>
                       <td className="small">{doing(a)}</td>
-                      <td className="small">{n ? <>{n.name} <span className="muted">· {day(n.start.slice(0, 10))}</span></> : <span className="muted">None</span>}</td>
+                      <td className="small">{n ? <><span className="swatch" style={{ ...slotStyle({ color: n.color, pattern: n.pattern }), width: 9, height: 9, marginRight: 4 }} />{n.name} <span className="muted">· {day(n.start.slice(0, 10))}</span></> : <span className="muted">None</span>}</td>
                       <td className="small">{a.base || <span className="muted">–</span>}</td>
                       <td className="small" style={{ maxWidth: 280 }}>{l ? <><span className="muted">{day(l.on)}:</span> {l.text}</> : <span className="muted">Nothing yet</span>}</td>
                     </tr>

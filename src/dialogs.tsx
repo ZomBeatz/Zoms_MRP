@@ -8,13 +8,13 @@ import { planSeason } from "./pages/Planner";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
 import { keepForm, keptForm, useStore } from "./store";
-import { typeTraining, dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
+import { crewCheck, typeTraining, dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
 import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, overlaps, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
 import { SWATCHES, missionLook, nextShade, shadesOf, slotStyle } from "./look";
 import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useDirty, useGuardedClose, useSpot } from "./components/ui";
-import { bookings, seasonsOf } from "./bookings";
+import { booking, bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
 import { baseRules, fmtRuleSet, jobLimits, rulesFor, seasonRules, stricter } from "./limits";
 import { flightHours } from "./program";
@@ -25,7 +25,7 @@ import { validUntil } from "./types";
 import { downSpan, equipmentFor, missingEquipment, renameType, statusWords } from "./aircraftTypes";
 import { slotSpan, slotsOf, tailSpan, withSlots } from "./slots";
 import { seasonSeats } from "./rotation";
-import type { Aircraft, AircraftSlot, AircraftType, AppData, Equipment, MissionDocument, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
+import type { Aircraft, AircraftSlot, AircraftType, AppData, Booking, Equipment, MissionDocument, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
 
 /** Opens the right dialog for whatever `editing` points at. */
 export function Dialogs() {
@@ -356,6 +356,8 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
                     <input type="checkbox" className="pick-season" aria-label={`Select ${fmtSpan(x.start, x.end)}`} checked={picked.has(x.id)}
                       onChange={() => setPicked((s) => { const n = new Set(s); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n; })} />
                     <button className="line-main" onClick={() => open("season", x.id)}>
+                      {/* A job wears its client's color and pattern everywhere it's listed. */}
+                      <span className="swatch" style={{ ...slotStyle(missionLook(m)), marginTop: 3, alignSelf: "flex-start" }} />
                       <span className="grow">
                         <span className="name" style={{ display: "block" }}>{fmtSpan(x.start, x.end)}</span>
                         <span className="small muted">{seasonTails(data, x)} · {x.pilotsNeeded}P{x.maintainersNeeded ? ` + ${x.maintainersNeeded}M` : ""}{x.pilotRotation ? ` · ${fmtRotation(x.pilotRotation)}` : ""}</span>
@@ -404,7 +406,7 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
 
       {tab === "crew" && (
         <>
-          <p className="form-note" style={{ marginTop: 0 }}>The people who rotate through this client. They're picked first when a job is filled, and only they need its qualifications.</p>
+          <p className="form-note" style={{ marginTop: 0 }}>Each job's <b>Who can work it</b> tab shows who meets its requirements and is free, and what the others still need. The people who rotate through this client. They're picked first when a job is filled, and only they need its qualifications.</p>
           {crewGroup("Pilot")}
           {crewGroup("Maintainer")}
         </>
@@ -952,7 +954,8 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   const issues = useMemo(() => findIssues(draft).filter((i) => i.seasonId === season.id), [draft, season.id]);
   const from = ms(season.start), to = ms(season.end);
   const timeError = !(to > from);
-  const required = mission ? requiredTraining(draft, mission) : [];
+  // What this job asks of its crew: its own requirements (or its client's), what everyone needs, its aircraft types'.
+  const required = mission ? [...new Set([...requiredTraining(draft, booking(mission, season), "Pilot"), ...requiredTraining(draft, booking(mission, season), "Maintainer")])] : [];
   const pct = (t: number) => ((t - from) / (to - from)) * 100;
   const roleOf = (s: Shift) => data.people.find((p) => p.id === s.personId)?.role;
   const live = season.status !== "Done" && season.status !== "Cancelled";
@@ -1060,7 +1063,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           {rows.some((r) => r.shift) && need > 0 && <button className="btn sm ghost" onClick={() => fill(role, true)} title={`Remove the ${word} shifts and fill again from scratch`}>Start over</button>}
           <label className="check"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show everyone</label>
         </div>
-        {need > 0 && gaps.length > 0 && <WhyNobody data={draft} role={role} gap={gaps[0]} types={types} required={mission ? requiredTraining(draft, mission, role) : []} missionId={season.missionId} />}
+        {need > 0 && gaps.length > 0 && <WhyNobody data={draft} role={role} gap={gaps[0]} types={types} required={mission ? requiredTraining(draft, booking(mission, season), role) : []} missionId={season.missionId} />}
         {rows.length > 0 ? (
           <div className="lines" data-spot={role === "Pilot" ? "pilots" : "maintainers"}>
             {rows.map((r) => {
@@ -1137,11 +1140,24 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
         { key: "details", label: "Job requirements", alert: timeError },
         { key: "pilots", label: <>Pilots <span className="chip">{season.pilotsNeeded}</span></>, alert: gapsAlert("Pilot") },
         { key: "maintainers", label: <>Maintainers <span className="chip">{season.maintainersNeeded}</span></>, alert: gapsAlert("Maintainer") },
+        ...(mission && !isNew ? [{ key: "who", label: "Who can work it" }] : []),
         ...(issues.length ? [{ key: "problems", label: <>Problems <span className="chip">{issues.length}</span></>, alert: issues.some((i) => i.severity === "danger") }] : []),
       ]}
       tab={tab === "problems" && !issues.length ? "details" : tab} onTab={(t) => { setTab(t); setEditingShift(null); }}
       foot={<Foot isNew={isNew} label="job" problem={!mission ? "Pick a client first." : timeError && "The last day is before the first day (Details tab)."} onSave={save}
         onDelete={() => { remove("seasons", season.id, `Deleted the job ${fmtDates(season.start, season.end)}`); close(); }} />}>
+      {tab === "who" && mission && (
+        <WhoCanWork data={draft} job={booking(mission, season)}
+          onBook={(personId, role) => {
+            // Only this person, on the job's rotation and every limit, into the days still open.
+            const others = new Set(data.people.filter((p) => p.id !== personId).map((p) => p.id));
+            const added = fillSeason(draft, season, role, role === "Pilot" ? season.pilotRotation : season.maintainerRotation, { ...data.settings.rules, skip: others });
+            setShifts((x) => [...x, ...added]);
+            const who = data.people.find((p) => p.id === personId)?.name ?? "They";
+            useStore.getState().showToast(added.length ? `${who}: ${plural(added.reduce((t, x) => t + Math.round((ms(x.end) - ms(x.start)) / DAY), 0), "day")} booked on the open days. Save to keep it.` : `${who} can't take any of the open days (booked, off, resting or over a limit).`);
+          }} />
+      )}
+
       {(tab === "details" || (tab === "problems" && !issues.length)) && (
         <div className="form-grid">
           <Field label="Client" full>
@@ -1256,6 +1272,60 @@ function WhyNobody({ data, role, gap, types, required, missionId }: { data: AppD
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * Everyone who could work a job, by role: who meets its requirements (rating on its types, each qualification
+ * for the whole job, recent flying) and how many of its days they're free, and for the rest, what they still
+ * need. Book someone onto the open days, or put them on the client's regular crew so Fill picks them first.
+ */
+function WhoCanWork({ data, job, onBook }: { data: AppData; job: Booking; onBook: (personId: string, role: Person["role"]) => void }) {
+  const { change, open } = useStore();
+  const [show, setShow] = useState<"all" | "ready" | "needs">("all");
+  const roles = (["Pilot", "Maintainer"] as const).filter((r) => (r === "Pilot" ? job.pilotsNeeded : job.maintainersNeeded) > 0 || data.people.some((p) => p.role === r && data.shifts.some((s) => s.seasonId === job.id && s.personId === p.id)));
+  const toggleCrew = (p: Person, on: boolean) => change((d) => ({ ...d, people: d.people.map((x) => (x.id === p.id ? { ...x, missionIds: on ? [...x.missionIds, job.missionId] : x.missionIds.filter((m) => m !== job.missionId) } : x)) }),
+    on ? `${p.name} is on ${job.name}'s crew` : `${p.name} is off ${job.name}'s crew`);
+  if (!roles.length) return <p className="muted">This job doesn't need pilots or maintainers yet (Job requirements tab).</p>;
+  return (
+    <>
+      <div className="row gap-sm wrap" style={{ marginBottom: 10 }}>
+        <div className="seg">
+          {([["all", "Everyone"], ["ready", "Meets the requirements"], ["needs", "Needs something"]] as const).map(([k, l]) => <button key={k} className={show === k ? "active" : ""} onClick={() => setShow(k)}>{l}</button>)}
+        </div>
+        <span className="small muted">From today to the end of the job. Needs: what each person is missing for this job's requirements.</span>
+      </div>
+      {roles.map((role) => {
+        const rows = crewCheck(data, job, role).filter((r) => show === "all" || (show === "ready" ? !r.missing.length : r.missing.length > 0));
+        return (
+          <div key={role} style={{ marginBottom: 14 }}>
+            <h4 className="form-section">{role === "Pilot" ? "Pilots" : "Maintainers"} <span className="chip">{crewCheck(data, job, role).filter((r) => r.ready).length} meet it and are free</span></h4>
+            <div className="lines">
+              {rows.map((r) => (
+                <div key={r.person.id} className="line who-line">
+                  <button type="button" className="row gap-sm link-plain" onClick={() => open("person", r.person.id, undefined, { tab: "training" })} title="Open their qualifications">
+                    <Avatar person={r.person} /><b>{r.person.name}</b>
+                  </button>
+                  <span className="grow small">
+                    {r.onJob > 0 && <span className="pill accent">On this job {plural(r.onJob, "day")}</span>}{" "}
+                    {r.regular && <span className="pill">Client's crew</span>}{" "}
+                    {r.missing.length ? <span className="pill warn">Needs {r.missing.length === 1 ? "1 thing" : `${r.missing.length} things`}</span> : <span className="pill ok">Meets the requirements</span>}{" "}
+                    <span className="muted">{r.days ? (r.free === r.days ? "Free all of it" : r.free ? `Free ${r.free} of ${r.days} days` : "Not free (booked, off or off rotation)") : "The job is over"}</span>
+                    {r.missing.length > 0 && <span style={{ display: "block" }} className="muted">{r.missing.join(" · ")}</span>}
+                  </span>
+                  <span className="row gap-sm">
+                    {!r.missing.length && r.free > 0 && <button type="button" className="btn sm primary" onClick={() => onBook(r.person.id, role)}>Book open days</button>}
+                    <button type="button" className="btn sm" onClick={() => toggleCrew(r.person, !r.regular)}>{r.regular ? "Off the crew" : "Add to crew"}</button>
+                  </span>
+                </div>
+              ))}
+              {rows.length === 0 && <p className="muted small">Nobody here.</p>}
+            </div>
+          </div>
+        );
+      })}
+      <p className="form-note">Book open days puts them on the days nobody has yet, on this job's rotation and within every limit; Save to keep it. The client's crew are picked first when the schedule is filled.</p>
+    </>
   );
 }
 
@@ -1838,10 +1908,10 @@ function SwapDialog({ id }: Props) {
     const b = all.find((x) => x.id === s.seasonId);
     const m = b && data.missions.find((x) => x.id === b.missionId);
     if (!b) return false;
-    return whoCanCover(data, role, ms(s.start), ms(s.end), seasonTypes(data, b), except, m ? requiredTraining(data, m, role) : [], b.missionId)
+    return whoCanCover(data, role, ms(s.start), ms(s.end), seasonTypes(data, b), except, m ? requiredTraining(data, b, role) : [], b.missionId)
       .some((c) => c.person.id === who && c.ok);
   };
-  const givers = whoCanCover(data, person.role, ms(shift.start), ms(shift.end), seasonTypes(data, season), [shift.id], mission ? requiredTraining(data, mission, person.role) : [], season.missionId)
+  const givers = whoCanCover(data, person.role, ms(shift.start), ms(shift.end), seasonTypes(data, season), [shift.id], mission ? requiredTraining(data, season, person.role) : [], season.missionId)
     .filter((c) => c.ok && c.person.id !== person.id);
   const near = 120 * DAY, now = Date.now();
   const trades = data.shifts
