@@ -93,8 +93,8 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
 
   // ---- Seasons: every mission's dates, aircraft and how well each is crewed.
   {
-    const ws = sheet("Seasons", [
-      { header: "Job", key: "name", width: 30 }, { header: "Contact", key: "contact", width: 30 }, { header: "First day", key: "start", width: 13, date: true },
+    const ws = sheet("Jobs", [
+      { header: "Client", key: "name", width: 30 }, { header: "Contact", key: "contact", width: 30 }, { header: "First day", key: "start", width: 13, date: true },
       { header: "Last day", key: "end", width: 13, date: true }, { header: "Days", key: "days", width: 7 }, { header: "Aircraft", key: "tail", width: 11 },
       { header: "Status", key: "status", width: 11 }, { header: "Pilots on board", key: "pilots", width: 15 }, { header: "Fully crewed", key: "crewed", width: 13, pct: true },
     ]);
@@ -111,7 +111,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
   // ---- Crew roster: every shift, earliest first.
   {
     const ws = sheet("Crew roster", [
-      { header: "Person", key: "person", width: 20 }, { header: "Role", key: "role", width: 11 }, { header: "Job", key: "mission", width: 30 },
+      { header: "Person", key: "person", width: 20 }, { header: "Role", key: "role", width: 11 }, { header: "Client", key: "mission", width: 30 },
       { header: "Aircraft", key: "tail", width: 11 }, { header: "First day", key: "start", width: 13, date: true }, { header: "Last day", key: "end", width: 13, date: true },
       { header: "Days", key: "days", width: 7 },
     ]);
@@ -146,7 +146,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
   // ---- Maintenance: every job, earliest first.
   {
     const ws = sheet("Maintenance", [
-      { header: "Tail", key: "tail", width: 11 }, { header: "Job", key: "title", width: 30 }, { header: "Kind", key: "kind", width: 12 },
+      { header: "Tail", key: "tail", width: 11 }, { header: "Client", key: "title", width: 30 }, { header: "Kind", key: "kind", width: 12 },
       { header: "First day", key: "start", width: 13, date: true }, { header: "Last day", key: "end", width: 13, date: true },
       { header: "Grounds it", key: "grounds", width: 11 }, { header: "Maintainers", key: "who", width: 30 }, { header: "Done", key: "done", width: 8 },
     ]);

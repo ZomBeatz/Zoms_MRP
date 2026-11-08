@@ -26,7 +26,7 @@ export function BackupPlace({ onBackup }: { onBackup: () => void }) {
     <section className="panel">
       <h3><Archive size={16} /> Backups</h3>
       <p className="small muted" style={{ marginTop: 0 }}>
-        A backup is one file with the whole plan and its attached files (job documents, certificate scans). Restore it on this device or another.
+        A backup is one file with the whole plan and its attached files (client documents, certificate scans). Restore it on this device or another.
       </p>
       {isDesktopApp ? (
         <>

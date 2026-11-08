@@ -120,30 +120,30 @@ async function openSeason(tabName?: string) {
 export const TOURS: Tour[] = [
   {
     id: "basics", title: "The big picture", minutes: 3,
-    summary: "Where everything is: the overview, the fleet board, the schedule, jobs, crew and reports.",
+    summary: "Where everything is: the overview, the fleet board, the schedule, clients, crew and reports.",
     steps: [
-      { title: "Welcome to the Mission Ready Planner", body: "This is a made-up operator in Alaska: 12 helicopters, about 45 crew and 19 jobs over two years. Tap around as you go: the demo is kept apart from your own data, and it's put back the way it was when the tour ends." },
+      { title: "Welcome to the Mission Ready Planner", body: "This is a made-up operator in Alaska: 12 helicopters, about 45 crew and 19 clients over two years. Tap around as you go: the demo is kept apart from your own data, and it's put back the way it was when the tour ends." },
       { page: "overview", target: ".page .tiles", title: "The overview", body: "Start each day here. The tiles show what's flying now, what's coming up and how many problems need a look. Tap a tile to go to that page." },
       { page: "overview", target: ".page .issue", title: "Needs attention", body: "Every open seat, double booking, missing rating, lapsed qualification and too-long hitch, worst first. Tap one and Zom's MRP opens the thing to fix." },
       { page: "aircraft", target: ".gantt", title: "The fleet board", body: "Every tail over time, grouped by type. Colored bars are jobs; the green dashed blocks are free windows, counted from today. Ctrl + scroll (or pinch) zooms, and dragging moves through time." },
       { page: "aircraft", target: ".g-lane.sub", title: "How many are free each day", body: "The short bars count the aircraft that are free each day. A red mark means nothing is free that day." },
       { page: "aircraft", target: ".maint-lane", title: "Maintenance under each tail", body: "Inspections and repairs sit in a thin row under their aircraft. A work order that grounds it is outlined red if a job is booked on top." },
-      { page: "schedule", target: ".page-head .seg", title: "The schedule", body: "The same plan as a Gantt chart, with rows by aircraft, by job (with its crew under it) or by person. Pick one job from the list to see only its work." },
-      { page: "missions", target: ".page tbody tr, .page .list-card", title: "Jobs are customers", body: "Each job is one customer's kind of work, with its color, the qualifications it needs and its regular crew. Its seasons are the stretches of dates it flies." },
-      { page: "people", target: ".page tbody tr, .page .list-card", title: "Crew", body: "Pilots and maintainers, what they're rated on, the jobs they work, their own rotation if they have one, their qualifications and time off." },
-      { page: "reports", target: ".page .tiles", title: "Reports", body: "Fleet use, days per job, how busy each person is and how much of the flying was fully crewed, for any dates. PDF report and Excel report turn it into pages with charts and boards to share." },
+      { page: "schedule", target: ".page-head .seg", title: "The schedule", body: "The same plan as a Gantt chart, with rows by aircraft, by client (with its crew under it) or by person. Pick one client from the list to see only its work." },
+      { page: "missions", target: ".page tbody tr, .page .list-card", title: "Clients are customers", body: "Each client is one customer's kind of work, with its color, the qualifications it needs and its regular crew. Its jobs are the stretches of dates it flies." },
+      { page: "people", target: ".page tbody tr, .page .list-card", title: "Crew", body: "Pilots and maintainers, what they're rated on, the clients they work, their own rotation if they have one, their qualifications and time off." },
+      { page: "reports", target: ".page .tiles", title: "Reports", body: "Fleet use, days per client, how busy each person is and how much of the flying was fully crewed, for any dates. PDF report and Excel report turn it into pages with charts and boards to share." },
       { title: "That's the tour", body: "Next, try the lessons in the Guide. They start with adding a qualification and build up to a customer calling and a pilot calling in sick, with you doing each step. The Guide's How do I… section answers everyday questions." },
     ],
   },
   {
-    id: "add-mission", title: "Add a job", minutes: 2,
-    summary: "The form for a new customer: its name and look, first season, qualifications and crew. Nothing is saved.",
+    id: "add-mission", title: "Add a client", minutes: 2,
+    summary: "The form for a new customer: its name and look, first job, qualifications and crew. Nothing is saved.",
     steps: [
       { before: async () => { if (store().editing?.id !== "new" || store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Details"); }, target: ".dialog .form-grid", title: "Name and look", body: "Type the customer's name, who to call there, and pick a color and pattern so its bars are easy to spot on the schedule." },
-      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("First season"); }, target: ".dialog .form-grid", title: "Its first season", body: "The first stretch of dates it flies. Add the aircraft if you know them, how many pilots and maintainers it needs at a time, and its rotation. You can leave the aircraft for later." },
-      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Qualifications"); }, target: ".dialog .picker-row", title: "Qualifications it needs", body: "Tap the qualifications this customer's crew must have. Only people on this job need them." },
+      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("First job"); }, target: ".dialog .form-grid", title: "Its first job", body: "The first stretch of dates it flies. Add the aircraft if you know them, how many pilots and maintainers it needs at a time, and its rotation. You can leave the aircraft for later." },
+      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Job requirements"); }, target: ".dialog .picker-row", title: "Qualifications it needs", body: "Tap the qualifications this customer's crew must have. Only people on this client need them." },
       { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Crew"); }, target: ".dialog-body", title: "Its regular crew", body: "Tap the people who usually work it. People rated on its aircraft are listed first; the rest are folded away." },
-      { before: () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); }, target: ".dialog-foot", title: "Add it", body: "Add job saves it. If something's missing, like the name, the button says what. This walkthrough closes without saving." },
+      { before: () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); }, target: ".dialog-foot", title: "Add it", body: "Add client saves it. If something's missing, like the name, the button says what. This walkthrough closes without saving." },
     ],
   },
   {
@@ -153,20 +153,20 @@ export const TOURS: Tour[] = [
       { page: "aircraft", target: { sel: ".page-head .btn", text: "Can we take a job" }, title: "A customer calls", body: "Say a survey company wants a helicopter for a month. Start from the Fleet page with Can we take a job?" },
       { before: async () => { if (store().editing?.kind !== "support") store().open("support", "new"); await waitFor(".dialog .form-grid"); }, target: ".dialog .form-grid", title: "What the job needs", body: "Pick the dates, the aircraft type if it matters, how many pilots fly on board, and any qualifications the customer asks for (like mountain flying)." },
       { before: () => { if (store().editing?.kind !== "support") store().open("support", "new"); }, target: ".dialog .issue", title: "The answer, tail by tail", body: "Each tail says Can do, Short crew or Can't, and why: booked, in maintenance, grounded, or not enough rated and current pilots free every day. A busy tail shows the first day it's free for the whole job." },
-      { before: () => { if (store().editing?.kind !== "support") store().open("support", "new"); }, target: { sel: ".dialog .btn", text: "Book on" }, title: "Book it", body: "Book on N… starts a new job with those dates, that tail and crew size filled in. Name the customer, save, and it's on the board." },
-      { title: "Done", body: "The new job's season then needs crew. That's the next walkthrough: “Crew a job on a rotation”." },
+      { before: () => { if (store().editing?.kind !== "support") store().open("support", "new"); }, target: { sel: ".dialog .btn", text: "Book on" }, title: "Book it", body: "Book on N… starts a new client and its job with those dates, that tail and crew size filled in. Name the customer, save, and it's on the board." },
+      { title: "Done", body: "The new client's job then needs crew. That's the next walkthrough: “Crew a job on a rotation”." },
     ],
   },
   {
     id: "crew", title: "Crew a job on a rotation", minutes: 3,
     summary: "Set aircraft, crew numbers and a 14 on / 7 off rotation, then fill the schedule and close the gaps.",
     steps: [
-      { before: () => openSeason("Details"), target: ".dialog-meta", title: "A season to crew", body: "This is next summer's fire season. The line under the title shows it at a glance: status, dates, tails and how much is crewed." },
+      { before: () => openSeason("Details"), target: ".dialog-meta", title: "A job to crew", body: "This is next summer's fire job. The line under the title shows it at a glance: status, dates, tails and how much is crewed." },
       { before: () => openSeason("Details"), target: '.dialog [data-spot="aircraft"]', title: "Several aircraft on one job", body: "Add the tails when they're known; a planned job can wait for them. Each tail says if it's free for these dates. People rated on any of these types can crew it." },
       { before: () => openSeason("Details"), target: ".dialog .stepper", title: "Crew needed at any time", body: "How many pilots and maintainers the whole job needs on any day, across all its aircraft." },
       { before: () => openSeason("Details"), target: ".dialog .rotation", title: "The job's rotation", body: "Like 14 days on, 7 off, or 21 on, 14 off. Pilots and maintainers can have different rotations." },
       { before: () => openSeason("Pilots"), target: ".dialog .cov-bar", title: "Where it's short", body: "Green is covered; red stripes are days with an open seat. The Pilots tab has a red dot while any are open." },
-      { before: () => openSeason("Pilots"), target: { sel: ".dialog .btn", text: "Fill the schedule" }, title: "Fill the schedule", body: "Rotates people through the open days on the job's pattern. It only picks people who are rated, current on the job's qualifications, free, rested and on their own rotation, and the job's regular crew go first." },
+      { before: () => openSeason("Pilots"), target: { sel: ".dialog .btn", text: "Fill the schedule" }, title: "Fill the schedule", body: "Rotates people through the open days on the job's pattern. It only picks people who are rated, current on the client's qualifications, free, rested and on their own rotation, and the client's regular crew go first." },
       { before: async () => { await openSeason("Pilots"); await click({ sel: ".dialog .btn", text: "Fill the schedule" }); }, target: ".dialog .lines", title: "One line per shift", body: "Each shift is who and when. Any days nobody could cover stay as red Open seat lines, in date order. Tap an open seat to put someone on just those days." },
       { before: () => openSeason("Pilots"), target: { sel: ".dialog .line", text: "" }, title: "Change a shift", body: "Tap a line to swap the person or change the dates. The list of people only shows who can take that shift." },
       { before: () => openSeason("Pilots"), target: ".dialog .toolbar .check", title: "Show everyone", body: "Turn this on to see everyone, with the reason each one can't take it: not rated, qualifications lapsed, off rotation, time off or booked elsewhere." },
@@ -178,18 +178,18 @@ export const TOURS: Tour[] = [
     summary: "See every open seat across all jobs, and who's free and qualified to fill it.",
     steps: [
       { page: "schedule", before: () => click({ sel: ".page-head .seg button", text: "Crew" }), target: ".gantt", title: "The crew view", body: "Rows by person. Open seats are at the top, as red dashed slots for each job that's short. Grey hatching is someone's time off or off-rotation days." },
-      { page: "schedule", before: async () => { await click({ sel: ".page-head .seg button", text: "Crew" }); await choose('select[aria-label="Show one job"]', mission("Interior Fire Service")?.id ?? ""); }, target: 'select[aria-label="Show one job"]', title: "One job at a time", body: "Pick a job. The crew view then shows its open seats, the people on it, and the people who are rated and current but not on it yet: the ones to call." },
-      { page: "overview", target: ".page .issue", title: "Or work from the list", body: "The overview lists the same gaps with every other problem. Tap one to open the season with the gap, and use Fill the schedule or tap the open seat." },
-      { page: "schedule", before: () => choose('select[aria-label="Show one job"]', ""), title: "Done", body: "Tip: with every seat filled, the season's pill turns green: Crewed." },
+      { page: "schedule", before: async () => { await click({ sel: ".page-head .seg button", text: "Crew" }); await choose('select[aria-label="Show one client"]', mission("Interior Fire Service")?.id ?? ""); }, target: 'select[aria-label="Show one client"]', title: "One job at a time", body: "Pick a client. The crew view then shows its open seats, the people on it, and the people who are rated and current but not on it yet: the ones to call." },
+      { page: "overview", target: ".page .issue", title: "Or work from the list", body: "The overview lists the same gaps with every other problem. Tap one to open the job with the gap, and use Fill the schedule or tap the open seat." },
+      { page: "schedule", before: () => choose('select[aria-label="Show one client"]', ""), title: "Done", body: "Tip: with every seat filled, the job's pill turns green: Crewed." },
     ],
   },
   {
     id: "training", title: "Keep qualifications current", minutes: 2,
-    summary: "Jobs set the qualifications they need; see who's current and what runs out soon.",
+    summary: "Clients set the qualifications they need; see who's current and what runs out soon.",
     steps: [
-      { page: "missions", before: async () => { const m = mission("Mat-Su Medevac"); if (m) store().open("mission", m.id); await tab("Qualifications"); }, target: ".dialog .picker-row", title: "Jobs set the qualifications", body: "Each job ticks the qualifications its crew need. People only need the qualifications of the jobs they work, so a fire pilot doesn't need NVG unless they also fly medevac." },
-      { page: "training", target: ".page .seg", title: "Who's current", body: "A grid of people and qualifications: current, runs out soon, or lapsed. Qualifications nobody needs for their jobs are left blank." },
-      { page: "training", before: () => choose('select[aria-label="Show crew for"]', mission("Mat-Su Medevac")?.id ?? ""), target: 'select[aria-label="Show crew for"]', title: "Crew for one job", body: "Narrow it to one job's crew to check they can all fly it." },
+      { page: "missions", before: async () => { const m = mission("Mat-Su Medevac"); if (m) store().open("mission", m.id); await tab("Job requirements"); }, target: ".dialog .picker-row", title: "Clients set the qualifications", body: "Each client ticks the qualifications its crew need. People only need the qualifications of the clients they work, so a fire pilot doesn't need NVG unless they also fly medevac." },
+      { page: "training", target: ".page .seg", title: "Who's current", body: "A grid of people and qualifications: current, runs out soon, or lapsed. Qualifications nobody needs for their clients are left blank." },
+      { page: "training", before: () => choose('select[aria-label="Show crew for"]', mission("Mat-Su Medevac")?.id ?? ""), target: 'select[aria-label="Show crew for"]', title: "Crew for one client", body: "Narrow it to one client's crew to check they can all fly it." },
       { page: "people", before: async () => { const p = store().data.people.find((x) => x.role === "Pilot"); if (p) store().open("person", p.id); await tab("Qualifications"); }, target: ".dialog .lines", title: "A person's records", body: "One line per qualification with when it runs out. Tap one to update it after a renewal; older records are kept and greyed out as Renewed." },
       { title: "Warnings ahead of time", body: "Zom's MRP warns when a qualification runs out within the warning window in Settings, and flags any shift where qualifications would lapse mid-hitch." },
     ],
@@ -199,8 +199,8 @@ export const TOURS: Tour[] = [
     summary: "Book inspections and repairs, with maintainers, and keep grounded aircraft off jobs.",
     steps: [
       { page: "maintenance", target: ".page tbody tr, .page .list-card", title: "Work orders", body: "Inspections and repairs on each tail, with the maintainers working on them." },
-      { page: "maintenance", before: async () => { const j = store().data.jobs.find((x) => x.grounds) ?? store().data.jobs[0]; if (j) store().open("job", j.id); await waitFor(".dialog"); }, target: { sel: ".dialog .check", text: "can't fly" }, title: "Grounding jobs", body: "Tick this when the aircraft can't fly during the job. Zom's MRP then flags any job booked on it, and it doesn't count as free on the Fleet page." },
-      { page: "aircraft", target: ".maint-lane", title: "On the fleet board", body: "Jobs show in the thin row under each tail, so a gap in the jobs is easy to plan into." },
+      { page: "maintenance", before: async () => { const j = store().data.jobs.find((x) => x.grounds) ?? store().data.jobs[0]; if (j) store().open("job", j.id); await waitFor(".dialog"); }, target: { sel: ".dialog .check", text: "can't fly" }, title: "Grounding jobs", body: "Tick this when the aircraft can't fly during the work order. Zom's MRP then flags any job booked on it, and it doesn't count as free on the Fleet page." },
+      { page: "aircraft", target: ".maint-lane", title: "On the fleet board", body: "Work orders show in the thin row under each tail, so a gap in the jobs is easy to plan into." },
     ],
   },
 ];
@@ -240,7 +240,7 @@ function pickSick() {
   const sh = d.shifts.find((x) => ms(x.start) <= a && ms(x.end) > dayAt(a, 3) && d.people.find((p) => p.id === x.personId)?.role === "Pilot");
   const p = d.people.find((x) => x.id === sh?.personId) ?? d.people[0];
   const season = d.seasons.find((x) => x.id === sh?.seasonId);
-  sick = { id: p.id, name: p.name, mission: d.missions.find((m) => m.id === season?.missionId)?.name ?? "a job", a, b: dayAt(a, 7) };
+  sick = { id: p.id, name: p.name, mission: d.missions.find((m) => m.id === season?.missionId)?.name ?? "a client", a, b: dayAt(a, 7) };
 }
 
 const pilotsOnBoard = () => Number((document.querySelector('.dialog input[aria-label="pilots"]') as HTMLInputElement | null)?.value ?? 0);
@@ -290,12 +290,12 @@ export const SCENARIOS: Tour[] = [
       },
       {
         target: { sel: ".dialog .btn", text: "Book on" }, title: "Book it",
-        body: "Booking starts a new job with the dates, the tail and the pilots already filled in.",
+        body: "Booking starts a new client and its job with the dates, the tail and the pilots already filled in.",
         task: { say: "Tap Book on… next to a tail that says Can do.", done: () => editing()?.kind === "mission" && editing()?.id === "new", doIt: () => click({ sel: ".dialog .btn", text: "Book on" }) },
       },
       {
         target: '.dialog input[placeholder="Interior Fire Service"]', title: "Name the customer",
-        body: "A job is the customer. Its color and pattern are picked for you; change them if you like.",
+        body: "A client is the customer. Its color and pattern are picked for you; change them if you like.",
         task: {
           say: "Type Denali Heli-Ski Tours as the name.",
           done: () => !!(findTarget('.dialog input[placeholder="Interior Fire Service"]') as HTMLInputElement | null)?.value.trim(),
@@ -303,9 +303,9 @@ export const SCENARIOS: Tour[] = [
         },
       },
       {
-        target: { sel: ".dialog-tabs button", text: "First season" }, title: "Check its first season",
+        target: { sel: ".dialog-tabs button", text: "First job" }, title: "Check its first job",
         body: "The dates, the tail and the pilots on board came from the check. One thing is left: how the pilots rotate.",
-        task: { say: "Tap the First season tab.", done: () => activeTab().startsWith("First season"), doIt: () => tab("First season") },
+        task: { say: "Tap the First job tab.", done: () => activeTab().startsWith("First job"), doIt: () => tab("First job") },
       },
       {
         target: ".dialog .rotation", title: "Set the rotation",
@@ -313,20 +313,20 @@ export const SCENARIOS: Tour[] = [
         task: {
           say: "Set the pilot rotation to 14 on, 7 off.",
           done: () => { const [on, off] = document.querySelectorAll<HTMLInputElement>(".dialog .rotation input"); return on?.value === "14" && off?.value === "7"; },
-          doIt: async () => { if (!activeTab().startsWith("First season")) await tab("First season"); const [on, off] = document.querySelectorAll<HTMLInputElement>(".dialog .rotation input"); await type(on, "14"); await type(off, "7"); },
+          doIt: async () => { if (!activeTab().startsWith("First job")) await tab("First job"); const [on, off] = document.querySelectorAll<HTMLInputElement>(".dialog .rotation input"); await type(on, "14"); await type(off, "7"); },
         },
       },
       {
         target: ".dialog-foot .btn.primary", title: "Add it",
         body: "That's enough to put it on the board. Qualifications and regular crew can be set any time on its other tabs.",
-        task: { say: "Tap Add job.", done: () => !!newMission() && editing()?.kind !== "mission", doIt: () => click(".dialog-foot .btn.primary") },
+        task: { say: "Tap Add client.", done: () => !!newMission() && editing()?.kind !== "mission", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
         before: () => { if (editing()?.kind === "support") store().close(); },
         title: "Now crew it",
-        body: () => `“${newMission()?.name ?? "The new job"}” is booked but has nobody on it yet. Its season is where the crew goes.`,
+        body: () => `“${newMission()?.name ?? "The new client"}” is booked but has nobody on it yet. Its job is where the crew goes.`,
         task: {
-          say: () => `Open its season: Jobs › ${newMission()?.name ?? "the new job"} › Seasons › tap the dates.`,
+          say: () => `Open its job: Clients › ${newMission()?.name ?? "the new client"} › Jobs › tap the dates.`,
           done: () => editing()?.kind === "season" && editing()?.id === newSeason()?.id,
           doIt: () => { const x = newSeason(); if (x) store().open("season", x.id); },
         },
@@ -416,7 +416,7 @@ export const SCENARIOS: Tour[] = [
       {
         before: async () => { await openSeason("Details"); mark.tags = tagCount(); mark.pilots = pilotsAtATime(); },
         target: '.dialog [data-spot="aircraft"]', title: "One more aircraft",
-        body: "Interior Fire Service wants a third helicopter for next summer's season, with one more pilot on at a time. Each tail says whether it's free for these dates.",
+        body: "Interior Fire Service wants a third helicopter for next summer's job, with one more pilot on at a time. Each tail says whether it's free for these dates.",
         task: {
           say: "Under Add another, tap a tail that says Free.",
           done: () => tagCount() > mark.tags,
@@ -439,7 +439,7 @@ export const SCENARIOS: Tour[] = [
         body: "Any red left means nobody rated and current was free those days. That's when to hire, train, or move someone from another job.",
         task: { say: "Tap Save.", done: () => editing()?.kind !== "season", doIt: () => click(".dialog-foot .btn.primary") },
       },
-      { page: "aircraft", title: "Done", body: "The new tail shows the fire season on the Fleet board." },
+      { page: "aircraft", title: "Done", body: "The new tail shows the fire job on the Fleet board." },
     ],
   },
 ];
@@ -478,7 +478,7 @@ export const SETUP: Tour[] = [
         people: d.people.map((p) => ({ ...p, training: p.training.filter((r) => !old.has(r.trainingId)) })),
       };
     }),
-    summary: "Add a qualification people need, and set which job needs it.",
+    summary: "Add a qualification people need, and set which client needs it.",
     steps: [
       {
         page: "training",
@@ -497,18 +497,18 @@ export const SETUP: Tour[] = [
       },
       {
         target: ".dialog-foot .btn.primary", title: "Add it",
-        body: "A qualification on its own doesn't ask anything of anyone yet. A job has to need it.",
+        body: "A qualification on its own doesn't ask anything of anyone yet. A client has to need it.",
         task: { say: "Tap Add qualification.", done: () => !!course() && editing()?.kind !== "training", doIt: () => click(".dialog-foot .btn.primary") },
       },
       {
         // Points at whatever comes next as the person gets there: the mission's tabs, then the course.
-        target: () => (editing()?.kind !== "mission" ? "" : activeTab().startsWith("Qualifications") ? { sel: ".dialog .chip.pick", text: course()?.name ?? COURSE } : ".dialog-tabs"),
-        title: "Jobs say what they need",
-        body: () => `Open ${ICEFIELD} and tick ${course()?.name ?? COURSE} on its Qualifications tab. Then only the people who work it need the qualification.`,
+        target: () => (editing()?.kind !== "mission" ? "" : activeTab().startsWith("Job requirements") ? { sel: ".dialog .chip.pick", text: course()?.name ?? COURSE } : ".dialog-tabs"),
+        title: "Clients say what they need",
+        body: () => `Open ${ICEFIELD} and tick ${course()?.name ?? COURSE} on its Job requirements tab. Then only the people who work it need the qualification.`,
         task: {
-          say: () => `Open ${ICEFIELD} (Jobs page), go to its Qualifications tab, and tap ${course()?.name ?? COURSE}.`,
+          say: () => `Open ${ICEFIELD} (Clients page), go to its Job requirements tab, and tap ${course()?.name ?? COURSE}.`,
           done: () => editing()?.kind === "mission" && pickOn(course()?.name ?? COURSE),
-          doIt: async () => { const m = icefield(); if (m && editing()?.id !== m.id) store().open("mission", m.id); await tab("Qualifications"); await tapPick(course()?.name ?? COURSE); },
+          doIt: async () => { const m = icefield(); if (m && editing()?.id !== m.id) store().open("mission", m.id); await tab("Job requirements"); await tapPick(course()?.name ?? COURSE); },
         },
       },
       {
@@ -516,7 +516,7 @@ export const SETUP: Tour[] = [
         body: "Its crew now show as not current for this qualification until it's recorded on them, the way lesson 3 does for a new pilot.",
         task: { say: "Tap Save.", done: () => !!course() && !!icefield()?.requiredTrainingIds.includes(course()!.id), doIt: () => click(".dialog-foot .btn.primary") },
       },
-      { page: "training", target: ".page .seg", title: "Lesson done", body: "Who's current on this page now counts the new qualification for that job's crew." },
+      { page: "training", target: ".page .seg", title: "Lesson done", body: "Who's current on this page now counts the new qualification for that client's crew." },
     ],
   },
   {
@@ -564,7 +564,7 @@ export const SETUP: Tour[] = [
       const old = new Set(d.people.filter((p) => same(p.name, PILOT)).map((p) => p.id));
       return { ...d, people: d.people.filter((p) => !old.has(p.id)), shifts: d.shifts.filter((x) => !old.has(x.personId)), timeOff: d.timeOff.filter((t) => !old.has(t.personId)), jobs: d.jobs.map((j) => ({ ...j, maintainerIds: j.maintainerIds.filter((id) => !old.has(id)) })) };
     }),
-    summary: "A new pilot: what they're rated on, the job they work, and their qualifications.",
+    summary: "A new pilot: what they're rated on, the client they work, and their qualifications.",
     steps: [
       {
         page: "people",
@@ -585,8 +585,8 @@ export const SETUP: Tour[] = [
       },
       {
         before: async () => { if (editing()?.kind === "person" && !activeTab().startsWith("Ratings")) await tab("Ratings"); },
-        target: { sel: ".dialog .chip.pick", text: ICEFIELD }, title: "The job they work",
-        body: "Works on is the jobs they rotate through. It decides which qualifications they need, and they're picked first when those jobs are filled.",
+        target: { sel: ".dialog .chip.pick", text: ICEFIELD }, title: "The client they work",
+        body: "Works on is the clients they rotate through. It decides which qualifications they need, and they're picked first when those clients are filled.",
         task: { say: `Tap ${ICEFIELD}.`, done: () => pickOn(ICEFIELD), doIt: async () => { await tab("Ratings"); await tapPick(ICEFIELD); } },
       },
       {
@@ -601,8 +601,8 @@ export const SETUP: Tour[] = [
         target: () => (findTarget(".dialog .picker-row") ? ".dialog .picker-row" : ".dialog .toolbar"), title: "Their qualifications",
         body: () => `${mark.auto ? `${ICEFIELD} wasn't ticked under Works on, so it's ticked now: the qualifications below come from it. ` : ""}Each qualification ${ICEFIELD} needs has a + button. It's added as done today; tap its line afterwards to change the dates.`,
         task: {
-          say: "Tap each qualification under “Needed for their jobs” until none are left.",
-          done: () => activeTab().startsWith("Qualifications") && !findTarget({ sel: ".dialog .form-section", text: "Needed for their jobs" }) && !document.querySelector(".dialog .line-edit") && document.querySelectorAll(".dialog .line").length > 0,
+          say: "Tap each qualification under “Needed for their clients” until none are left.",
+          done: () => activeTab().startsWith("Qualifications") && !findTarget({ sel: ".dialog .form-section", text: "Needed for their clients" }) && !document.querySelector(".dialog .line-edit") && document.querySelectorAll(".dialog .line").length > 0,
           doIt: async () => {
             if (!activeTab().startsWith("Qualifications")) await tab("Qualifications");
             for (let i = 0; i < 8; i++) {

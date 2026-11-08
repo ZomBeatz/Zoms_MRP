@@ -9,10 +9,10 @@ describe("Export to Excel", () => {
     const blob = await buildWorkbook(data);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await blob.arrayBuffer());
-    expect(wb.worksheets.map((w) => w.name)).toEqual(["Fleet board", "Fleet use", "Seasons", "Crew roster", "Qualifications", "Maintenance", "Problems"]);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["Fleet board", "Fleet use", "Jobs", "Crew roster", "Qualifications", "Maintenance", "Problems"]);
     // One row per active tail on the board (plus the header and the note underneath).
     expect(wb.getWorksheet("Fleet board")!.getColumn(1).values.filter(Boolean).length).toBeGreaterThanOrEqual(13);
-    const seasons = wb.getWorksheet("Seasons")!;
+    const seasons = wb.getWorksheet("Jobs")!;
     expect(seasons.rowCount - 1).toBe(data.seasons.filter((s) => s.status !== "Cancelled").length);
     expect(seasons.getRow(2).getCell(3).value).toBeInstanceOf(Date);
     expect(wb.getWorksheet("Crew roster")!.rowCount - 1).toBe(data.shifts.length);

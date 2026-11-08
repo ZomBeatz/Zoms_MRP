@@ -22,7 +22,7 @@ export function UpdateSettings() {
       </div>
       <p className="small muted" style={{ margin: "6px 0 0" }}>
         {status === "none" ? "You have the latest version."
-          : status === "error" ? `Couldn't check: ${error}. Try again when you're online.`
+          : status === "error" ? `Couldn't check. ${error}`
           : status === "downloading" ? `Downloading ${version}…`
           : status === "installing" ? `Installing ${version}…`
           : version ? `Version ${version} is out.`

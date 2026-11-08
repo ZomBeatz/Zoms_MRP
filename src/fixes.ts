@@ -27,8 +27,8 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
   const person = data.people.find((p) => p.id === i.personId);
   const tail = data.aircraft.find((a) => a.id === i.aircraftId)?.tail ?? "the aircraft";
   const crewTab = person?.role === "Maintainer" ? "maintainers" : "pilots";
-  const name = (id?: string) => (id ? seasons.get(id)?.name : undefined) ?? "the job";
-  const jobTitle = (id?: string) => data.jobs.find((j) => j.id === id)?.title ?? "the job";
+  const name = (id?: string) => (id ? seasons.get(id)?.name : undefined) ?? "the client";
+  const jobTitle = (id?: string) => data.jobs.find((j) => j.id === id)?.title ?? "the client";
 
   const season = (label: string, tab: string, spot?: string, id = i.seasonId): Fix[] => (id ? [{ label, kind: "season", id, tab, spot }] : []);
   const shift = (label: string, seasonId = i.seasonId, shiftId = i.shiftId, tab = crewTab): Fix[] =>
@@ -54,6 +54,8 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
       { label: `Tick it on ${tail}`, kind: "aircraft", id: i.aircraftId!, spot: "equipment" },
       ...season("Pick another aircraft", "details", "aircraft"),
     ];
+    case "flyday": return season("Add a pilot to share the flying", "details", "crew");
+    case "shorthitch": return shift("Lengthen the hitch");
     case "slot": return season("Pick the tail", "details", "aircraft");
     case "acback": return [{ label: `Update ${tail}'s status`, kind: "aircraft", id: i.aircraftId!, spot: "status" }];
     case "acjob": return [
@@ -72,7 +74,7 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
     ];
     case "qual": return [...shift("Swap them out"), ...who("Add the rating", "work", "quals")];
     case "offrot": return [...shift("Swap them out"), ...who("Change their rotation", "details", "rotation")];
-    case "outside": return [...shift("Fix the shift's dates"), ...season("Change the season's dates", "details", "dates")];
+    case "outside": return [...shift("Fix the shift's dates"), ...season("Change the job's dates", "details", "dates")];
     case "stime": return shift("Fix the shift's dates");
     case "jqual": return [...job("Pick another maintainer", "maintainers"), ...who("Add the rating", "work", "quals")];
     case "dbl": return [
@@ -99,7 +101,7 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
     case "renew": return [...who("Record the renewal", "training", `training:${i.trainingId}`), ...extendIt()];
   }
   // Anything new: at least open what it's about.
-  if (i.seasonId) return season("Open the season", "details");
+  if (i.seasonId) return season("Open the job", "details");
   if (i.jobId) return job("Open the work order", "dates");
   if (i.personId) return who("Open their details", "details", "");
   return [];
