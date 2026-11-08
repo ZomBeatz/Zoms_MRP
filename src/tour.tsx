@@ -141,7 +141,7 @@ export const TOURS: Tour[] = [
     steps: [
       { before: async () => { if (store().editing?.id !== "new" || store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Details"); }, target: ".dialog .form-grid", title: "Name and look", body: "Type the customer's name, who to call there, and pick a color and pattern so its bars are easy to spot on the schedule." },
       { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("First job"); }, target: ".dialog .form-grid", title: "Its first job", body: "The first stretch of dates it flies. Add the aircraft if you know them, how many pilots and maintainers it needs at a time, and its rotation. You can leave the aircraft for later." },
-      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Qualifications"); }, target: ".dialog .picker-row", title: "Qualifications it needs", body: "Tap the qualifications this customer's crew must have. Only people on this client need them." },
+      { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Job requirements"); }, target: ".dialog .picker-row", title: "Qualifications it needs", body: "Tap the qualifications this customer's crew must have. Only people on this client need them." },
       { before: async () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); await tab("Crew"); }, target: ".dialog-body", title: "Its regular crew", body: "Tap the people who usually work it. People rated on its aircraft are listed first; the rest are folded away." },
       { before: () => { if (store().editing?.kind !== "mission") store().open("mission", "new"); }, target: ".dialog-foot", title: "Add it", body: "Add client saves it. If something's missing, like the name, the button says what. This walkthrough closes without saving." },
     ],
@@ -187,7 +187,7 @@ export const TOURS: Tour[] = [
     id: "training", title: "Keep qualifications current", minutes: 2,
     summary: "Clients set the qualifications they need; see who's current and what runs out soon.",
     steps: [
-      { page: "missions", before: async () => { const m = mission("Mat-Su Medevac"); if (m) store().open("mission", m.id); await tab("Qualifications"); }, target: ".dialog .picker-row", title: "Clients set the qualifications", body: "Each client ticks the qualifications its crew need. People only need the qualifications of the clients they work, so a fire pilot doesn't need NVG unless they also fly medevac." },
+      { page: "missions", before: async () => { const m = mission("Mat-Su Medevac"); if (m) store().open("mission", m.id); await tab("Job requirements"); }, target: ".dialog .picker-row", title: "Clients set the qualifications", body: "Each client ticks the qualifications its crew need. People only need the qualifications of the clients they work, so a fire pilot doesn't need NVG unless they also fly medevac." },
       { page: "training", target: ".page .seg", title: "Who's current", body: "A grid of people and qualifications: current, runs out soon, or lapsed. Qualifications nobody needs for their clients are left blank." },
       { page: "training", before: () => choose('select[aria-label="Show crew for"]', mission("Mat-Su Medevac")?.id ?? ""), target: 'select[aria-label="Show crew for"]', title: "Crew for one client", body: "Narrow it to one client's crew to check they can all fly it." },
       { page: "people", before: async () => { const p = store().data.people.find((x) => x.role === "Pilot"); if (p) store().open("person", p.id); await tab("Qualifications"); }, target: ".dialog .lines", title: "A person's records", body: "One line per qualification with when it runs out. Tap one to update it after a renewal; older records are kept and greyed out as Renewed." },
@@ -502,13 +502,13 @@ export const SETUP: Tour[] = [
       },
       {
         // Points at whatever comes next as the person gets there: the mission's tabs, then the course.
-        target: () => (editing()?.kind !== "mission" ? "" : activeTab().startsWith("Qualifications") ? { sel: ".dialog .chip.pick", text: course()?.name ?? COURSE } : ".dialog-tabs"),
+        target: () => (editing()?.kind !== "mission" ? "" : activeTab().startsWith("Job requirements") ? { sel: ".dialog .chip.pick", text: course()?.name ?? COURSE } : ".dialog-tabs"),
         title: "Clients say what they need",
-        body: () => `Open ${ICEFIELD} and tick ${course()?.name ?? COURSE} on its Qualifications tab. Then only the people who work it need the qualification.`,
+        body: () => `Open ${ICEFIELD} and tick ${course()?.name ?? COURSE} on its Job requirements tab. Then only the people who work it need the qualification.`,
         task: {
-          say: () => `Open ${ICEFIELD} (Clients page), go to its Qualifications tab, and tap ${course()?.name ?? COURSE}.`,
+          say: () => `Open ${ICEFIELD} (Clients page), go to its Job requirements tab, and tap ${course()?.name ?? COURSE}.`,
           done: () => editing()?.kind === "mission" && pickOn(course()?.name ?? COURSE),
-          doIt: async () => { const m = icefield(); if (m && editing()?.id !== m.id) store().open("mission", m.id); await tab("Qualifications"); await tapPick(course()?.name ?? COURSE); },
+          doIt: async () => { const m = icefield(); if (m && editing()?.id !== m.id) store().open("mission", m.id); await tab("Job requirements"); await tapPick(course()?.name ?? COURSE); },
         },
       },
       {

@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { validUntil, type AppData, type Mission, type Person, type Season, type Shift } from "./types";
+import { validUntil, type AppData, type Booking, type Mission, type Person, type Season, type Shift } from "./types";
 import { bookings } from "./bookings";
 import { downSpan, missingEquipment, statusWords } from "./aircraftTypes";
 import { slotSpan, slotsOf, tailSpan } from "./slots";
@@ -495,4 +495,64 @@ export function trainingStatus(p: Person, trainingId: string, a: number, b: numb
   if (end <= a) return { state: "expired", expires: latest };
   if (end < b) return { state: "runs-out", expires: latest };
   return { state: "ok", expires: latest };
+}
+
+export interface CrewFit {
+  person: Person;
+  /** On the client's regular crew. */
+  regular: boolean;
+  /** Days already booked on this job. */
+  onJob: number;
+  /** Days of the job (from today on) they're free: not booked elsewhere, not off, on their own rotation. */
+  free: number;
+  days: number;
+  /** What they still need for this job, in words ("Rating on the Bell 412", "NVG: runs out Dec 1"). */
+  missing: string[];
+  /** Meets every requirement and is free at least one day. */
+  ready: boolean;
+}
+
+/**
+ * Everyone in a role against one job: whether they meet its requirements (a rating on one of its types, each
+ * qualification for the whole job, recent flying on the type) and how much of it they're free for. The job's
+ * regular crew and the people who fit come first.
+ */
+export function crewCheck(data: AppData, b: Booking, role: Person["role"], now = Date.now()): CrewFit[] {
+  const from = Math.max(ms(b.start), dayAt(now, 0)), to = ms(b.end);
+  const days: number[] = [];
+  for (let d = from; d < to; d = dayAt(d, 1)) days.push(d);
+  const types = seasonTypes(data, b);
+  const required = requiredTraining(data, b, role);
+  const names = new Map(data.trainings.map((t) => [t.id, t]));
+  const day = (iso: string) => format(new Date(`${iso}T00:00`), "MMM d");
+  return data.people
+    .filter((p) => p.role === role)
+    .map((p): CrewFit => {
+      const missing: string[] = [];
+      if (types.length && !types.some((t) => p.quals.includes(t))) missing.push(`Rating on the ${types.join(" or ")}`);
+      for (const id of required) {
+        const t = names.get(id);
+        if (!t) continue;
+        const st = trainingStatus(p, id, from, Math.max(to, from + 1));
+        const label = t.nickname || t.name;
+        if (st.state === "missing") missing.push(`${label}: not on record`);
+        else if (st.state === "expired") missing.push(`${label}: ran out ${day(st.expires!)}`);
+        else if (st.state === "runs-out") missing.push(`${label}: runs out ${day(st.expires!)}`);
+      }
+      const stale = types.length && days.length ? staleOn(data, p, types, from) : null;
+      if (stale) missing.push(`Hasn't flown the ${stale.type} in ${stale.days} days`);
+      const duty = dutyOf(data, p.id);
+      const off = data.timeOff.filter((t) => t.personId === p.id && !t.soft).map((t) => [ms(t.start), ms(t.end)] as const);
+      let free = 0, onJob = 0;
+      for (const d of days) {
+        const e = dayAt(d, 1);
+        const here = duty.some((x) => x.seasonId === b.id && overlaps(d, e, x.a, x.b));
+        if (here) { onJob++; continue; }
+        if (duty.some((x) => overlaps(d, e, x.a, x.b)) || off.some(([x, y]) => overlaps(d, e, x, y)) || !onRotationFor(p, d, e)) continue;
+        free++;
+      }
+      return { person: p, regular: p.missionIds.includes(b.missionId), onJob, free, days: days.length, missing, ready: !missing.length && free > 0 };
+    })
+    .sort((x, y) => Number(y.onJob > 0) - Number(x.onJob > 0) || Number(y.ready) - Number(x.ready) || Number(y.regular) - Number(x.regular)
+      || x.missing.length - y.missing.length || y.free - x.free || x.person.name.localeCompare(y.person.name));
 }

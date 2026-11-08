@@ -316,3 +316,23 @@ describe("job requirements and schedule limitations", () => {
     expect(ids()).not.toContain("flyday-m1");
   });
 });
+
+describe("who can work a job", () => {
+  it("says who meets the job's requirements, how free they are, and what the others still need", async () => {
+    const { crewCheck } = await import("./coverage");
+    const { bookings } = await import("./bookings");
+    const data = base();
+    data.trainings = [{ id: "nvg", name: "Night vision goggles", nickname: "NVG", validMonths: 12, appliesTo: "Pilot", notes: "" }];
+    data.missions[0].requiredTrainingIds = ["nvg"];
+    data.people[0].training = [{ trainingId: "nvg", completed: "2030-01-01", expires: "2031-01-01" }];
+    data.people[1].training = [{ trainingId: "nvg", completed: "2029-01-01", expires: "2030-11-10" }];
+    data.timeOff = [{ id: "o", personId: "p1", start: d(1), end: d(8), reason: "" }];
+    const now = new Date(d(1)).getTime();
+    const rows = crewCheck({ ...data }, bookings({ ...data })[0], "Pilot", now);
+    const by = (id: string) => rows.find((r) => r.person.id === id)!;
+    expect(by("p1")).toMatchObject({ ready: true, free: 21, days: 28, missing: [] });
+    expect(by("p2").missing).toEqual(["NVG: runs out Nov 10"]);
+    expect(by("p3").missing).toEqual(["Rating on the Bell 412", "NVG: not on record"]);
+    expect(rows[0].person.id).toBe("p1");
+  });
+});
