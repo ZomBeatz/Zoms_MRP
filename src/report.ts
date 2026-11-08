@@ -103,7 +103,7 @@ export function fullReport(data: AppData, from: number, to: number): FullReport 
       const t = data.trainings.find((x) => x.id === tid);
       if (!t) continue;
       const st = trainingStatus(p, tid, from, to);
-      training.push({ person: p, course: t.name, neededFor: missions.map((m) => m.name).join(", "), state: st.state, expires: st.expires });
+      training.push({ person: p, course: t.name, neededFor: missions.map((m) => m.name).join(", ") || `Every ${p.role.toLowerCase()}`, state: st.state, expires: st.expires });
     }
   training.sort((x, y) => order[x.state] - order[y.state] || x.person.name.localeCompare(y.person.name));
 

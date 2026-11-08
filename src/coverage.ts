@@ -129,6 +129,9 @@ export function dutyOf(data: AppData, personId: string) {
   return out.sort((x, y) => x.a - y.a);
 }
 
+/** "Alex hasn't done Hoist rescue", or for a certificate "Alex has no Second class medical on record". */
+const notDone = (name: string, t: { name: string; kind?: string }) => (!t.kind || t.kind === "course" ? `${name} hasn't done ${t.name}` : `${name} has no ${t.name} on record`);
+
 export function findIssues(data: AppData): Issue[] {
   const issues: Issue[] = [];
   const { maxDaysOn, minDaysOff } = data.settings.rules;
@@ -326,8 +329,8 @@ export function findIssues(data: AppData): Issue[] {
       if (st.state === "ok") continue;
       issues.push({
         id: `train-${s.id}-${tid}`, severity: "danger",
-        title: st.state === "missing" ? `${p.name} hasn't done ${t.name}` : st.state === "expired" ? `${p.name}'s ${t.name} has run out` : `${p.name}'s ${t.name} runs out during “${m.name}”`,
-        detail: `“${m.name}” needs it.${st.expires ? ` It ${st.state === "expired" ? "ran out" : "runs out"} ${fmtDate(st.expires)}.` : ""} Swap them out or record the qualification.`,
+        title: st.state === "missing" ? notDone(p.name, t) : st.state === "expired" ? `${p.name}'s ${t.name} has run out` : `${p.name}'s ${t.name} runs out during “${m.name}”`,
+        detail: `${t.everyone && !(m.requiredTrainingIds ?? []).includes(tid) ? `Every ${p.role.toLowerCase()} needs it` : `“${m.name}” needs it`}.${st.expires ? ` It ${st.state === "expired" ? "ran out" : "runs out"} ${fmtDate(st.expires)}.` : ""} Swap them out or record the qualification.`,
         at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id, trainingId: tid,
       });
     }
@@ -357,11 +360,11 @@ export function findIssues(data: AppData): Issue[] {
       const booked = p.training.some((r) => r.trainingId === tid && ms(`${r.completed}T00:00`) > now);
       if (booked || done.some((r) => !validUntil(r))) continue;
       const latest = done.map((r) => validUntil(r)!).sort().at(-1);
-      const missions = needers.map((m) => `“${m.name}”`).join(", ");
-      const needs = needers.length === 1 ? "needs" : "need";
+      const missions = needers.length ? needers.map((m) => `“${m.name}”`).join(", ") : p.role === "Pilot" ? "Every pilot" : "Every maintainer";
+      const needs = needers.length > 1 ? "need" : "needs";
       if (!latest || ms(`${latest}T00:00`) <= now)
-        issues.push({ id: `lapsed-${p.id}-${tid}`, severity: "warn", title: latest ? `${p.name}'s ${t.name} has run out` : `${p.name} hasn't done ${t.name}`,
-          detail: `${missions} ${needs} it, so they can't be booked there until it's done.`, at: now, personId: p.id, trainingId: tid });
+        issues.push({ id: `lapsed-${p.id}-${tid}`, severity: "warn", title: latest ? `${p.name}'s ${t.name} has run out` : notDone(p.name, t),
+          detail: `${missions} ${needs} it, so they can't be booked ${needers.length ? "there" : "on any job"} until it's on record.`, at: now, personId: p.id, trainingId: tid });
       else if (ms(`${latest}T00:00`) <= dayAt(now, data.settings.expiryWarningDays))
         issues.push({ id: `renew-${p.id}-${tid}`, severity: "warn", title: `${p.name}'s ${t.name} runs out ${fmtDate(latest)}`,
           detail: `${missions} ${needs} it. Book the renewal before then.`, at: ms(`${latest}T00:00`), personId: p.id, trainingId: tid });
@@ -418,8 +421,9 @@ const fmtDate = (d: string) => format(new Date(`${d}T00:00`), "MMM d, yyyy");
 
 /** The training a mission needs from someone in this role. */
 export function requiredTraining(data: AppData, m: Pick<Mission, "requiredTrainingIds">, role?: Person["role"]): string[] {
-  const ids = [...new Set(m.requiredTrainingIds ?? [])];
-  if (!role) return ids;
+  if (!role) return [...new Set(m.requiredTrainingIds ?? [])];
+  // With a role: also what everyone in it needs, whatever the job (a pilot certificate, a medical).
+  const ids = [...new Set([...(m.requiredTrainingIds ?? []), ...data.trainings.filter((t) => t.everyone).map((t) => t.id)])];
   return ids.filter((id) => {
     const t = data.trainings.find((x) => x.id === id);
     return t && (t.appliesTo === "Both" || t.appliesTo === role);
@@ -439,9 +443,12 @@ export function neededTraining(data: AppData, p: Person): Map<string, Mission[]>
     if (s.personId === p.id && season && active(season) && ms(season.end) > now) theirs.add(season.missionId);
   }
   const need = new Map<string, Mission[]>();
+  // Needed by everyone in their role: no job to name.
+  for (const t of data.trainings) if (t.everyone && (t.appliesTo === "Both" || t.appliesTo === p.role)) need.set(t.id, []);
   for (const m of data.missions) {
     if (!theirs.has(m.id)) continue;
-    for (const t of requiredTraining(data, m, p.role)) need.set(t, [...(need.get(t) ?? []), m]);
+    // The job's own (what everyone needs is already there, with no job to name).
+    for (const t of requiredTraining(data, m, p.role)) if (!data.trainings.find((x) => x.id === t)?.everyone) need.set(t, [...(need.get(t) ?? []), m]);
   }
   return need;
 }

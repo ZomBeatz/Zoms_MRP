@@ -137,7 +137,7 @@ export async function buildWorkbook(data: AppData): Promise<Blob> {
         if (!t) continue;
         const st = trainingStatus(p, tid, t0, t0 + 1);
         const standing = st.state === "ok" ? (st.expires && ms(`${st.expires}T00:00`) < soon ? "Runs out soon" : "Current") : st.state === "missing" ? "Not done" : "Ran out";
-        const row = ws.addRow({ person: p.name, role: p.role, training: t.name, for: missions.map((m) => m.name).join(", "), expires: st.expires ? new Date(`${st.expires}T00:00`) : null, standing });
+        const row = ws.addRow({ person: p.name, role: p.role, training: t.name, for: missions.map((m) => m.name).join(", ") || `Every ${p.role.toLowerCase()}`, expires: st.expires ? new Date(`${st.expires}T00:00`) : null, standing });
         const tone = standing === "Current" ? "#dcfce7" : standing === "Runs out soon" ? "#fef3c7" : "#fee2e2";
         row.getCell(6).fill = fill(tone);
       }

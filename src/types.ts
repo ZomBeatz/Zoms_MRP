@@ -88,6 +88,14 @@ export interface Training {
   validMonths: number;
   appliesTo: Role | "Both";
   notes: string;
+  /** What it is: a course, a certificate or licence, a medical, or a check ride. Missing: a course. */
+  kind?: "course" | "certificate" | "medical" | "check";
+  /** Everyone it applies to needs it, whatever job they're on (a pilot certificate, a medical). */
+  everyone?: boolean;
+  /** It runs out at the end of the month it falls due in, not on the day (medicals, check rides). */
+  endOfMonth?: boolean;
+  /** Courses that renew it: recording one of them records this too, on the same day. */
+  renewedBy?: ID[];
 }
 
 /** One person's completed training. Dates are "2026-03-14". */
@@ -102,6 +110,14 @@ export interface TrainingRecord {
    */
   extendedTo?: string | null;
   extensionNote?: string;
+  /** For a certificate: its number, who issued it, and its class or ratings ("Commercial, rotorcraft-helicopter"). */
+  number?: string;
+  issuedBy?: string;
+  grade?: string;
+  /** Scans of it (the files are kept in this device's file storage, like a job's documents). */
+  documents?: MissionDocument[];
+  /** Recorded because a course that renews it was recorded. */
+  renewedFrom?: ID;
 }
 
 /** The day a record really runs out: its extension if it has one and it's later, else its own date. */

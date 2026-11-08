@@ -374,7 +374,13 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
   },
   {
     id: "training", title: "Qualifications", tour: "training",
-    body: <p>Each job sets the qualifications its crew need, so people only need the qualifications of the jobs they work or are booked on. <b>Who's current</b> shows everyone against every qualification they need: current, runs out soon, or lapsed. Narrow it to one job's crew. Warnings start the number of days set in Settings before a qualification runs out, and any shift where qualifications would lapse mid-hitch is flagged.</p>,
+    body: (
+      <>
+        <p>Each job sets the qualifications its crew need, so people only need the qualifications of the jobs they work or are booked on. <b>Who's current</b> shows everyone against every qualification they need: current, runs out soon, or lapsed. Narrow it to one job's crew. Warnings start the number of days set in Settings before a qualification runs out, and any shift where qualifications would lapse mid-hitch is flagged.</p>
+        <p><b>Certificates, licences, medicals and check rides</b> are qualifications too: pick the <b>Kind</b> when you add one. Tick <b>Every pilot needs it</b> (or every maintainer) for the ones nobody can work without, like a pilot certificate or a medical; they're then checked on every booking, whatever the job, and Fill only picks people who have them. <b>Runs out at the end of the month</b> suits medicals and check rides. On a person's Qualifications tab, a certificate's record keeps its <b>number</b>, <b>who issued it</b>, its <b>class or ratings</b> and <b>scans</b> of it (PDFs and pictures show in the app).</p>
+        <p>A certificate can be <b>renewed by</b> courses: recording the course for someone records the certificate on the same day. <b>Due and expired</b> lists everything missing, expired or running out across the crew, soonest first, with each one's number and files; tap one to record the renewal or attach the new card.</p>
+      </>
+    ),
   },
   {
     id: "maintenance", title: "Maintenance", tour: "maintenance",

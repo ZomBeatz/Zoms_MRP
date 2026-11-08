@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Calculator, Check, CopyPlus, Download, FileText, Plus, Trash2, Upload, Wand2 } from "lucide-react";
 import { fileSize, getFile, putFile, viewable } from "./docs";
+import { KINDS, everyoneWord, expiryFor, kindOf, withRenewals } from "./certificates";
 import { isServerBuild } from "./platform";
 import { planSeason } from "./pages/Planner";
 import { fillSeason } from "./fill";
@@ -408,7 +409,7 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
  * A mission's documents: add files (PDFs mostly, any type works), view PDFs, pictures and text right here,
  * open or save the rest. The list is saved with the mission; the files stay in this device's file storage.
  */
-function MissionDocuments({ docs, onChange }: { docs: MissionDocument[]; onChange: (d: MissionDocument[]) => void }) {
+function MissionDocuments({ docs, onChange, intro }: { docs: MissionDocument[]; onChange: (d: MissionDocument[]) => void; intro?: string }) {
   const demo = useStore((s) => s.demo);
   const showToast = useStore((s) => s.showToast);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -450,7 +451,7 @@ function MissionDocuments({ docs, onChange }: { docs: MissionDocument[]; onChang
   };
   return (
     <>
-      <p className="form-note" style={{ marginTop: 0 }}>Contracts, task orders, maps: PDFs show right here, and so do pictures and text; other files can be downloaded and opened. They're kept with the job when you press Save.</p>
+      <p className="form-note" style={{ marginTop: 0 }}>{intro ?? "Contracts, task orders, maps: PDFs show right here, and so do pictures and text; other files can be downloaded and opened. They're kept with the job when you press Save."}</p>
       <label className="btn sm primary" style={{ cursor: "pointer" }}>
         <Upload size={14} /> {busy ? "Adding…" : "Add files…"}
         <input type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
@@ -1967,7 +1968,7 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
   const add = (tid?: string) => {
     const t = trainings.find((x) => x.id === tid) ?? forRole.find((x) => !person.training.some((r) => r.trainingId === x.id)) ?? forRole[0] ?? trainings[0];
     if (!t) return;
-    onChange([...person.training, { trainingId: t.id, completed: todayStr, expires: t.validMonths ? addMonthsTo(todayStr, t.validMonths) : null }]);
+    onChange([...person.training, ...withRenewals(data, { trainingId: t.id, completed: todayStr, expires: expiryFor(t, todayStr) })]);
     setEditing(person.training.length);
   };
   // The course a problem is about: where it stands, and one tap to record the new date.
@@ -2012,14 +2013,27 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
                   <Field label="Qualification">
                     <select value={r.trainingId} onChange={(e) => {
                       const nt = trainings.find((x) => x.id === e.target.value);
-                      setAt(i, { trainingId: e.target.value, expires: nt?.validMonths ? addMonthsTo(r.completed, nt.validMonths) : null });
+                      setAt(i, { trainingId: e.target.value, expires: nt ? expiryFor(nt, r.completed) : null });
                     }}>
                       {trainings.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                     </select>
                   </Field>
                   <div className="pair">
-                    <DateInput label="Completed" today value={r.completed} onChange={(v) => setAt(i, { completed: v, expires: t?.validMonths ? addMonthsTo(v, t.validMonths) : r.expires })} />
-                    <DateInput label="Runs out" hint="Empty if it never does." value={r.expires ?? ""} min={r.completed} clearable="Never runs out" onChange={(v) => setAt(i, { expires: v || null })} />
+                    <DateInput label={t && kindOf(t) !== "course" ? "Issued or passed" : "Completed"} today value={r.completed} onChange={(v) => setAt(i, { completed: v, expires: t?.validMonths ? expiryFor(t, v) : r.expires })} />
+                    <DateInput label="Runs out" hint={t?.endOfMonth ? "The first day it no longer counts (end of the month)." : "Empty if it never does."} value={r.expires ?? ""} min={r.completed} clearable="Never runs out" onChange={(v) => setAt(i, { expires: v || null })} />
+                  </div>
+                  {t && kindOf(t) !== "course" && (
+                    <>
+                      <div className="pair">
+                        <Field label="Number"><input value={r.number ?? ""} placeholder="3521847" onChange={(e) => setAt(i, { number: e.target.value })} /></Field>
+                        <Field label="Issued by"><input value={r.issuedBy ?? ""} placeholder={kindOf(t) === "medical" ? "Dr. Lee, AME" : "FAA"} onChange={(e) => setAt(i, { issuedBy: e.target.value })} /></Field>
+                      </div>
+                      <Field label={kindOf(t) === "medical" ? "Class" : "Class or ratings"}><input value={r.grade ?? ""} placeholder={kindOf(t) === "medical" ? "Second class" : "Commercial, rotorcraft-helicopter, instrument"} onChange={(e) => setAt(i, { grade: e.target.value })} /></Field>
+                    </>
+                  )}
+                  <div className="field">
+                    <span>Scans and files</span>
+                    <MissionDocuments docs={r.documents ?? []} onChange={(documents) => setAt(i, { documents })} intro="The certificate, card or completion record. PDFs and pictures show right here." />
                   </div>
                   {r.expires && (
                     <div className="field">
@@ -2045,7 +2059,7 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
               );
             return (
               <button key={i} className={`line ${expired && needs.has(r.trainingId) && !renewed.has(i) ? "flag" : ""}`} style={renewed.has(i) ? { opacity: 0.55 } : undefined} onClick={() => setEditing(i)}>
-                <span className="name">{t?.name ?? "Deleted qualification"}</span>
+                <span className="name">{t?.name ?? "Deleted qualification"}{r.number ? <span className="small muted"> · No. {r.number}</span> : null}{r.documents?.length ? <span className="small muted"> · {plural(r.documents.length, "file")}</span> : null}</span>
                 {renewed.has(i) ? <span className="when">Renewed</span>
                   : !needs.has(r.trainingId) ? <span className="small muted">Not needed</span> : null}
                 {renewed.has(i) ? null : expired ? <span className="pill danger">Ran out {fmtDay(until!)}</span>
@@ -2086,7 +2100,7 @@ function TrainingDialog({ id }: Props) {
   const missions = data.missions.filter((m) => m.requiredTrainingIds.includes(id)).length;
   return (
     <Dialog title={existing ? t.name || "Qualifications" : "Add qualification"} onClose={close} dirty={dirty}
-      meta={existing && <><span>{plural(holders, "person", "people")} on record</span>·<span>Needed by {plural(missions, "job")}</span></>}
+      meta={existing && <><span>{plural(holders, "person", "people")} on record</span>·<span>{t.everyone ? `${everyoneWord(t).replace(/^./, (c) => c.toUpperCase())} needs it` : `Needed by ${plural(missions, "job")}`}</span></>}
       foot={<Foot isNew={!existing} label="qualification" problem={!t.name.trim() && "Name the qualification first."}
         onSave={() => { upsert("trainings", t); if (!existing) showToast(`Added “${t.name}”`); close(); }}
         onDelete={() => { remove("trainings", t.id, `Deleted “${t.name}”${holders ? ` and ${plural(holders, "record")}` : ""}`); close(); }} />}>
@@ -2098,6 +2112,29 @@ function TrainingDialog({ id }: Props) {
             <option value="Pilot">Pilots</option><option value="Maintainer">Maintainers</option><option value="Both">Pilots and maintainers</option>
           </select>
         </Field>
+        <Field label="Kind">
+          <select value={kindOf(t)} onChange={(e) => { const kind = e.target.value as NonNullable<Training["kind"]>; set({ kind, ...(kind === "medical" || kind === "check" ? { endOfMonth: true } : {}) }); }}>
+            {Object.entries(KINDS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          </select>
+        </Field>
+        <div className="field full">
+          <label className="check"><input type="checkbox" checked={!!t.everyone} onChange={(e) => set({ everyone: e.target.checked })} /> {everyoneWord(t).replace(/^./, (c) => c.toUpperCase())} needs it, whatever job they're on</label>
+          <span className="hint">{t.everyone ? "Like a pilot certificate or a medical: checked on every booking." : "Off: only people on jobs that ask for it need it (a job's Qualifications tab)."}</span>
+          {t.validMonths > 0 && (
+            <label className="check" style={{ marginTop: 6 }}><input type="checkbox" checked={!!t.endOfMonth} onChange={(e) => set({ endOfMonth: e.target.checked })} /> Runs out at the end of the month it's due</label>
+          )}
+        </div>
+        {kindOf(t) !== "course" && data.trainings.some((x) => x.id !== t.id && kindOf(x) === "course") && (
+          <div className="field full">
+            <span>Renewed by</span>
+            <div className="picker-row">
+              {data.trainings.filter((x) => x.id !== t.id && kindOf(x) === "course").map((x) => (
+                <Pick key={x.id} on={(t.renewedBy ?? []).includes(x.id)} onToggle={() => set({ renewedBy: toggled(t.renewedBy ?? [], x.id) })}>{x.name}</Pick>
+              ))}
+            </div>
+            <span className="hint">Recording one of these courses for someone records this too, on the same day.</span>
+          </div>
+        )}
         <Field label="Notes" full><textarea rows={2} value={t.notes} onChange={(e) => set({ notes: e.target.value })} /></Field>
         {existing && <div className="full"><button className="btn sm" onClick={() => useStore.getState().open("groupTraining", "new", { trainingId: t.id })}>Record it for several people…</button></div>}
       </div>
@@ -2127,10 +2164,10 @@ function GroupTrainingDialog({ id, defaults }: Props) {
       return { p, needs, due: needs && !!st && st.state !== "ok" };
     })
     .sort((a, b) => Number(b.due) - Number(a.due) || Number(b.needs) - Number(a.needs) || a.p.name.localeCompare(b.p.name));
-  const expires = course?.validMonths ? addMonthsTo(completed, course.validMonths) : null;
+  const expires = course ? expiryFor(course, completed) : null;
   const save = () => {
     if (!course || !chosen.size) return;
-    change((d) => ({ ...d, people: d.people.map((p) => (chosen.has(p.id) ? { ...p, training: [...p.training, { trainingId: course.id, completed, expires }] } : p)) }),
+    change((d) => ({ ...d, people: d.people.map((p) => (chosen.has(p.id) ? { ...p, training: [...p.training, ...withRenewals(data, { trainingId: course.id, completed, expires })] } : p)) }),
       `Recorded ${course.name} for ${plural(chosen.size, "person", "people")}`);
     close();
   };
