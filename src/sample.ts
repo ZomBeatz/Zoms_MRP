@@ -2,6 +2,7 @@ import { addMonths, format } from "date-fns";
 import type { Aircraft, AircraftType, AppData, Booking, Equipment, MaintenanceJob, Mission, Pattern, Person, ProgramItem, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
 import { booking } from "./bookings";
 import { shadeAt } from "./look";
+import { expiryFor } from "./certificates";
 import { onRotationFor } from "./rotation";
 import { DAY, dayAt, overlaps, toWhen, today } from "./time";
 
@@ -82,7 +83,15 @@ export function sampleData(settings = defaultSettings()): AppData {
   const tArctic = course("Arctic survival", 24, "Both");
   const tCold = course("Cold weather maintenance", 24, "Maintainer");
   const tFuel = course("Fuel and hazmat handling", 24, "Maintainer");
-  const trainings = [tMtn, tFire, tWater, tNvg, tHoist, tArctic, tCold, tFuel];
+  // Certificates, medicals and check rides: everyone in the role needs them, whatever the job.
+  const cert = (name: string, kind: Training["kind"], validMonths: number, appliesTo: Training["appliesTo"], more: Partial<Training> = {}): Training =>
+    ({ ...course(name, validMonths, appliesTo), kind, everyone: true, ...more });
+  const cPilot = cert("Commercial pilot certificate", "certificate", 0, "Pilot");
+  const cMedical = cert("Second class medical", "medical", 12, "Pilot", { endOfMonth: true });
+  const cCheck = cert("Part 135 competency check", "check", 12, "Pilot", { endOfMonth: true });
+  const cMechanic = cert("Mechanic certificate (A&P)", "certificate", 0, "Maintainer");
+  const cHazmat = cert("Hazmat handler card", "certificate", 24, "Maintainer", { everyone: false, renewedBy: [tFuel.id] });
+  const trainings = [tMtn, tFire, tWater, tNvg, tHoist, tArctic, tCold, tFuel, cPilot, cMedical, cCheck, cMechanic, cHazmat];
 
   // ---- fleet: twelve tails, three of each type
   const ac = (tail: string, type: string, seats: number, base: string): Aircraft => ({ id: `a-${tail}`, tail, type, seats, base, status: "Airworthy", notes: "" });
@@ -313,6 +322,32 @@ export function sampleData(settings = defaultSettings()): AppData {
       if (next < windowTo && !unbooked.has(`${p.id}:${t.id}`)) p.training.push(rec(next));
     }
   }
+  // Certificate records, from their own seeded numbers so the rest of the demo comes out as before.
+  const rc = seeded(4242);
+  const num = () => String(1_000_000 + Math.floor(rc() * 8_999_999));
+  people.forEach((p, i) => {
+    if (p.role === "Pilot") {
+      p.training.push({ trainingId: cPilot.id, completed: iso(dayAt(t0, -400 - Math.floor(rc() * 3000))), expires: null, number: num(), issuedBy: "FAA", grade: "Commercial, rotorcraft-helicopter, instrument helicopter" });
+      for (const c of [cMedical, cCheck]) {
+        // Done 1 to 11 months ago; the next one booked two weeks before it runs out. On purpose, Elena's
+        // check ride runs out within a few weeks with nothing booked yet.
+        const done = iso(dayAt(t0, -30 - Math.floor(rc() * 300)));
+        const rec = { trainingId: c.id, completed: done, expires: expiryFor(c, done), number: c === cMedical ? num() : "", issuedBy: c === cMedical ? "Dr. Okafor, AME" : "Check airman J. Reyes", grade: c === cMedical ? "Second class" : "" };
+        const late = c === cCheck && p === P.elena;
+        if (late) { rec.completed = iso(dayAt(t0, -350)); rec.expires = expiryFor(c, rec.completed); }
+        // The one before it, so the past year is covered too.
+        const before = format(addMonths(new Date(`${rec.completed}T00:00`), 1 - c.validMonths), "yyyy-MM-dd");
+        p.training.push({ trainingId: c.id, completed: before, expires: expiryFor(c, before) }, rec);
+        const next = dayAt(new Date(`${rec.expires}T00:00`).getTime(), -14);
+        if (!late && next < windowTo) p.training.push({ trainingId: c.id, completed: iso(next), expires: expiryFor(c, iso(next)) });
+      }
+    } else {
+      p.training.push({ trainingId: cMechanic.id, completed: iso(dayAt(t0, -500 - i * 97)), expires: null, number: num(), issuedBy: "FAA", grade: "Airframe and powerplant" });
+      // The hazmat card is renewed by the fuel and hazmat course: one record for each time they did it.
+      for (const r of p.training.filter((x) => x.trainingId === tFuel.id)) p.training.push({ trainingId: cHazmat.id, completed: r.completed, expires: expiryFor(cHazmat, r.completed), renewedFrom: tFuel.id });
+    }
+  });
+
   const trainedFor = (p: Person, m: Booking, a: number, b: number) =>
     m.requiredTrainingIds.every((id) => {
       const t = trainings.find((x) => x.id === id)!;
