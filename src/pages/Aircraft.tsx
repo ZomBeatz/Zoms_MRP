@@ -176,7 +176,7 @@ export function AircraftPage() {
             <span><span className="swatch" style={{ background: "var(--zb-orange)", width: 3 }} />Today</span>
             <span><span className="swatch" style={{ background: "color-mix(in srgb, var(--zb-danger) 22%, var(--zb-surface))", outline: "2px solid var(--zb-danger)" }} />Maintenance during a job</span>
             <span><span className="swatch" style={{ background: "repeating-linear-gradient(45deg, var(--zb-surface-3) 0 4px, var(--zb-surface) 4px 8px)" }} />In maintenance, AOG</span>
-            <span className="muted">Jobs show in their own colors. Free windows count from today. Tap a free block to book it.</span>
+            <span className="muted">Jobs show in their client's colors. Free windows count from today. Tap a free block to book it.</span>
           </div>
           </>}
           {retired.length > 0 && <p className="small muted">Retired: {retired.map((a) => a.tail).join(", ")}.</p>}

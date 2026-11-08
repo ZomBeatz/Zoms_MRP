@@ -145,7 +145,7 @@ export function findIssues(data: AppData): Issue[] {
   for (const m of missions) {
     const from = ms(m.start), to = ms(m.end);
     if (!(to > from)) {
-      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the job and fix its times.", at: from, seasonId: m.id });
+      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the client and fix its times.", at: from, seasonId: m.id });
       continue;
     }
     const ground = m.kind === "ground";

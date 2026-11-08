@@ -37,8 +37,8 @@ export function QuickFind({ onClose }: { onClose: () => void }) {
       ...PAGES.filter((h) => !hidden.has(h.id as Page)),
       ...data.people.map((p): Hit => ({ key: `p${p.id}`, label: p.name, sub: `${p.role}${p.quals.length ? ` · ${p.quals.join(", ")}` : ""}`, kind: "person", id: p.id })),
       ...data.aircraft.map((a): Hit => ({ key: `a${a.id}`, label: a.tail, sub: `${a.type} · ${a.status}`, kind: "aircraft", id: a.id })),
-      ...data.missions.map((m): Hit => ({ key: `m${m.id}`, label: m.name, sub: "Job", kind: "mission", id: m.id })),
-      ...bookings(data).map((b): Hit => ({ key: `s${b.id}`, label: b.name, sub: `Season ${fmtDates(b.start, b.end)} · ${b.status}`, kind: "season", id: b.id })),
+      ...data.missions.map((m): Hit => ({ key: `m${m.id}`, label: m.name, sub: "Client", kind: "mission", id: m.id })),
+      ...bookings(data).map((b): Hit => ({ key: `s${b.id}`, label: b.name, sub: `Job ${fmtDates(b.start, b.end)} · ${b.status}`, kind: "season", id: b.id })),
       ...data.jobs.map((j): Hit => ({ key: `j${j.id}`, label: j.title, sub: `Maintenance · ${tails.get(j.aircraftId) ?? ""} · ${fmtDates(j.start, j.end)}`, kind: "job", id: j.id })),
       ...data.trainings.map((t): Hit => ({ key: `t${t.id}`, label: t.name, sub: "Qualification", kind: "training", id: t.id })),
       ...TOPICS,
@@ -67,7 +67,7 @@ export function QuickFind({ onClose }: { onClose: () => void }) {
       <div className="quickfind" role="dialog" aria-modal="true" aria-label="Find">
         <div className="quickfind-bar">
           <Search size={18} />
-          <input ref={input} value={q} placeholder="Find a page, person, tail, job or how-to" aria-label="Find"
+          <input ref={input} value={q} placeholder="Find a page, person, tail, client or how-to" aria-label="Find"
             onChange={(e) => { setQ(e.target.value); setAt(0); }}
             onKeyDown={(e) => {
               if (e.key === "Escape") onClose();

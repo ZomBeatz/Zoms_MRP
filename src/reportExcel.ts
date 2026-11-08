@@ -91,7 +91,7 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
     const crewShare = r.crew.length ? r.crew.reduce((t, c) => t + c.on, 0) / (r.crew.length * r.days) : 0;
     const problems = r.issues.filter((i) => i.severity === "danger").length;
     const tiles: [string, number, string, string][] = [
-      ["Jobs", r.byMission.length, "0", INK],
+      ["Clients", r.byMission.length, "0", INK],
       ["Job days", Math.round(r.total), "0", INK],
       ["Fully crewed", r.crewedShare, "0%", r.crewedShare < 1 ? "#d97706" : "#16a34a"],
       ["Fleet on jobs", fleetUse, "0%", INK],
@@ -125,9 +125,9 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
         c.fill = fill(BLUE);
       });
     };
-    ws.getCell("B11").value = "Days by job";
+    ws.getCell("B11").value = "Days by client";
     ws.getCell("B11").font = { size: 13, bold: true };
-    head(12, 2, ["Job", "Days", "Share"]);
+    head(12, 2, ["Client", "Days", "Share"]);
     const most = r.byMission[0]?.days ?? 1;
     r.byMission.forEach(({ m, days }, i) => {
       const row = 13 + i;
@@ -284,8 +284,8 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
 
   // ---- Missions in the period.
   {
-    const ws = table("Jobs", "Jobs", [
-      { header: "Job", key: "name", width: 32 }, { header: "Aircraft", key: "tail", width: 14 }, { header: "First day", key: "start", width: 13, date: true },
+    const ws = table("Clients", "Clients", [
+      { header: "Client", key: "name", width: 32 }, { header: "Aircraft", key: "tail", width: 14 }, { header: "First day", key: "start", width: 13, date: true },
       { header: "Last day", key: "end", width: 13, date: true }, { header: "Status", key: "status", width: 12 }, { header: "Days in period", key: "days", width: 14 },
       { header: "Crewed", key: "crewed", width: 16, pct: true }, { header: "Contact", key: "contact", width: 30 },
       ...(hasRates(data) ? [{ header: "Crew cost", key: "crewCost", width: 12 }, { header: "Flying cost", key: "flyCost", width: 12 }, { header: "Cost", key: "cost", width: 12 }, { header: "Charged", key: "charged", width: 12 }, { header: "Margin", key: "margin", width: 12 }] : []),
@@ -335,7 +335,7 @@ export async function buildReportWorkbook(data: AppData, from: number, to: numbe
     const tails = new Map(data.aircraft.map((a) => [a.id, a.tail]));
     const people = new Map(data.people.map((p) => [p.id, p.name]));
     const ws = table("Maintenance", "Maintenance", [
-      { header: "Tail", key: "tail", width: 11 }, { header: "Job", key: "title", width: 30 }, { header: "Kind", key: "kind", width: 12 },
+      { header: "Tail", key: "tail", width: 11 }, { header: "Client", key: "title", width: 30 }, { header: "Kind", key: "kind", width: 12 },
       { header: "First day", key: "start", width: 13, date: true }, { header: "Last day", key: "end", width: 13, date: true },
       { header: "Grounds it", key: "grounds", width: 11 }, { header: "Maintainers", key: "who", width: 30 }, { header: "Done", key: "done", width: 8 },
     ]);

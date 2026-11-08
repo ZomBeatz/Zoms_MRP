@@ -37,7 +37,7 @@ const NAV: { page: Page; label: string; icon: typeof Plane }[] = [
   { page: "aircraft", label: "Fleet", icon: Plane },
   { page: "types", label: "Types & equipment", icon: Package },
   { page: "schedule", label: "Schedule", icon: CalendarRange },
-  { page: "missions", label: "Jobs", icon: ClipboardList },
+  { page: "missions", label: "Clients", icon: ClipboardList },
   { page: "people", label: "Crew", icon: Users },
   { page: "maintenance", label: "Maintenance", icon: Wrench },
   { page: "training", label: "Qualifications", icon: GraduationCap },
@@ -90,7 +90,9 @@ export default function App() {
       if (mod || e.altKey || typing(e) || useStore.getState().editing) return;
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
-        const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training", types: "aircraftType" } as const)[page as "aircraft"] ?? "mission";
+        // A new item for the page; elsewhere a new job (or the first client, when there's none yet).
+        const kind = ({ aircraft: "aircraft", people: "person", maintenance: "job", training: "training", types: "aircraftType", missions: "mission" } as const)[page as "aircraft"]
+          ?? (useStore.getState().data.missions.length ? "season" : "mission");
         open(kind, "new");
       } else if (e.key === "[") updateSettings({ sidebarCollapsed: !useStore.getState().data.settings.sidebarCollapsed });
       else if (e.key === "?") useStore.getState().go("guide");
@@ -129,6 +131,9 @@ export default function App() {
 
   if (!started) return <Welcome />;
 
+  // A new job is for a client: pick one in the job, or start with the client when there's none yet.
+  const newJob = () => (data.missions.length ? open("season", "new") : open("mission", "new"));
+
   const navTo = (p: Page) => {
     go(p);
     setDrawer(false);
@@ -147,7 +152,7 @@ export default function App() {
         <button className="icon-btn" aria-label="Find" onClick={() => setFinding(true)}>
           <Search size={20} />
         </button>
-        <button className="icon-btn" aria-label="New job" onClick={() => open("mission", "new")}>
+        <button className="icon-btn" aria-label="New job" onClick={newJob}>
           <Plus size={20} />
         </button>
       </div>
@@ -164,7 +169,7 @@ export default function App() {
             </button>
           )}
         </div>
-        <button className="btn primary big" onClick={() => open("mission", "new")} title="New job (N)">
+        <button className="btn primary big" onClick={newJob} title="New job (N)">
           <Plus size={16} />
           {(!collapsed || drawer) && "New job"}
         </button>

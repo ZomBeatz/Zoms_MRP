@@ -79,14 +79,14 @@ export function TrainingPage() {
 
       {tab === "current" && (
         data.trainings.length === 0 || rows.length === 0 ? (
-          <Empty icon={<GraduationCap size={28} />} text={mission ? "Nobody works this job yet. Pick its crew in the job." : "Add qualifications, set which jobs need them, then record who has done what."}
-            action={<button className="btn primary" onClick={() => (mission ? open("mission", mission.id) : open("training", "new"))}>{mission ? "Open the job…" : "Add qualification…"}</button>} />
+          <Empty icon={<GraduationCap size={28} />} text={mission ? "Nobody works this client yet. Pick its crew in the client." : "Add qualifications, set which clients need them, then record who has done what."}
+            action={<button className="btn primary" onClick={() => (mission ? open("mission", mission.id) : open("training", "new"))}>{mission ? "Open the client…" : "Add qualification…"}</button>} />
         ) : (
           <>
             <NeedsTraining rows={rows} warn={warn} />
             <p className="small muted" style={{ marginTop: 0 }}>
-              {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their jobs need. "}
-              People need only the qualifications their jobs ask for. Tap a person to record qualifications or change what they work on.
+              {gaps ? `${gaps} ${gaps === 1 ? "thing needs" : "things need"} attention. ` : "Everyone has what their clients need. "}
+              People need only the qualifications their clients ask for. Tap a person to record qualifications or change what they work on.
             </p>
             <div className="table-wrap">
               <table className="table">
@@ -144,7 +144,7 @@ export function TrainingPage() {
 
       {tab === "courses" && (
         data.trainings.length === 0 ? (
-          <Empty icon={<GraduationCap size={28} />} text="Qualifications and certifications some jobs need, like NVG or mountain flying." action={<button className="btn primary" onClick={() => open("training", "new")}>Add qualification…</button>} />
+          <Empty icon={<GraduationCap size={28} />} text="Qualifications and certifications some clients need, like NVG or mountain flying." action={<button className="btn primary" onClick={() => open("training", "new")}>Add qualification…</button>} />
         ) : (
           <div className="table-wrap">
             <table className="table">

@@ -52,7 +52,7 @@ type Section = { heading?: string; rows: Row[] };
 
 const VIEWS: { id: Settings["scheduleGroup"]; label: string }[] = [
   { id: "aircraft", label: "Aircraft" },
-  { id: "missions", label: "Jobs" },
+  { id: "missions", label: "Clients" },
   { id: "people", label: "Crew" },
 ];
 
@@ -189,7 +189,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
         data-person={r.personId}
         className={`g-lane ${r.sub ? "sub" : ""} ${trimming?.edge === "move" && trimming.engaged && trimming.target && trimming.target === r.personId ? "drop" : ""}`}
         style={{ height }}
-        title={r.addDefaults ? "Drag to move through time. Tap empty space to add a job here." : "Drag to move through time."}
+        title={r.addDefaults ? "Drag to move through time. Tap empty space to add a client here." : "Drag to move through time."}
         onClick={(e) => {
           if (justDragged.current || !r.addDefaults || e.target !== e.currentTarget) return;
           const day = tl.dayAtX(e.clientX, e.currentTarget.getBoundingClientRect());
@@ -255,8 +255,8 @@ export function Schedule({ issues }: { issues: Issue[] }) {
       <div className="sched-bar">
         <TimelineControls tl={tl} />
         <span className="grow" />
-        <select value={missionId} onChange={(e) => setMissionId(e.target.value)} aria-label="Show one job" style={{ maxWidth: 240 }}>
-          <option value="">All jobs</option>
+        <select value={missionId} onChange={(e) => setMissionId(e.target.value)} aria-label="Show one client" style={{ maxWidth: 240 }}>
+          <option value="">All clients</option>
           {[...data.missions].sort((a, b) => a.name.localeCompare(b.name)).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </div>
@@ -267,7 +267,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
           <TimeHead tl={tl} />
           {shown.length === 0 && (
             <div style={{ gridColumn: "1 / -1" }} className="empty">
-              <p>{missionId ? "Nothing for this job in these dates." : emptyText(view)}</p>
+              <p>{missionId ? "Nothing for this client in these dates." : emptyText(view)}</p>
               {!missionId && <button className="btn primary" onClick={() => open(view === "aircraft" ? "aircraft" : view === "people" ? "person" : "mission", "new")}>{addText(view)}</button>}
             </div>
           )}
@@ -298,7 +298,7 @@ export function Schedule({ issues }: { issues: Issue[] }) {
 const emptyText = (v: Settings["scheduleGroup"]) =>
   ({ missions: "No jobs in these days.", aircraft: "No aircraft yet.", people: "No crew yet." })[v];
 const addText = (v: Settings["scheduleGroup"]) =>
-  ({ missions: "New job…", aircraft: "Add aircraft…", people: "Add a person…" })[v];
+  ({ missions: "New client…", aircraft: "Add aircraft…", people: "Add a person…" })[v];
 
 
 function Legend({ data, view }: { data: AppData; view: Settings["scheduleGroup"] }) {
@@ -506,7 +506,7 @@ function buildRows(
     return [
       ...seats,
       { heading: `On ${chosen.name}`, rows: onIt.sort(byRoleThenName).map(personRow) },
-      { heading: "Rated and current, not on this job", rows: qualified.sort(byRoleThenName).map(personRow) },
+      { heading: "Rated and current, not on this client", rows: qualified.sort(byRoleThenName).map(personRow) },
     ];
   }
   return [
