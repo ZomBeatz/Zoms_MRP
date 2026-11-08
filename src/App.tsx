@@ -117,6 +117,13 @@ export default function App() {
     // run with one plan's list against the other's files.
   }, [started]);
 
+  // Desktop app: a backup in the chosen folder once a day, if that's turned on (Settings › Backups).
+  useEffect(() => {
+    if (!started || !isDesktopApp) return;
+    const d = useStore.getState();
+    void import("./backup").then((m) => m.dailyBackup(d.data, d.demo)).catch((e) => d.showToast(`Today's backup couldn't be saved: ${String(e)}`));
+  }, [started]);
+
   // The desktop app looks for a new version once a day (only a build made with the updater key).
   useEffect(() => { if (started) void startUpdates(); }, [started]);
 

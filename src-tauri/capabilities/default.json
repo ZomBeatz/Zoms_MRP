@@ -15,6 +15,7 @@
     "allow-save-plan",
     "allow-write-excel",
     "allow-save-download",
+    "allow-write-backup",
     "allow-data-folder",
     "allow-update-mode",
     "allow-backup-before-update"
