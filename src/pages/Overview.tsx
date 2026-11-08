@@ -320,7 +320,7 @@ function GettingStarted() {
   return (
     <section className="panel getting-started">
       <h3><BookOpen size={16} /> Getting started</h3>
-      <p>Nothing is set up yet. The Guide lists what to add, in order, with a button for each step: aircraft, qualifications, crew, then each customer as a job.</p>
+      <p>Nothing is set up yet. The Guide lists what to add, in order, with a button for each step: aircraft, qualifications, crew, then each customer as a client.</p>
       <div className="row gap-sm wrap">
         <button className="btn primary" onClick={toSetup}>Set up step by step</button>
         {!demo && <button className="btn" onClick={() => setDemo(true)}>Look at the demo first</button>}

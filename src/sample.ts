@@ -1,5 +1,5 @@
 import { addMonths, format } from "date-fns";
-import type { Aircraft, AircraftType, AppData, Booking, Equipment, MaintenanceJob, Mission, Pattern, Person, ProgramItem, Season, Settings, Shift, TimeOff, Training, TrainingRecord } from "./types";
+import type { Aircraft, AircraftType, AppData, Booking, Equipment, MaintenanceJob, Mission, Pattern, Person, ProgramItem, RuleSet, Season, Settings, Shift, TimeOff, Training, TrainingRecord, WorkType } from "./types";
 import { booking } from "./bookings";
 import { shadeAt } from "./look";
 import { expiryFor, medicalExpiry } from "./certificates";
@@ -73,8 +73,13 @@ export function sampleData(settings = defaultSettings()): AppData {
   const iso = (t: number) => format(t, "yyyy-MM-dd");
 
   // ---- training
+  const NICK: Record<string, string> = {
+    "Mountain flying": "Mountain", "Fire bucket operations": "Bucket", "Over water and HUET": "HUET", "Night vision goggles (NVG)": "NVG", "Hoist rescue": "Hoist",
+    "Arctic survival": "Survival", "Cold weather maintenance": "Cold wx", "Fuel and hazmat handling": "Fuel", "Commercial pilot certificate": "CPL",
+    "Medical certificate": "Medical", "Part 135 competency check": "293", "Mechanic certificate (A&P)": "A&P", "Hazmat handler card": "Hazmat",
+  };
   const course = (name: string, validMonths: number, appliesTo: Training["appliesTo"]): Training =>
-    ({ id: `t-${name.toLowerCase().replace(/\W+/g, "-")}`, name, validMonths, appliesTo, notes: "" });
+    ({ id: `t-${name.toLowerCase().replace(/\W+/g, "-")}`, name, nickname: NICK[name], validMonths, appliesTo, notes: "" });
   const tMtn = course("Mountain flying", 12, "Pilot");
   const tFire = course("Fire bucket operations", 12, "Pilot");
   const tWater = course("Over water and HUET", 24, "Pilot");
@@ -274,6 +279,10 @@ export function sampleData(settings = defaultSettings()): AppData {
         contractOf.set(season.id, c);
       }
   }
+  // ---- schedule limitations for the fire contract (the rest follow Settings).
+  const fireLimits: RuleSet = { id: "rs-fire", name: "Wildland fire", maxDaysOn: 14, minDaysOff: 7, maxDutyHours: 14, minRestHours: 10, maxFlightHoursPerDay: 8, flightLimits: [{ hours: 42, days: 6 }] };
+  settings = { ...settings, ruleSets: [...(settings.ruleSets ?? []).filter((x) => x.id !== fireLimits.id), fireLimits] };
+
   // ---- types of work: each customer's job is a shade of its line of business's color.
   const kinds: [string, string, string[]][] = [
     ["Fire", "#c2410c", ["Interior Fire Service"]],
@@ -283,10 +292,23 @@ export function sampleData(settings = defaultSettings()): AppData {
     ["Tours and charters", "#2563eb", ["Juneau Icefield Tours", "Southeast Avalanche Program", "Bristol Bay hunting charters", "Kachemak Bay film shoot"]],
     ["Ground duty", "#475569", ["State hangar on-call"]],
   ];
-  const workTypes = kinds.map(([name, color], i) => ({ id: `wt-${i + 1}`, name, color }));
+  // Each line's job requirements, for a new client of it: what its first client asks for, with crew and rotations.
+  const workTypes: WorkType[] = kinds.map(([name, color, names], i) => {
+    const first = missionList.find((x) => x.name === names[0]);
+    const c = contracts.find((x) => x.name === names[0]);
+    return {
+      id: `wt-${i + 1}`, name, color,
+      defaults: {
+        requiredTrainingIds: first?.requiredTrainingIds ?? [], requiredEquipmentIds: first?.requiredEquipmentIds ?? [], ground: !!c?.ground,
+        pilots: c?.pilots ?? 1, maintainers: c?.maint ?? 0, pilotRotation: c?.pilots ? { on: HITCH, off: settings.rules.minDaysOff } : null,
+        maintainerRotation: c?.maint ? { on: HITCH, off: settings.rules.minDaysOff } : null,
+        ...(name === "Fire" ? { ruleSetId: fireLimits.id } : {}),
+      },
+    };
+  });
   kinds.forEach(([, color, names], i) => names.forEach((n, k) => {
     const m = missionList.find((x) => x.name === n);
-    if (m) Object.assign(m, { workTypeId: workTypes[i].id, color: shadeAt(color, k) });
+    if (m) Object.assign(m, { workTypeId: workTypes[i].id, color: shadeAt(color, k), ...(i === 0 ? { ruleSetId: fireLimits.id } : {}) });
   }));
 
   // The coming fire season wants a third aircraft, a Bell 412 for July and August only, its tail not picked yet.

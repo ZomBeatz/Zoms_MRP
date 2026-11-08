@@ -151,7 +151,7 @@ class Pdf {
     const crewShare = r.crew.length ? r.crew.reduce((t, c) => t + c.on, 0) / (r.crew.length * r.days) : 0;
     const problems = r.issues.filter((i) => i.severity === "danger").length;
     const tiles: [string, string, string][] = [
-      ["Jobs", String(r.byMission.length), C.ink],
+      ["Clients", String(r.byMission.length), C.ink],
       ["Job days", String(Math.round(r.total)), C.ink],
       ["Fully crewed", `${Math.round(r.crewedShare * 100)}%`, r.crewedShare < 1 ? C.warn : C.ok],
       ["Fleet on jobs", `${Math.round(fleetUse * 100)}%`, C.ink],
@@ -172,7 +172,7 @@ class Pdf {
     // Left: days by mission. Right: aircraft free each day, then each tail's use.
     const half = (W - 2 * M - 24) / 2, xr = M + half + 24;
     this.font(12, "bold");
-    this.text("Days by job", M, y);
+    this.text("Days by client", M, y);
     this.text("Aircraft free each day", xr, y);
     this.bars(M, y + 16, half, BOTTOM - y - 16, r.byMission.map(({ m, days }) => ({ label: m.name, value: days, max: r.byMission[0]?.days ?? 1, color: m.color, note: `${Math.round(days)} d` })), "No jobs in this period.");
     const chartH = 92;
@@ -467,8 +467,8 @@ class Pdf {
   private missions() {
     const { r, data } = this;
     const clipDays = (a: number, b: number) => Math.max(0, Math.min(b, r.to) - Math.max(a, r.from)) / DAY;
-    this.table("Jobs", [
-      { title: "Job", w: 200, get: (m) => ({ swatch: m.color, text: m.name }) },
+    this.table("Clients", [
+      { title: "Client", w: 200, get: (m) => ({ swatch: m.color, text: m.name }) },
       { title: "Aircraft", w: 90, get: (m) => seasonTails(data, m, "None") },
       { title: "Dates", w: 160, get: (m) => `${format(ms(m.start), "MMM d, yyyy")} to ${format(ms(m.end) - DAY / 2, "MMM d, yyyy")}`, muted: true },
       { title: "Status", w: 70, get: (m) => m.status },
@@ -513,7 +513,7 @@ class Pdf {
     const cell = new Map(rows.map((t) => [`${t.person.id}|${t.course}`, t]));
     const look = this.r.training.filter((t) => t.state !== "ok").length;
     this.font(9, "normal", C.muted);
-    this.text(look ? `${look} need a look: a qualification that's missing, has run out, or runs out during the period.` : "Everyone is current on what their jobs need for the whole period.", M, y);
+    this.text(look ? `${look} need a look: a qualification that's missing, has run out, or runs out during the period.` : "Everyone is current on what their clients need for the whole period.", M, y);
     y += 14;
 
     const nameW = 140, cw = Math.min(96, (W - 2 * M - nameW) / courses.length), rowH = 17;
@@ -560,7 +560,7 @@ class Pdf {
     const people = new Map(this.data.people.map((p) => [p.id, p.name]));
     this.table("Maintenance", [
       { title: "Aircraft", w: 80, bold: true, get: (j) => tails.get(j.aircraftId) ?? "" },
-      { title: "Job", w: 200, get: (j) => ({ swatch: REPORT_COLORS.maintenance, text: j.title }) },
+      { title: "Client", w: 200, get: (j) => ({ swatch: REPORT_COLORS.maintenance, text: j.title }) },
       { title: "Kind", w: 80, muted: true, get: (j) => j.kind },
       { title: "Dates", w: 160, muted: true, get: (j) => `${format(ms(j.start), "MMM d")} to ${format(ms(j.end) - DAY / 2, "MMM d, yyyy")}` },
       { title: "Grounds it", w: 70, get: (j) => (j.grounds ? "Yes" : "No") },
@@ -627,7 +627,7 @@ export async function buildWeekPdf(data: AppData, from: number): Promise<Blob> {
   let y = 64;
   box(M, y, W - 2 * M, 22, C.panel, 4);
   font(9, "bold", C.muted);
-  doc.text("Job", M + 6, y + 14);
+  doc.text("Client", M + 6, y + 14);
   days.forEach((d, i) => doc.text(format(d, "EEE MMM d"), x0 + i * colW + 4, y + 14));
   y += 26;
 

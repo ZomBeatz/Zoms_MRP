@@ -76,14 +76,14 @@ export function TypesPage() {
       ))}
 
       {tab === "equipment" && (equipment.length === 0 ? (
-        <Empty icon={<Package size={28} />} text="Add what your aircraft carry for different work, like a rescue hoist, a fire bucket or a medical interior. Jobs pick what they need."
+        <Empty icon={<Package size={28} />} text="Add what your aircraft carry for different work, like a rescue hoist, a fire bucket or a medical interior. Clients pick what they need."
           action={<button className="btn primary" onClick={() => open("equipment", "new")}>Add equipment…</button>} />
       ) : (
         <>
-          <p className="muted" style={{ marginTop: -8 }}>Tick what each tail has on its Fleet form, and what each job needs on its Equipment tab. A tail booked on a job without it shows as a problem.</p>
+          <p className="muted" style={{ marginTop: -8 }}>Tick what each tail has on its Fleet form, and what each client needs on its Equipment tab. A tail booked on a job without it shows as a problem.</p>
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Equipment</th><th>Fits</th><th>On tails</th><th>Jobs that need it</th></tr></thead>
+              <thead><tr><th>Equipment</th><th>Fits</th><th>On tails</th><th>Clients that need it</th></tr></thead>
               <tbody>
                 {equipment.map((e) => {
                   const fits = data.aircraftTypes.filter((t) => t.equipmentIds.includes(e.id)).map((t) => t.name);
@@ -108,7 +108,7 @@ export function TypesPage() {
               return (
                 <button key={e.id} className="list-card" onClick={() => open("equipment", e.id)}>
                   <b>{e.name}</b>
-                  <span className="small muted">On {tails.length ? tails.map((a) => a.tail).join(", ") : "no tails"} · needed by {plural(missions.length, "job")}</span>
+                  <span className="small muted">On {tails.length ? tails.map((a) => a.tail).join(", ") : "no tails"} · needed by {plural(missions.length, "client")}</span>
                 </button>
               );
             })}

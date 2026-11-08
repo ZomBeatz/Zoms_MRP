@@ -224,7 +224,7 @@ export function LookPicker({ color, pattern, onChange, shades }: { color: string
             </button>
           ))}
         </div>
-        <span className="hint">The pattern helps tell jobs apart when colors are close.</span>
+        <span className="hint">The pattern helps tell clients apart when colors are close.</span>
       </div>
     </div>
   );

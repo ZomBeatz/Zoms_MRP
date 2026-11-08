@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.7
+
+**Clients and jobs.** What was a job is now a **client** (the customer), and what was a season is now a **job** (one stretch of dates). Type of work is now **line of business**, and kind of contract is now **schedule limitations**. Your plan is kept as it was.
+
+**Job requirements**
+- A client's **Job requirements** tab holds the qualifications and equipment its jobs need, its schedule limitations, and the crew and rotations a new job starts with.
+- Each job can use its client's requirements or have its own.
+- A new client of a **line of business** starts with that line's requirements.
+- Aircraft types can require qualifications: everyone rated on the type needs them.
+- **Schedule limitations** cover the fewest and most days on, days off, duty hours, rest, flight hours a day and flight hours in so many days. The checks and Fill the schedule follow each job's.
+
+**Crew**
+- **Who can work it** on each job: who meets its requirements and how many of its days they're free, and what everyone else is missing. Book them onto the open days, or add them to the client's crew.
+
+**Libraries**
+- Qualifications have **nicknames** (NVG, HUET, 293), and there's a library of common ones.
+- Settings › Lines of business has a library that adds a whole kind of work (fire, EMS, search and rescue, utilities, survey, tours, hangar on-call) with its qualifications, equipment and schedule limitations.
+- The Qualifications page shows what every pilot and every maintainer needs.
+
+**Fixes**
+- **Updates:** the desktop app can update itself again. The 0.2.5 and 0.2.6 releases were missing their update file, so installed apps reported a JSON or offline error. Copies of 0.2.5 and 0.2.6 find 0.2.7 by themselves once it's published.
+- Rotation boxes stay empty when you clear them.
+- Jobs show their client's color everywhere they're listed.
+
 ## 0.2.6
 
 The words change: a mission is now a **job**, training is **qualifications**, and maintenance items are **work orders**. Your plan is kept as it was.

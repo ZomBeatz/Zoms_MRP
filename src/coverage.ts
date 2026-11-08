@@ -1,13 +1,13 @@
 import { format } from "date-fns";
-import { validUntil, type AppData, type Mission, type Person, type Season, type Shift } from "./types";
+import { validUntil, type AppData, type Booking, type Mission, type Person, type Season, type Shift } from "./types";
 import { bookings } from "./bookings";
 import { downSpan, missingEquipment, statusWords } from "./aircraftTypes";
 import { slotSpan, slotsOf, tailSpan } from "./slots";
 import { fmtRotation, onRotationFor, seasonSeats, seasonTypes } from "./rotation";
-import { rulesFor } from "./limits";
+import { jobLimits, ruleSetOf, rulesFor } from "./limits";
 import { dueList } from "./program";
 import { currencyDays, staleOn } from "./currency";
-import { flightSpans, overLimit } from "./flight";
+import { flightSpans, pilotHoursPerDay, pilotOverLimit } from "./flight";
 import { DAY, dateToStart, dayAt, fmtDay, fmtDays, fmtRange, ms, overlaps, plural, toWhen } from "./time";
 
 /**
@@ -145,7 +145,7 @@ export function findIssues(data: AppData): Issue[] {
   for (const m of missions) {
     const from = ms(m.start), to = ms(m.end);
     if (!(to > from)) {
-      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the job and fix its times.", at: from, seasonId: m.id });
+      issues.push({ id: `time-${m.id}`, severity: "danger", title: `“${m.name}” ends before it starts`, detail: "Open the client and fix its times.", at: from, seasonId: m.id });
       continue;
     }
     const ground = m.kind === "ground";
@@ -185,16 +185,33 @@ export function findIssues(data: AppData): Issue[] {
       }
     }
 
-    // Duty days longer than allowed (Settings), when the season says how long they are.
-    const maxDuty = data.settings.maxDutyHours ?? 0;
+    // Duty days longer than allowed (schedule limitations, else Settings), when the season says how long they are.
+    const lim = jobLimits(data, m);
+    const from_ = ruleSetOf(data, m)?.name ? `“${ruleSetOf(data, m)!.name}”` : "Settings";
+    const maxDuty = lim.maxDutyHours;
     if (maxDuty && m.dutyHours && m.dutyHours > maxDuty)
       issues.push({ id: `dutyh-${m.id}`, severity: "danger", at: from, seasonId: m.id, title: `Duty days on “${m.name}” are ${m.dutyHours} hours`,
-        detail: `The most is ${maxDuty} hours (Settings). Shorten the duty day or add crew to split it.` });
+        detail: `The most is ${maxDuty} hours (${from_}). Shorten the duty day or add crew to split it.` });
     // Rest between duty days: a duty day this long leaves too few hours off before the next.
-    const rest = data.settings.minRestHours ?? 0;
+    const rest = lim.minRestHours;
     if (rest && m.dutyHours && 24 - m.dutyHours < rest && !(maxDuty && m.dutyHours > maxDuty))
       issues.push({ id: `resth-${m.id}`, severity: "danger", at: from, seasonId: m.id, title: `Only ${24 - m.dutyHours} hours off between duty days on “${m.name}”`,
-        detail: `Duty days are ${m.dutyHours} hours and the rest between should be at least ${rest} (Settings). Shorten the duty day or add crew to split it.` });
+        detail: `Duty days are ${m.dutyHours} hours and the rest between should be at least ${rest} (${from_}). Shorten the duty day or add crew to split it.` });
+    // Flight hours a day for each pilot, over what these jobs allow.
+    const perPilot = m.kind === "ground" ? 0 : Math.round(pilotHoursPerDay(data, m) * 10) / 10;
+    if (lim.maxFlightHoursPerDay && perPilot > lim.maxFlightHoursPerDay)
+      issues.push({ id: `flyday-${m.id}`, severity: "warn", at: from, seasonId: m.id, title: `Pilots on “${m.name}” fly about ${perPilot} hours a day`,
+        detail: `The most is ${lim.maxFlightHoursPerDay} (${from_}). Add a pilot to share the flying, or plan fewer hours a day.` });
+    // Hitches shorter than these jobs allow (not counting ones cut short by the job's own first or last day).
+    if (lim.minDaysOn)
+      for (const s of data.shifts.filter((x) => x.seasonId === m.id)) {
+        const days = Math.round((ms(s.end) - ms(s.start)) / DAY);
+        if (days < lim.minDaysOn && ms(s.start) > from && ms(s.end) < to) {
+          const who = people.get(s.personId);
+          if (who) issues.push({ id: `shorthitch-${s.id}`, severity: "warn", at: ms(s.start), seasonId: m.id, personId: who.id, shiftId: s.id,
+            title: `${who.name}'s hitch on “${m.name}” is ${plural(days, "day")}`, detail: `${fmtRange(s.start, s.end)}. Hitches here are at least ${plural(lim.minDaysOn, "day")} (${from_}).` });
+        }
+      }
 
     const cov = missionCoverage(data, m);
     for (const g of cov.pilotGaps)
@@ -307,12 +324,12 @@ export function findIssues(data: AppData): Issue[] {
     flush();
 
     // Flight hours: the most in any so-many days (Settings), from the flying planned on their shifts.
-    const flew = p.role === "Pilot" ? overLimit(data, flightSpans(data, p.id)) : null;
+    const flew = p.role === "Pilot" ? pilotOverLimit(data, flightSpans(data, p.id)) : null;
     if (flew) {
       const { limit: fl, at } = flew;
       const shift = data.shifts.find((s) => s.personId === p.id && ms(s.end) > at && ms(s.start) < dayAt(at, fl.days));
       issues.push({ id: `fly-${p.id}-${at}`, severity: "danger", title: `${p.name} flies about ${flew.hours} hours in ${fl.days} days`,
-        detail: `${range(at, dayAt(at, fl.days))}. The most is ${fl.hours} hours (Settings). Rotate someone in.`, at, personId: p.id, seasonId: shift?.seasonId, shiftId: shift?.id });
+        detail: `${range(at, dayAt(at, fl.days))}. The most is ${fl.hours} hours. Rotate someone in.`, at, personId: p.id, seasonId: shift?.seasonId, shiftId: shift?.id });
     }
   }
 
@@ -420,10 +437,12 @@ export function whoCanCover(data: AppData, role: Person["role"], a: number, b: n
 const fmtDate = (d: string) => format(new Date(`${d}T00:00`), "MMM d, yyyy");
 
 /** The training a mission needs from someone in this role. */
-export function requiredTraining(data: AppData, m: Pick<Mission, "requiredTrainingIds">, role?: Person["role"]): string[] {
+export function requiredTraining(data: AppData, m: Pick<Mission, "requiredTrainingIds"> & Partial<Pick<Season, "aircraftIds" | "slots">>, role?: Person["role"]): string[] {
   if (!role) return [...new Set(m.requiredTrainingIds ?? [])];
-  // With a role: also what everyone in it needs, whatever the job (a pilot certificate, a medical).
-  const ids = [...new Set([...(m.requiredTrainingIds ?? []), ...data.trainings.filter((t) => t.everyone).map((t) => t.id)])];
+  // With a role: also what everyone in it needs, whatever the job (a pilot certificate, a medical), and, on a
+  // job, what its aircraft types need (a type course).
+  const ids = [...new Set([...(m.requiredTrainingIds ?? []), ...data.trainings.filter((t) => t.everyone).map((t) => t.id),
+    ...(m.aircraftIds ? typeTraining(data, seasonTypes(data, m as Pick<Season, "aircraftIds" | "slots">)) : [])])];
   return ids.filter((id) => {
     const t = data.trainings.find((x) => x.id === id);
     return t && (t.appliesTo === "Both" || t.appliesTo === role);
@@ -436,21 +455,32 @@ export function requiredTraining(data: AppData, m: Pick<Mission, "requiredTraini
  */
 export function neededTraining(data: AppData, p: Person): Map<string, Mission[]> {
   const now = Date.now();
-  const theirs = new Set(p.missionIds);
-  const seasons = new Map(data.seasons.map((x) => [x.id, x]));
-  for (const s of data.shifts) {
-    const season = seasons.get(s.seasonId);
-    if (s.personId === p.id && season && active(season) && ms(season.end) > now) theirs.add(season.missionId);
-  }
+  const applies = (id: string) => { const t = data.trainings.find((x) => x.id === id); return !!t && (t.appliesTo === "Both" || t.appliesTo === p.role); };
   const need = new Map<string, Mission[]>();
-  // Needed by everyone in their role: no job to name.
-  for (const t of data.trainings) if (t.everyone && (t.appliesTo === "Both" || t.appliesTo === p.role)) need.set(t.id, []);
-  for (const m of data.missions) {
-    if (!theirs.has(m.id)) continue;
-    // The job's own (what everyone needs is already there, with no job to name).
-    for (const t of requiredTraining(data, m, p.role)) if (!data.trainings.find((x) => x.id === t)?.everyone) need.set(t, [...(need.get(t) ?? []), m]);
+  const add = (id: string, by?: Pick<Mission, "id" | "name">) => {
+    if (!applies(id)) return;
+    const list = need.get(id) ?? [];
+    if (by && !list.some((x) => x.id === by.id)) list.push(by as Mission);
+    need.set(id, list);
+  };
+  // Needed by everyone in their role: no client to name.
+  for (const t of data.trainings) if (t.everyone) add(t.id);
+  // What the clients they work ask for.
+  for (const m of data.missions) if (p.missionIds.includes(m.id)) for (const id of m.requiredTrainingIds ?? []) add(id, m);
+  // What the jobs they're booked on ask for (a job's own requirements, its aircraft types').
+  const booked = new Set(data.shifts.filter((s) => s.personId === p.id).map((s) => s.seasonId));
+  for (const b of bookings(data)) {
+    if (!booked.has(b.id) || !active(b) || ms(b.end) <= now) continue;
+    for (const id of requiredTraining(data, b, p.role)) if (!data.trainings.find((x) => x.id === id)?.everyone) add(id, { id: b.missionId, name: b.name });
   }
+  // What the aircraft types they're rated on ask for, named by the type.
+  for (const t of data.aircraftTypes ?? []) if (p.quals.includes(t.name)) for (const id of t.requiredTrainingIds ?? []) add(id, { id: `type:${t.id}`, name: `the ${t.name}` });
   return need;
+}
+
+/** Qualifications the given aircraft types ask of everyone who flies or works on them. */
+export function typeTraining(data: AppData, types: string[]): string[] {
+  return [...new Set((data.aircraftTypes ?? []).filter((t) => types.includes(t.name)).flatMap((t) => t.requiredTrainingIds ?? []))];
 }
 
 export type TrainingState = "ok" | "missing" | "expired" | "runs-out";
@@ -465,4 +495,64 @@ export function trainingStatus(p: Person, trainingId: string, a: number, b: numb
   if (end <= a) return { state: "expired", expires: latest };
   if (end < b) return { state: "runs-out", expires: latest };
   return { state: "ok", expires: latest };
+}
+
+export interface CrewFit {
+  person: Person;
+  /** On the client's regular crew. */
+  regular: boolean;
+  /** Days already booked on this job. */
+  onJob: number;
+  /** Days of the job (from today on) they're free: not booked elsewhere, not off, on their own rotation. */
+  free: number;
+  days: number;
+  /** What they still need for this job, in words ("Rating on the Bell 412", "NVG: runs out Dec 1"). */
+  missing: string[];
+  /** Meets every requirement and is free at least one day. */
+  ready: boolean;
+}
+
+/**
+ * Everyone in a role against one job: whether they meet its requirements (a rating on one of its types, each
+ * qualification for the whole job, recent flying on the type) and how much of it they're free for. The job's
+ * regular crew and the people who fit come first.
+ */
+export function crewCheck(data: AppData, b: Booking, role: Person["role"], now = Date.now()): CrewFit[] {
+  const from = Math.max(ms(b.start), dayAt(now, 0)), to = ms(b.end);
+  const days: number[] = [];
+  for (let d = from; d < to; d = dayAt(d, 1)) days.push(d);
+  const types = seasonTypes(data, b);
+  const required = requiredTraining(data, b, role);
+  const names = new Map(data.trainings.map((t) => [t.id, t]));
+  const day = (iso: string) => format(new Date(`${iso}T00:00`), "MMM d");
+  return data.people
+    .filter((p) => p.role === role)
+    .map((p): CrewFit => {
+      const missing: string[] = [];
+      if (types.length && !types.some((t) => p.quals.includes(t))) missing.push(`Rating on the ${types.join(" or ")}`);
+      for (const id of required) {
+        const t = names.get(id);
+        if (!t) continue;
+        const st = trainingStatus(p, id, from, Math.max(to, from + 1));
+        const label = t.nickname || t.name;
+        if (st.state === "missing") missing.push(`${label}: not on record`);
+        else if (st.state === "expired") missing.push(`${label}: ran out ${day(st.expires!)}`);
+        else if (st.state === "runs-out") missing.push(`${label}: runs out ${day(st.expires!)}`);
+      }
+      const stale = types.length && days.length ? staleOn(data, p, types, from) : null;
+      if (stale) missing.push(`Hasn't flown the ${stale.type} in ${stale.days} days`);
+      const duty = dutyOf(data, p.id);
+      const off = data.timeOff.filter((t) => t.personId === p.id && !t.soft).map((t) => [ms(t.start), ms(t.end)] as const);
+      let free = 0, onJob = 0;
+      for (const d of days) {
+        const e = dayAt(d, 1);
+        const here = duty.some((x) => x.seasonId === b.id && overlaps(d, e, x.a, x.b));
+        if (here) { onJob++; continue; }
+        if (duty.some((x) => overlaps(d, e, x.a, x.b)) || off.some(([x, y]) => overlaps(d, e, x, y)) || !onRotationFor(p, d, e)) continue;
+        free++;
+      }
+      return { person: p, regular: p.missionIds.includes(b.missionId), onJob, free, days: days.length, missing, ready: !missing.length && free > 0 };
+    })
+    .sort((x, y) => Number(y.onJob > 0) - Number(x.onJob > 0) || Number(y.ready) - Number(x.ready) || Number(y.regular) - Number(x.regular)
+      || x.missing.length - y.missing.length || y.free - x.free || x.person.name.localeCompare(y.person.name));
 }

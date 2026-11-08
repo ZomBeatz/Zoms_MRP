@@ -1,21 +1,22 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Calculator, Check, CopyPlus, Download, FileText, Plus, Trash2, Upload, Wand2 } from "lucide-react";
 import { fileSize, getFile, putFile, viewable } from "./docs";
+import { qualLabel } from "./library";
 import { KINDS, PRIVILEGES, ageOn, everyoneWord, expiryFor, kindOf, medicalExpiry, medicalStages, refreshMedicals, withRenewals } from "./certificates";
 import { isServerBuild } from "./platform";
 import { planSeason } from "./pages/Planner";
 import { fillSeason } from "./fill";
 import { fmtRotation, seasonTails, seasonTypes } from "./rotation";
 import { keepForm, keptForm, useStore } from "./store";
-import { dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
+import { crewCheck, typeTraining, dutyOf, findIssues, missionCoverage, neededTraining, requiredTraining, trainingStatus, whoCanCover } from "./coverage";
 import { canSupport } from "./fleet";
 import { DAY, addDays, dateToEnd, dateToStart, dayAt, endToDate, fmtDates, fmtSpan, ms, overlaps, plural, startToDate, toWhen, today, uid } from "./time";
 import { addMonths, format } from "date-fns";
 import { SWATCHES, missionLook, nextShade, shadesOf, slotStyle } from "./look";
 import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useDirty, useGuardedClose, useSpot } from "./components/ui";
-import { bookings, seasonsOf } from "./bookings";
+import { booking, bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
-import { baseRules, rulesFor, seasonRules, stricter } from "./limits";
+import { baseRules, fmtRuleSet, jobLimits, rulesFor, seasonRules, stricter } from "./limits";
 import { flightHours } from "./program";
 import { daysSince } from "./currency";
 import { ConfirmButton, IssueList } from "./pages/Overview";
@@ -24,7 +25,7 @@ import { validUntil } from "./types";
 import { downSpan, equipmentFor, missingEquipment, renameType, statusWords } from "./aircraftTypes";
 import { slotSpan, slotsOf, tailSpan, withSlots } from "./slots";
 import { seasonSeats } from "./rotation";
-import type { Aircraft, AircraftSlot, AircraftType, AppData, Equipment, MissionDocument, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
+import type { Aircraft, AircraftSlot, AircraftType, AppData, Booking, Equipment, MissionDocument, Limits, MaintainerNeed, MaintenanceJob, Mission, Rules, Person, PersonRotation, Rotation, Season, Shift, TimeOff, Training, TrainingRecord, When } from "./types";
 
 /** Opens the right dialog for whatever `editing` points at. */
 export function Dialogs() {
@@ -112,7 +113,8 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
   const existing = data.missions.find((m) => m.id === id);
   const isNew = !existing;
   const [kept] = useState(() => keptForm<{ tab: string; m: Mission; pool: Set<string> }>());
-  const [tab, setTab] = useState(kept.tab ?? fix.tab ?? "details");
+  // Qualifications and equipment were their own tabs; they're the Job requirements tab now.
+  const [tab, setTab] = useState(() => { const t = kept.tab ?? fix.tab ?? "details"; return t === "training" || t === "equipment" ? "requirements" : t; });
   const [m, setM] = useState<Mission>(() => kept.m ?? existing ?? {
     id: uid(), name: "", contact: "", location: "", notes: "",
     requiredTrainingIds: (defaults.requiredTrainingIds as string[] | undefined) ?? [],
@@ -138,12 +140,29 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
     change((d) => what === "delete"
       ? { ...d, seasons: d.seasons.filter((x) => !ids.has(x.id)), shifts: d.shifts.filter((x) => !ids.has(x.seasonId)) }
       : { ...d, seasons: d.seasons.map((x) => (ids.has(x.id) ? { ...x, status: what } : x)) },
-      what === "delete" ? `Deleted ${plural(ids.size, "season")}` : `${what === "Confirmed" ? "Confirmed" : "Cancelled"} ${plural(ids.size, "season")}`);
+      what === "delete" ? `Deleted ${plural(ids.size, "job")}` : `${what === "Confirmed" ? "Confirmed" : "Cancelled"} ${plural(ids.size, "job")}`);
     setPicked(new Set());
     setSureBulk(false);
   };
   useKeep({ tab, m, pool });
   const set = (patch: Partial<Mission>) => setM((x) => ({ ...x, ...patch }));
+  const line = data.workTypes.find((w) => w.id === m.workTypeId);
+  /** Load a line of business's job requirements into this client (and a new client's first job). */
+  const useLine = (lineId: string) => {
+    const d = data.workTypes.find((w) => w.id === lineId)?.defaults;
+    if (!d) return;
+    set({
+      requiredTrainingIds: d.requiredTrainingIds ?? [], requiredEquipmentIds: d.requiredEquipmentIds ?? [], ruleSetId: d.ruleSetId ?? null,
+      kind: d.ground ? "ground" : "flight",
+      jobDefaults: { pilots: d.pilots, maintainers: d.maintainers, maintainerNeed: d.maintainerNeed, pilotRotation: d.pilotRotation, maintainerRotation: d.maintainerRotation, dutyHours: d.dutyHours },
+    });
+    if (isNew) setFirst((x) => ({
+      ...x, ...(d.ground ? { slots: [], aircraftIds: [] } : {}),
+      pilotsNeeded: d.pilots ?? x.pilotsNeeded, maintainersNeeded: d.maintainers ?? x.maintainersNeeded, maintainerNeed: d.maintainerNeed ?? x.maintainerNeed,
+      pilotRotation: d.pilotRotation !== undefined ? d.pilotRotation : x.pilotRotation, maintainerRotation: d.maintainerRotation !== undefined ? d.maintainerRotation : x.maintainerRotation,
+      dutyHours: d.dutyHours !== undefined ? d.dutyHours : x.dutyHours,
+    }));
+  };
   const setF = (patch: Partial<Season>) => setFirst((x) => ({ ...x, ...patch }));
   const seasons = seasonsOf(data, m.id);
   const firstBad = isNew && !(ms(first.end) > ms(first.start));
@@ -178,7 +197,7 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
       ...(last.slots ? { slots: last.slots.map((x) => ({ ...x, id: uid(), start: null, end: null })) } : {}),
       start: toWhen(addMonths(ms(last.start), 12)), end: toWhen(addMonths(ms(last.end), 12)),
     };
-    change((d) => ({ ...d, missions: d.missions.map((x) => (x.id === m.id ? m : x)), seasons: [...d.seasons, next] }), `Added the season ${fmtDates(next.start, next.end)}`);
+    change((d) => ({ ...d, missions: d.missions.map((x) => (x.id === m.id ? m : x)), seasons: [...d.seasons, next] }), `Added the job ${fmtDates(next.start, next.end)}`);
     open("season", next.id);
   };
 
@@ -226,29 +245,28 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
   };
 
   return (
-    <Dialog wide title={isNew ? m.name || "New job" : m.name || "Job"} onClose={close} dirty={dirty}
+    <Dialog wide title={isNew ? m.name || "New client" : m.name || "Client"} onClose={close} dirty={dirty}
       icon={<span className="swatch" style={slotStyle(missionLook(m))} />}
-      meta={isNew ? <span>A job is one customer's work. Its dates are its seasons.</span> : (
+      meta={isNew ? <span>A client is one customer's work. Its dates are its jobs.</span> : (
         <>
-          <span>{plural(seasons.length, "season")}</span>·<span>{plural(pool.size, "person", "people")} on the crew</span>
+          <span>{plural(seasons.length, "job")}</span>·<span>{plural(pool.size, "person", "people")} on the crew</span>
           {current && <>·<span>{ms(current.start) <= now ? "Now" : "Next"}: {fmtSpan(current.start, current.end)}</span></>}
         </>
       )}
       tabs={[
         { key: "details", label: "Details", alert: !m.name.trim() && tab !== "details" },
-        { key: "seasons", label: isNew ? "First season" : <>Seasons <span className="chip">{seasons.length}</span></>, alert: firstBad },
-        { key: "training", label: <>Qualifications <span className="chip">{m.requiredTrainingIds.length}</span></> },
-        ...(m.kind === "ground" ? [] : [{ key: "equipment", label: <>Equipment <span className="chip">{(m.requiredEquipmentIds ?? []).length}</span></> }]),
+        { key: "seasons", label: isNew ? "First job" : <>Jobs <span className="chip">{seasons.length}</span></>, alert: firstBad },
+        { key: "requirements", label: <>Job requirements <span className="chip">{m.requiredTrainingIds.length + (m.kind === "ground" ? 0 : (m.requiredEquipmentIds ?? []).length)}</span></> },
         { key: "documents", label: <>Documents <span className="chip">{(m.documents ?? []).length}</span></> },
         { key: "crew", label: <>Crew <span className="chip">{pool.size}</span></> },
         ...(isNew ? [] : [{ key: "rotations", label: "Rotations" }]),
       ]}
       tab={tab} onTab={setTab}
-      foot={<Foot isNew={isNew} label="job" problem={!m.name.trim() ? "Give the job a name first (Details tab)." : firstBad && "The first season's last day is before its first day."} onSave={save}
-        onDelete={() => { remove("missions", m.id, `Deleted “${m.name}”${seasons.length ? ` and its ${plural(seasons.length, "season")}` : ""}`); close(); }} />}>
+      foot={<Foot isNew={isNew} label="client" problem={!m.name.trim() ? "Give the client a name first (Details tab)." : firstBad && "The first job's last day is before its first day."} onSave={save}
+        onDelete={() => { remove("missions", m.id, `Deleted “${m.name}”${seasons.length ? ` and its ${plural(seasons.length, "job")}` : ""}`); close(); }} />}>
       {tab === "details" && (
         <div className="form-grid">
-          <Field label="Job (customer)" full>
+          <Field label="Client (customer)" full>
             <input autoFocus={autoFocusBox} value={m.name} placeholder="Interior Fire Service" onChange={(e) => set({ name: e.target.value })} />
           </Field>
           <div className="field full">
@@ -259,14 +277,20 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
                   onClick={() => { set({ kind: k }); if (isNew && k === "ground") setFirst((x) => ({ ...x, slots: [], aircraftIds: [], pilotsNeeded: 0, maintainersNeeded: Math.max(1, x.maintainersNeeded), maintainerNeed: { mode: "always", days: 1 } })); }}>{label}</button>
               ))}
             </div>
-            <span className="hint">{m.kind === "ground" ? "No aircraft: someone on call in the hangar, standby, or any other work on the ground. Its seasons are dates and how many people, filled like any other." : "Aircraft and their crew."}</span>
+            <span className="hint">{m.kind === "ground" ? "No aircraft: someone on call in the hangar, standby, or any other work on the ground. Its jobs are dates and how many people, filled like any other." : "Aircraft and their crew."}</span>
           </div>
-          <Field label="Type of work" full hint={data.workTypes.length ? "Its color is a shade of the type's, so jobs of one kind look alike." : "Set up types of work (fire, medevac…) in Settings › Types of work, each with its own color."}>
-            <select value={m.workTypeId ?? ""} onChange={(e) => { const id = e.target.value || null; set(id ? { workTypeId: id, color: nextShade(data, id, m.id) } : { workTypeId: null }); }}>
+          <Field label="Line of business" full hint={data.workTypes.length ? "Its color is a shade of the type's, so clients of one kind look alike." : "Set up lines of business (fire, medevac…) in Settings › Lines of business, each with its own color."}>
+            <select value={m.workTypeId ?? ""} onChange={(e) => { const id = e.target.value || null; set(id ? { workTypeId: id, color: nextShade(data, id, m.id) } : { workTypeId: null }); if (id && isNew) useLine(id); }}>
               <option value="">None</option>
               {data.workTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </Field>
+          {line?.defaults && (
+            <div className="full small muted" style={{ marginTop: -6 }}>
+              {isNew ? <>Its job requirements are loaded (Job requirements tab); change any of them for this client. </> : null}
+              <button type="button" className="link" onClick={() => { useLine(line.id); setTab("requirements"); }}>{isNew ? "Load them again" : `Use ${line.name}'s job requirements`}</button>
+            </div>
+          )}
           <Field label="Customer contact"><input value={m.contact} placeholder="Name" onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="Location"><input value={m.location} onChange={(e) => set({ location: e.target.value })} /></Field>
           <Field label="Phone"><input type="tel" value={m.phone ?? ""} placeholder="(907) 555-0142" onChange={(e) => set({ phone: e.target.value })} /></Field>
@@ -279,15 +303,6 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
               {m.email && <a className="btn sm" href={`mailto:${m.email.trim()}`}>Email {m.contact || m.email}</a>}
             </div>
           )}
-          {(data.settings.ruleSets ?? []).length > 0 && (
-            <Field label="Kind of contract" hint="Its days on and off replace Settings' for this job (Settings › Kinds of contract).">
-              <select value={m.ruleSetId ?? ""} onChange={(e) => set({ ruleSetId: e.target.value || null })}>
-                <option value="">Settings' limits</option>
-                {data.settings.ruleSets.map((r) => <option key={r.id} value={r.id}>{r.name || "Unnamed"} · {r.maxDaysOn} on, {r.minDaysOff} off</option>)}
-              </select>
-            </Field>
-          )}
-          <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this job" applies={stricter(baseRules(data, m), m.limits)} />
           {data.settings.costs && (
             <Field label="Charge per day" hint="What the customer pays for a day, for the margin in Reports. Optional.">
               <input type="number" inputMode="decimal" min={0} value={m.dayCharge ?? ""} placeholder="0" onChange={(e) => set({ dayCharge: e.target.value === "" ? null : Number(e.target.value) })} />
@@ -311,17 +326,17 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
             <RotationField label="Pilot rotation" value={first.pilotRotation} onChange={(pilotRotation) => setF({ pilotRotation })} />
             <RotationField label="Maintainer rotation" value={first.maintainerRotation} onChange={(maintainerRotation) => setF({ maintainerRotation })} />
           </div>
-          <p className="form-note">Crew it after saving: open the season and use <b>Fill the schedule</b>.</p>
+          <p className="form-note">Crew it after saving: open the job and use <b>Fill the schedule</b>.</p>
         </>
       ) : (
         <>
           <div className="toolbar" style={{ marginTop: 0 }}>
-            <button className="btn sm primary" onClick={() => open("season", "new", { missionId: m.id })}><Plus size={14} /> Add season…</button>
-            {seasons.length > 0 && <button className="btn sm" onClick={copyToNext}><CopyPlus size={14} /> Copy to next season</button>}
+            <button className="btn sm primary" onClick={() => open("season", "new", { missionId: m.id })}><Plus size={14} /> Add job…</button>
+            {seasons.length > 0 && <button className="btn sm" onClick={copyToNext}><CopyPlus size={14} /> Copy to next job</button>}
           </div>
           {picked.size > 0 && (
             <div className="bulk-bar">
-              <b>{plural(picked.size, "season")} selected</b>
+              <b>{plural(picked.size, "job")} selected</b>
               <span className="grow" />
               <button className="btn sm confirm" onClick={() => bulk("Confirmed")}><Check size={13} /> Confirm</button>
               <button className="btn sm" onClick={() => bulk("Cancelled")}>Cancel them</button>
@@ -341,6 +356,8 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
                     <input type="checkbox" className="pick-season" aria-label={`Select ${fmtSpan(x.start, x.end)}`} checked={picked.has(x.id)}
                       onChange={() => setPicked((s) => { const n = new Set(s); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n; })} />
                     <button className="line-main" onClick={() => open("season", x.id)}>
+                      {/* A job wears its client's color and pattern everywhere it's listed. */}
+                      <span className="swatch" style={{ ...slotStyle(missionLook(m)), marginTop: 3, alignSelf: "flex-start" }} />
                       <span className="grow">
                         <span className="name" style={{ display: "block" }}>{fmtSpan(x.start, x.end)}</span>
                         <span className="small muted">{seasonTails(data, x)} · {x.pilotsNeeded}P{x.maintainersNeeded ? ` + ${x.maintainersNeeded}M` : ""}{x.pilotRotation ? ` · ${fmtRotation(x.pilotRotation)}` : ""}</span>
@@ -353,41 +370,34 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
                 );
               })}
             </div>
-          ) : <p className="muted">No seasons yet.</p>}
+          ) : <p className="muted">No jobs yet.</p>}
         </>
       ))}
 
-      {tab === "training" && (
-        <>
-          <p className="form-note" style={{ marginTop: 0, marginBottom: 12 }}>Everyone on this job needs these, current for their whole hitch. Nobody else does.</p>
-          <div className="picker-row">
-            {data.trainings.map((t) => (
-              <Pick key={t.id} on={m.requiredTrainingIds.includes(t.id)} onToggle={() => set({ requiredTrainingIds: toggled(m.requiredTrainingIds, t.id) })}>{t.name}</Pick>
-            ))}
-            {data.trainings.length === 0 && <span className="muted">No qualifications set up yet. Add qualifications under Qualifications.</span>}
-          </div>
-        </>
-      )}
-
-      {tab === "equipment" && (
-        <>
-          <p className="form-note" style={{ marginTop: 0, marginBottom: 12 }}>Every aircraft on this job needs these. A tail booked on it without them shows as a problem.</p>
-          <div className="picker-row" data-spot="equipment">
-            {data.equipment.map((e) => (
-              <Pick key={e.id} on={(m.requiredEquipmentIds ?? []).includes(e.id)} onToggle={() => set({ requiredEquipmentIds: toggled(m.requiredEquipmentIds ?? [], e.id) })}>{e.name}</Pick>
-            ))}
-            {data.equipment.length === 0 && <span className="muted">No equipment set up yet. Add it under Types & equipment.</span>}
-          </div>
+      {tab === "requirements" && (
+        <div className="form-grid">
+          <p className="form-note full" style={{ margin: 0 }}>What this client's jobs need. Each new job starts with these, and any job can have its own instead (its Job requirements tab).</p>
+          <RequirementPicks trainingIds={m.requiredTrainingIds} equipmentIds={m.requiredEquipmentIds ?? []} ground={m.kind === "ground"}
+            onChange={(p) => set({ ...(p.trainingIds ? { requiredTrainingIds: p.trainingIds } : {}), ...(p.equipmentIds ? { requiredEquipmentIds: p.equipmentIds } : {}) })} />
           {(() => {
-            const short = (isNew ? [first] : seasons.filter((x) => ms(x.end) > now && x.status !== "Cancelled"))
+            const short = (isNew ? [first] : seasons.filter((x) => ms(x.end) > now && x.status !== "Cancelled" && !x.requiredEquipmentIds))
               .flatMap((x) => x.aircraftIds).map((id) => data.aircraft.find((a) => a.id === id)).filter((a) => !!a)
               .filter((a, i, all) => all.indexOf(a) === i)
               .map((a) => ({ a, missing: missingEquipment(data, a, m.requiredEquipmentIds) })).filter((x) => x.missing.length);
             return short.length > 0 && (
-              <p className="form-note">Missing now: {short.map((x) => `${x.a.tail} has no ${x.missing.map((e) => e.name.toLowerCase()).join(" or ")}`).join("; ")}.</p>
+              <p className="form-note full" style={{ margin: 0 }}>Missing now: {short.map((x) => `${x.a.tail} has no ${x.missing.map((e) => e.name.toLowerCase()).join(" or ")}`).join("; ")}.</p>
             );
           })()}
-        </>
+          <ScheduleLimitsPick value={m.ruleSetId ?? null} onChange={(ruleSetId) => set({ ruleSetId })} inherit={null} />
+          <LimitsField value={m.limits} onChange={(limits) => set({ limits })} who="this client" applies={stricter(baseRules(data, m), m.limits)} />
+          {!isNew && (
+            <div className="full">
+              <h4 className="form-section">A new job starts with</h4>
+              <JobDefaultsField value={m.jobDefaults ?? {}} ground={m.kind === "ground"} onChange={(jobDefaults) => set({ jobDefaults })} />
+              <span className="hint">Empty: the job before it, or Settings' new-job numbers.</span>
+            </div>
+          )}
+        </div>
       )}
 
       {tab === "documents" && <MissionDocuments docs={m.documents ?? []} onChange={(documents) => set({ documents })} />}
@@ -396,7 +406,7 @@ function MissionDialog({ id, defaults, fix = {} }: Props) {
 
       {tab === "crew" && (
         <>
-          <p className="form-note" style={{ marginTop: 0 }}>The people who rotate through this job. They're picked first when a season is filled, and only they need its qualifications.</p>
+          <p className="form-note" style={{ marginTop: 0 }}>Each job's <b>Who can work it</b> tab shows who meets its requirements and is free, and what the others still need. The people who rotate through this client. They're picked first when a job is filled, and only they need its qualifications.</p>
           {crewGroup("Pilot")}
           {crewGroup("Maintainer")}
         </>
@@ -451,7 +461,7 @@ function MissionDocuments({ docs, onChange, intro }: { docs: MissionDocument[]; 
   };
   return (
     <>
-      <p className="form-note" style={{ marginTop: 0 }}>{intro ?? "Contracts, task orders, maps: PDFs show right here, and so do pictures and text; other files can be downloaded and opened. They're kept with the job when you press Save."}</p>
+      <p className="form-note" style={{ marginTop: 0 }}>{intro ?? "Contracts, task orders, maps: PDFs show right here, and so do pictures and text; other files can be downloaded and opened. They're kept with the client when you press Save."}</p>
       <label className="btn sm primary" style={{ cursor: "pointer" }}>
         <Upload size={14} /> {busy ? "Adding…" : "Add files…"}
         <input type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
@@ -524,11 +534,11 @@ function RotationsTab({ missionId, pool }: { missionId: string; pool: Set<string
     setSub(null);
   };
 
-  if (!seasons.length) return <p className="muted" style={{ margin: 0 }}>No seasons running or coming up. Add one on the Seasons tab.</p>;
+  if (!seasons.length) return <p className="muted" style={{ margin: 0 }}>No jobs running or coming up. Add one on the Jobs tab.</p>;
   return (
     <>
       <p className="form-note" style={{ marginTop: 0 }}>
-        Each season's rotation, in order. <b>Fill from the crew</b> uses only the people on the Crew tab; where they can't cover, <b>Sub in someone else</b> finds who can.
+        Each job's rotation, in order. <b>Fill from the crew</b> uses only the people on the Crew tab; where they can't cover, <b>Sub in someone else</b> finds who can.
       </p>
       {seasons.map((season) => {
         const cov = missionCoverage(data, season);
@@ -683,7 +693,7 @@ function AircraftLines({ season, onChange, spot, needs }: { season: Season; onCh
             </div>
             <label className="check small">
               <input type="checkbox" checked={!own} onChange={(e) => setLine(x.id, e.target.checked ? { start: null, end: null } : { start: season.start, end: season.end })} />
-              The whole season
+              The whole job
             </label>
             {own && okDates && (
               <DateFields labels={["Joins on", "Last day"]} start={x.start ?? season.start} end={x.end ?? season.end} min={season.start} max={season.end}
@@ -692,7 +702,74 @@ function AircraftLines({ season, onChange, spot, needs }: { season: Season; onCh
           </div>
         );
       })}
-      <span className="hint">Pick each type now and the tail when you know it; a confirmed season with a tail still to pick shows as a problem. Crew needed are for the whole job, across its aircraft.</span>
+      <span className="hint">Pick each type now and the tail when you know it; a confirmed job with a tail still to pick shows as a problem. Crew needed are for the whole job, across its aircraft.</span>
+    </div>
+  );
+}
+
+/** Qualifications and equipment a client's (or one job's) jobs need, with a note of what everyone needs anyway. */
+export function RequirementPicks({ trainingIds, equipmentIds, ground, onChange }: {
+  trainingIds: string[]; equipmentIds: string[]; ground?: boolean; onChange: (p: { trainingIds?: string[]; equipmentIds?: string[] }) => void;
+}) {
+  const data = useStore((s) => s.data);
+  const everyone = data.trainings.filter((t) => t.everyone);
+  const pickable = data.trainings.filter((t) => !t.everyone).sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <>
+      <div className="field full" data-spot="qualifications">
+        <span>Qualifications</span>
+        <div className="picker-row">
+          {pickable.map((t) => (
+            <Pick key={t.id} on={trainingIds.includes(t.id)} onToggle={() => onChange({ trainingIds: toggled(trainingIds, t.id) })} title={`${KINDS[kindOf(t)]}, ${t.appliesTo === "Both" ? "pilots and maintainers" : `${t.appliesTo.toLowerCase()}s`}`}>
+              {qualLabel(t)}
+            </Pick>
+          ))}
+          {pickable.length === 0 && <span className="muted small">None to pick yet. Add them on the Qualifications page (there's a library of common ones).</span>}
+        </div>
+        {everyone.length > 0 && <span className="hint">Needed on every job anyway: {everyone.map((t) => qualLabel(t, true)).join(", ")}.</span>}
+      </div>
+      {!ground && (
+        <div className="field full" data-spot="equipment">
+          <span>Equipment on the aircraft</span>
+          <div className="picker-row">
+            {data.equipment.map((e) => <Pick key={e.id} on={equipmentIds.includes(e.id)} onToggle={() => onChange({ equipmentIds: toggled(equipmentIds, e.id) })}>{e.name}</Pick>)}
+            {data.equipment.length === 0 && <span className="muted small">No equipment set up yet. Add it under Types & equipment.</span>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Which schedule limitations apply: Settings' (or, for one job, its client's) or a named set. */
+export function ScheduleLimitsPick({ value, onChange, inherit }: { value: string | null; onChange: (id: string | null) => void; inherit: { name: string } | null }) {
+  const data = useStore((s) => s.data);
+  const sets = data.settings.ruleSets ?? [];
+  const chosen = sets.find((r) => r.id === value);
+  return (
+    <Field label="Schedule limitations" full hint={chosen ? fmtRuleSet(chosen) : sets.length ? undefined : "Set up named limits for kinds of contract (fire, EMS) in Settings › Schedule limitations."}>
+      <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
+        <option value="">{inherit ? `Same as the client (${inherit.name})` : "Settings' limits"}</option>
+        {sets.map((r) => <option key={r.id} value={r.id}>{r.name || "Unnamed"}</option>)}
+      </select>
+    </Field>
+  );
+}
+
+/** Crew numbers and rotations a new job starts with. */
+export function JobDefaultsField({ value, ground, onChange }: { value: NonNullable<Mission["jobDefaults"]>; ground?: boolean; onChange: (v: NonNullable<Mission["jobDefaults"]>) => void }) {
+  const set = (p: Partial<NonNullable<Mission["jobDefaults"]>>) => onChange({ ...value, ...p });
+  return (
+    <div className="form-grid">
+      <div className="pair full">
+        {!ground && <div className="field"><span>Pilots at a time</span><Stepper label="pilots" value={value.pilots ?? 0} onChange={(pilots) => set({ pilots })} /></div>}
+        <div className="field"><span>Maintainers at a time</span><Stepper label="maintainers" value={value.maintainers ?? 0} onChange={(maintainers) => set({ maintainers })} /></div>
+      </div>
+      {!ground && <RotationField label="Pilot rotation" value={value.pilotRotation ?? null} onChange={(pilotRotation) => set({ pilotRotation })} />}
+      <RotationField label="Maintainer rotation" value={value.maintainerRotation ?? null} onChange={(maintainerRotation) => set({ maintainerRotation })} />
+      <Field label="Hours on duty in a day">
+        <input type="number" inputMode="decimal" min={0} max={24} value={value.dutyHours ?? ""} placeholder="–" onChange={(e) => set({ dutyHours: e.target.value === "" ? null : Number(e.target.value) })} />
+      </Field>
     </div>
   );
 }
@@ -700,7 +777,7 @@ function AircraftLines({ season, onChange, spot, needs }: { season: Season; onCh
 /** Pilots and maintainers the job needs at any time, across all its aircraft. */
 function CrewSize({ season, onChange }: { season: Season; onChange: (patch: Partial<Season>) => void }) {
   return (
-    <div className="full">
+    <div className="full" data-spot="crew">
       <div className="pair">
         <div className="field"><span>Pilots at a time</span><Stepper label="pilots" value={season.pilotsNeeded} onChange={(pilotsNeeded) => onChange({ pilotsNeeded })} /></div>
         <div className="field"><span>Maintainers at a time</span><Stepper label="maintainers" value={season.maintainersNeeded} onChange={(maintainersNeeded) => onChange({ maintainersNeeded })} /></div>
@@ -714,7 +791,7 @@ function CrewSize({ season, onChange }: { season: Season; onChange: (patch: Part
 const needWords = (n: MaintainerNeed) => (n.mode === "weekly" ? `${plural(n.days, "day")} a week` : n.mode === "ends" ? `${plural(n.days, "day")} at each end` : n.mode === "oncall" ? "on call" : "all the time");
 
 const NEED_MODES: { mode: MaintainerNeed["mode"]; label: string; hint: (n: number) => string }[] = [
-  { mode: "always", label: "All the time", hint: () => "Every day of the season needs a maintainer on; a day without one is a gap." },
+  { mode: "always", label: "All the time", hint: () => "Every day of the job needs a maintainer on; a day without one is a gap." },
   { mode: "weekly", label: "Days a week", hint: (n) => `Each week needs a maintainer on ${plural(n, "day")}. A week with fewer is a gap.` },
   { mode: "ends", label: "Start and end", hint: (n) => `Set-up and tear-down: the first and last ${plural(n, "day")} need a maintainer.` },
   { mode: "oncall", label: "On call", hint: () => "Book maintainers when they're needed. Days without one are never a gap." },
@@ -768,13 +845,13 @@ function LimitsField({ value, onChange, who, canOverride, applies }: { value?: L
           {canOverride && (
             <label className="check" style={{ marginTop: 6 }}>
               <input type="checkbox" checked={v.override} onChange={(e) => onChange({ ...value, override: e.target.checked })} />
-              Override the job and Settings (people's own limits still apply)
+              Override the client and Settings (people's own limits still apply)
             </label>
           )}
         </>
       )}
       <span className="hint">
-        {on ? (v.override ? "These replace the job's and Settings' limits for this season." : "The safest wins: these only count where they're stricter than Settings and the job.") : `Following ${canOverride ? "the job and Settings" : "Settings"}.`}
+        {on ? (v.override ? "These replace the client's and Settings' limits for this job." : "The safest wins: these only count where they're stricter than Settings and the client.") : `Following ${canOverride ? "the client and Settings" : "Settings"}.`}
         {" "}Applies: at most {plural(applies.maxDaysOn, "day")} on, {plural(applies.minDaysOff, "day")} off.
       </span>
     </div>
@@ -783,18 +860,36 @@ function LimitsField({ value, onChange, who, canOverride, applies }: { value?: L
 
 /** "21 on, 14 off", or empty for the hitch rules in Settings. */
 function RotationField({ label, value, onChange }: { label: string; value: Rotation | null; onChange: (r: Rotation | null) => void }) {
-  const num = (v: string) => (v === "" ? null : Math.max(0, Math.round(Number(v))));
-  const set = (on: number | null, off: number | null) => onChange(on === null && off === null ? null : { on: Math.max(1, on ?? 14), off: off ?? 0 });
+  // Each box keeps what's typed in it, empty included: a rotation is saved once both are filled, and
+  // emptying both goes back to the hitch rules. Nothing fills itself in.
+  const [on, setOn] = useState(value ? String(value.on) : "");
+  const [off, setOff] = useState(value ? String(value.off) : "");
+  // Changed from outside (another season picked, Undo): show that.
+  const shown = useRef(value);
+  if (shown.current !== value && !(value && shown.current && value.on === shown.current.on && value.off === shown.current.off)) {
+    shown.current = value;
+    if (value) { if (String(value.on) !== on) setOn(String(value.on)); if (String(value.off) !== off) setOff(String(value.off)); }
+  }
+  const update = (a: string, b: string) => {
+    setOn(a);
+    setOff(b);
+    const x = a === "" ? null : Math.max(1, Math.round(Number(a))), y = b === "" ? null : Math.max(0, Math.round(Number(b)));
+    const next = x !== null && y !== null ? { on: x, off: y } : null;
+    shown.current = next;
+    onChange(next);
+  };
+  const partly = (on === "") !== (off === "");
   return (
     <div className="field">
       <span>{label}</span>
       <span className="rotation">
-        <input type="number" inputMode="numeric" min={1} max={365} aria-label={`${label}: days on`} placeholder="21" value={value?.on ?? ""} onChange={(e) => set(num(e.target.value), value?.off ?? null)} />
+        <input type="number" inputMode="numeric" min={1} max={365} aria-label={`${label}: days on`} placeholder="–" value={on} onChange={(e) => update(e.target.value, off)} />
         on
-        <input type="number" inputMode="numeric" min={0} max={365} aria-label={`${label}: days off`} placeholder="14" value={value?.off ?? ""} onChange={(e) => set(value?.on ?? null, num(e.target.value))} />
+        <input type="number" inputMode="numeric" min={0} max={365} aria-label={`${label}: days off`} placeholder="–" value={off} onChange={(e) => update(on, e.target.value)} />
         off, in days
       </span>
-      {!value && <span className="hint">Empty: the hitch rules in Settings.</span>}
+      {partly ? <span className="hint">Fill in both, or leave both empty for the hitch rules in Settings.</span>
+        : !value && <span className="hint">Empty: the hitch rules in Settings.</span>}
     </div>
   );
 }
@@ -806,20 +901,26 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   const existing = data.seasons.find((x) => x.id === id);
   const isNew = !existing;
   const [kept] = useState(() => keptForm<{ tab: string; season: Season; shifts: Shift[] }>());
-  const [season, setSeason] = useState<Season>(() => {
-    if (kept.season) return kept.season;
-    if (existing) return existing;
-    const missionId = (defaults.missionId as string) ?? data.missions[0]?.id ?? "";
+  /**
+   * A new job for a client starts from its latest job (same aircraft, crew numbers and rotations), else the
+   * client's "A new job starts with", else Settings'.
+   */
+  const startFor = (missionId: string, keep: Partial<Season> = {}): Season => {
     const sd = data.settings.seasonDefaults ?? { pilots: 1, maintainers: 0, pilotRotation: null, dutyHours: null };
-    // A new season starts from the mission's latest one: same aircraft, crew numbers and rotations.
+    const jd = data.missions.find((x) => x.id === missionId)?.jobDefaults ?? {};
     const last = seasonsOf(data, missionId).at(-1);
     return {
       id: uid(), missionId, start: toWhen(tomorrow()), end: toWhen(dayAt(tomorrow(), 30)),
-      aircraftIds: last?.aircraftIds ?? [], ...(last?.slots ? { slots: last.slots.map((x) => ({ ...x, id: uid(), start: null, end: null })) } : {}), pilotsNeeded: last?.pilotsNeeded ?? sd.pilots, maintainersNeeded: last?.maintainersNeeded ?? sd.maintainers, maintainerNeed: last?.maintainerNeed,
-      pilotRotation: last?.pilotRotation ?? sd.pilotRotation, maintainerRotation: last?.maintainerRotation ?? null, dutyHours: last?.dutyHours ?? sd.dutyHours,
-      status: "Planned", notes: "", ...(defaults as Partial<Season>),
+      aircraftIds: last?.aircraftIds ?? [], ...(last?.slots ? { slots: last.slots.map((x) => ({ ...x, id: uid(), start: null, end: null })) } : {}),
+      pilotsNeeded: last?.pilotsNeeded ?? jd.pilots ?? sd.pilots, maintainersNeeded: last?.maintainersNeeded ?? jd.maintainers ?? sd.maintainers, maintainerNeed: last?.maintainerNeed ?? jd.maintainerNeed,
+      pilotRotation: last ? last.pilotRotation : jd.pilotRotation !== undefined ? jd.pilotRotation : sd.pilotRotation,
+      maintainerRotation: last ? last.maintainerRotation : jd.maintainerRotation ?? null, dutyHours: last ? last.dutyHours : jd.dutyHours !== undefined ? jd.dutyHours : sd.dutyHours,
+      ...(last?.requiredTrainingIds ? { requiredTrainingIds: last.requiredTrainingIds } : {}), ...(last?.requiredEquipmentIds ? { requiredEquipmentIds: last.requiredEquipmentIds } : {}),
+      ...(last?.ruleSetId ? { ruleSetId: last.ruleSetId } : {}),
+      status: "Planned", notes: "", ...keep,
     };
-  });
+  };
+  const [season, setSeason] = useState<Season>(() => kept.season ?? existing ?? startFor((defaults.missionId as string) ?? data.missions[0]?.id ?? "", defaults as Partial<Season>));
   // Open on the crew, where most of the work is, unless the season is new.
   const [tab, setTab] = useState(() => kept.tab ?? fix.tab ?? (isNew ? "details" : existing!.pilotsNeeded > 0 ? "pilots" : existing!.maintainersNeeded > 0 ? "maintainers" : "details"));
   const [shifts, setShifts] = useState<Shift[]>(() => kept.shifts ?? data.shifts.filter((s) => s.seasonId === id));
@@ -853,15 +954,16 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   const issues = useMemo(() => findIssues(draft).filter((i) => i.seasonId === season.id), [draft, season.id]);
   const from = ms(season.start), to = ms(season.end);
   const timeError = !(to > from);
-  const required = mission ? requiredTraining(draft, mission) : [];
+  // What this job asks of its crew: its own requirements (or its client's), what everyone needs, its aircraft types'.
+  const required = mission ? [...new Set([...requiredTraining(draft, booking(mission, season), "Pilot"), ...requiredTraining(draft, booking(mission, season), "Maintainer")])] : [];
   const pct = (t: number) => ((t - from) / (to - from)) * 100;
   const roleOf = (s: Shift) => data.people.find((p) => p.id === s.personId)?.role;
   const live = season.status !== "Done" && season.status !== "Cancelled";
 
   if (!data.missions.length)
     return (
-      <Dialog title="New season" onClose={close} foot={<><button className="btn" onClick={close}>Cancel</button><button className="btn primary" onClick={() => open("mission", "new", defaults)}>New job…</button></>}>
-        <p style={{ margin: 0 }}>A season is a stretch of dates for a job. Add the job first; its first season comes with it.</p>
+      <Dialog title="New job" onClose={close} foot={<><button className="btn" onClick={close}>Cancel</button><button className="btn primary" onClick={() => open("mission", "new", defaults)}>New client…</button></>}>
+        <p style={{ margin: 0 }}>A job is a stretch of dates for a client. Add the client first; its first job comes with it.</p>
       </Dialog>
     );
 
@@ -899,7 +1001,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
       shifts: [...d.shifts.filter((s) => s.seasonId !== season.id), ...shifts],
       // Anyone with a shift works this mission.
       people: d.people.map((p) => (shifts.some((s) => s.personId === p.id) && !p.missionIds.includes(season.missionId) ? { ...p, missionIds: [...p.missionIds, season.missionId] } : p)),
-    }), isNew ? `Added a season to “${mission.name}”` : undefined);
+    }), isNew ? `Added a job to “${mission.name}”` : undefined);
     close();
   };
 
@@ -909,7 +1011,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
     return showAll ? all : all.filter((c) => c.ok || c.person.id === shift.personId);
   };
   const why = (c: ReturnType<typeof whoCanCover>[number]) =>
-    !c.qualified ? " (not rated on this aircraft)" : !c.trained ? " (qualifications not current)" : !c.current ? " (not flown the type lately)" : c.off ? " (time off)" : !c.onRotation ? " (off rotation)" : c.busy ? " (booked elsewhere)" : c.regular ? "" : " (not on this job's crew)";
+    !c.qualified ? " (not rated on this aircraft)" : !c.trained ? " (qualifications not current)" : !c.current ? " (not flown the type lately)" : c.off ? " (time off)" : !c.onRotation ? " (off rotation)" : c.busy ? " (booked elsewhere)" : c.regular ? "" : " (not on this client's crew)";
   // Shifts with a problem: named in the issue, or the issue is about that person during the shift.
   const flagged = new Set(shifts.filter((s) => issues.some((i) => i.id.includes(s.id) || (i.personId === s.personId && i.at >= ms(s.start) && i.at < ms(s.end)))).map((s) => s.id));
   const covered = (role: Person["role"]) => {
@@ -961,7 +1063,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           {rows.some((r) => r.shift) && need > 0 && <button className="btn sm ghost" onClick={() => fill(role, true)} title={`Remove the ${word} shifts and fill again from scratch`}>Start over</button>}
           <label className="check"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Show everyone</label>
         </div>
-        {need > 0 && gaps.length > 0 && <WhyNobody data={draft} role={role} gap={gaps[0]} types={types} required={mission ? requiredTraining(draft, mission, role) : []} missionId={season.missionId} />}
+        {need > 0 && gaps.length > 0 && <WhyNobody data={draft} role={role} gap={gaps[0]} types={types} required={mission ? requiredTraining(draft, booking(mission, season), role) : []} missionId={season.missionId} />}
         {rows.length > 0 ? (
           <div className="lines" data-spot={role === "Pilot" ? "pilots" : "maintainers"}>
             {rows.map((r) => {
@@ -995,7 +1097,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
                     {/* Pilots fly inside the season; maintainers may come early or stay late for pre-flight. */}
                     <DateFields start={s.start} end={s.end} onChange={(start, end) => updateShift(s.id, { start, end })}
                       min={role === "Pilot" ? season.start : undefined} max={role === "Pilot" ? season.end : undefined}
-                      note={role === "Pilot" ? `season ${fmtSpan(season.start, season.end, true)}` : undefined} />
+                      note={role === "Pilot" ? `job ${fmtSpan(season.start, season.end, true)}` : undefined} />
                     <div className="row gap-sm">
                       <button className="btn sm danger" onClick={() => { setShifts((all) => all.filter((x) => x.id !== s.id)); setEditingShift(null); }}><Trash2 size={14} /> Remove</button>
                       <span className="grow" />
@@ -1023,7 +1125,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   );
 
   return (
-    <Dialog wide title={isNew ? `New season${mission ? `: ${mission.name}` : ""}` : mission?.name ?? "Season"} onClose={close} dirty={dirty}
+    <Dialog wide title={isNew ? `New job${mission ? `: ${mission.name}` : ""}` : mission?.name ?? "Job"} onClose={close} dirty={dirty}
       icon={mission && <span className="swatch" style={slotStyle(missionLook(mission))} />}
       meta={<>
         <StatusPill status={season.status} />
@@ -1035,19 +1137,34 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
         {crewedPill}
       </>}
       tabs={[
-        { key: "details", label: "Details", alert: timeError },
+        { key: "details", label: "Job requirements", alert: timeError },
         { key: "pilots", label: <>Pilots <span className="chip">{season.pilotsNeeded}</span></>, alert: gapsAlert("Pilot") },
         { key: "maintainers", label: <>Maintainers <span className="chip">{season.maintainersNeeded}</span></>, alert: gapsAlert("Maintainer") },
+        ...(mission && !isNew ? [{ key: "who", label: "Who can work it" }] : []),
         ...(issues.length ? [{ key: "problems", label: <>Problems <span className="chip">{issues.length}</span></>, alert: issues.some((i) => i.severity === "danger") }] : []),
       ]}
       tab={tab === "problems" && !issues.length ? "details" : tab} onTab={(t) => { setTab(t); setEditingShift(null); }}
-      foot={<Foot isNew={isNew} label="season" problem={!mission ? "Pick a job first." : timeError && "The last day is before the first day (Details tab)."} onSave={save}
-        onDelete={() => { remove("seasons", season.id, `Deleted the season ${fmtDates(season.start, season.end)}`); close(); }} />}>
+      foot={<Foot isNew={isNew} label="job" problem={!mission ? "Pick a client first." : timeError && "The last day is before the first day (Details tab)."} onSave={save}
+        onDelete={() => { remove("seasons", season.id, `Deleted the job ${fmtDates(season.start, season.end)}`); close(); }} />}>
+      {tab === "who" && mission && (
+        <WhoCanWork data={draft} job={booking(mission, season)}
+          onBook={(personId, role) => {
+            // Only this person, on the job's rotation and every limit, into the days still open.
+            const others = new Set(data.people.filter((p) => p.id !== personId).map((p) => p.id));
+            const added = fillSeason(draft, season, role, role === "Pilot" ? season.pilotRotation : season.maintainerRotation, { ...data.settings.rules, skip: others });
+            setShifts((x) => [...x, ...added]);
+            const who = data.people.find((p) => p.id === personId)?.name ?? "They";
+            useStore.getState().showToast(added.length ? `${who}: ${plural(added.reduce((t, x) => t + Math.round((ms(x.end) - ms(x.start)) / DAY), 0), "day")} booked on the open days. Save to keep it.` : `${who} can't take any of the open days (booked, off, resting or over a limit).`);
+          }} />
+      )}
+
       {(tab === "details" || (tab === "problems" && !issues.length)) && (
         <div className="form-grid">
-          <Field label="Job" full>
-            <select value={season.missionId} onChange={(e) => set({ missionId: e.target.value })} disabled={!isNew}>
+          <Field label="Client" full>
+            <select value={season.missionId} onChange={(e) => (e.target.value === NEW_CLIENT ? open("mission", "new")
+              : setSeason((x) => ({ ...startFor(e.target.value, { start: x.start, end: x.end, status: x.status, notes: x.notes }), id: x.id })))} disabled={!isNew}>
               {data.missions.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              {isNew && <option value={NEW_CLIENT}>New client…</option>}
             </select>
           </Field>
           <StatusPicker value={season.status} onChange={(status) => set({ status })} />
@@ -1056,9 +1173,36 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           <CrewSize season={season} onChange={set} />
           <RotationField label="Pilot rotation" value={season.pilotRotation} onChange={(pilotRotation) => set({ pilotRotation })} />
           <RotationField label="Maintainer rotation" value={season.maintainerRotation} onChange={(maintainerRotation) => set({ maintainerRotation })} />
-          <LimitsField value={season.limits} onChange={(limits) => set({ limits })} who="this season" canOverride applies={seasonRules(data, season)} />
-          {data.settings.maxDutyHours > 0 && (
-            <Field label="Hours on duty in a day" spot="duty" hint={`The most is ${data.settings.maxDutyHours} (Settings). Empty if you don't track it.`}>
+          {mission && (
+            <div className="full">
+              <h4 className="form-section">Qualifications and equipment</h4>
+              <label className="check">
+                <input type="checkbox" checked={!season.requiredTrainingIds && !season.requiredEquipmentIds}
+                  onChange={(e) => set(e.target.checked ? { requiredTrainingIds: undefined, requiredEquipmentIds: undefined } : { requiredTrainingIds: [...mission.requiredTrainingIds], requiredEquipmentIds: [...(mission.requiredEquipmentIds ?? [])] })} />
+                Same as the client
+              </label>
+              {!season.requiredTrainingIds && !season.requiredEquipmentIds ? (
+                <p className="small muted" style={{ margin: "4px 0 0" }}>
+                  {[...mission.requiredTrainingIds.map((id) => data.trainings.find((t) => t.id === id)).filter((t) => !!t).map((t) => qualLabel(t, true)),
+                    ...(mission.kind === "ground" ? [] : (mission.requiredEquipmentIds ?? []).map((id) => data.equipment.find((e) => e.id === id)?.name).filter(Boolean))].join(", ") || "Nothing beyond what everyone needs."}
+                  {" "}<button type="button" className="link" onClick={() => open("mission", mission.id, undefined, { tab: "requirements" })}>Change the client's…</button>
+                </p>
+              ) : (
+                <div className="form-grid" style={{ marginTop: 6 }}>
+                  <RequirementPicks trainingIds={season.requiredTrainingIds ?? []} equipmentIds={season.requiredEquipmentIds ?? []} ground={mission.kind === "ground"}
+                    onChange={(p) => set({ ...(p.trainingIds ? { requiredTrainingIds: p.trainingIds } : {}), ...(p.equipmentIds ? { requiredEquipmentIds: p.equipmentIds } : {}) })} />
+                </div>
+              )}
+              {typeTraining(data, seasonTypes(data, season)).length > 0 && (
+                <p className="small muted" style={{ margin: "6px 0 0" }}>Its aircraft types also need {typeTraining(data, seasonTypes(data, season)).map((id) => data.trainings.find((t) => t.id === id)).filter((t) => !!t).map((t) => qualLabel(t, true)).join(", ")}.</p>
+              )}
+            </div>
+          )}
+          <ScheduleLimitsPick value={season.ruleSetId ?? null} onChange={(ruleSetId) => set({ ruleSetId: ruleSetId ?? undefined })}
+            inherit={{ name: data.settings.ruleSets?.find((r) => r.id === mission?.ruleSetId)?.name ?? "Settings' limits" }} />
+          <LimitsField value={season.limits} onChange={(limits) => set({ limits })} who="this job" canOverride applies={seasonRules(data, season)} />
+          {jobLimits(data, season).maxDutyHours > 0 && (
+            <Field label="Hours on duty in a day" spot="duty" hint={`The most is ${jobLimits(data, season).maxDutyHours}. Empty if you don't track it.`}>
               <input type="number" inputMode="decimal" min={0} max={24} value={season.dutyHours ?? ""} placeholder="—" onChange={(e) => set({ dutyHours: e.target.value === "" ? null : Number(e.target.value) })} />
             </Field>
           )}
@@ -1066,7 +1210,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           {mission && (
             <p className="form-note full" style={{ margin: 0 }}>
               {required.length ? <>Crew need {required.map((tid) => data.trainings.find((t) => t.id === tid)?.name).filter(Boolean).join(", ")}. </> : null}
-              Qualifications, crew and look are on the job. <button className="link" onClick={() => open("mission", mission.id)}>Open {mission.name}…</button>
+              Qualifications, crew and look are on the client. <button className="link" onClick={() => open("mission", mission.id)}>Open {mission.name}…</button>
             </p>
           )}
         </div>
@@ -1128,6 +1272,60 @@ function WhyNobody({ data, role, gap, types, required, missionId }: { data: AppD
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * Everyone who could work a job, by role: who meets its requirements (rating on its types, each qualification
+ * for the whole job, recent flying) and how many of its days they're free, and for the rest, what they still
+ * need. Book someone onto the open days, or put them on the client's regular crew so Fill picks them first.
+ */
+function WhoCanWork({ data, job, onBook }: { data: AppData; job: Booking; onBook: (personId: string, role: Person["role"]) => void }) {
+  const { change, open } = useStore();
+  const [show, setShow] = useState<"all" | "ready" | "needs">("all");
+  const roles = (["Pilot", "Maintainer"] as const).filter((r) => (r === "Pilot" ? job.pilotsNeeded : job.maintainersNeeded) > 0 || data.people.some((p) => p.role === r && data.shifts.some((s) => s.seasonId === job.id && s.personId === p.id)));
+  const toggleCrew = (p: Person, on: boolean) => change((d) => ({ ...d, people: d.people.map((x) => (x.id === p.id ? { ...x, missionIds: on ? [...x.missionIds, job.missionId] : x.missionIds.filter((m) => m !== job.missionId) } : x)) }),
+    on ? `${p.name} is on ${job.name}'s crew` : `${p.name} is off ${job.name}'s crew`);
+  if (!roles.length) return <p className="muted">This job doesn't need pilots or maintainers yet (Job requirements tab).</p>;
+  return (
+    <>
+      <div className="row gap-sm wrap" style={{ marginBottom: 10 }}>
+        <div className="seg">
+          {([["all", "Everyone"], ["ready", "Meets the requirements"], ["needs", "Needs something"]] as const).map(([k, l]) => <button key={k} className={show === k ? "active" : ""} onClick={() => setShow(k)}>{l}</button>)}
+        </div>
+        <span className="small muted">From today to the end of the job. Needs: what each person is missing for this job's requirements.</span>
+      </div>
+      {roles.map((role) => {
+        const rows = crewCheck(data, job, role).filter((r) => show === "all" || (show === "ready" ? !r.missing.length : r.missing.length > 0));
+        return (
+          <div key={role} style={{ marginBottom: 14 }}>
+            <h4 className="form-section">{role === "Pilot" ? "Pilots" : "Maintainers"} <span className="chip">{crewCheck(data, job, role).filter((r) => r.ready).length} meet it and are free</span></h4>
+            <div className="lines">
+              {rows.map((r) => (
+                <div key={r.person.id} className="line who-line">
+                  <button type="button" className="row gap-sm link-plain" onClick={() => open("person", r.person.id, undefined, { tab: "training" })} title="Open their qualifications">
+                    <Avatar person={r.person} /><b>{r.person.name}</b>
+                  </button>
+                  <span className="grow small">
+                    {r.onJob > 0 && <span className="pill accent">On this job {plural(r.onJob, "day")}</span>}{" "}
+                    {r.regular && <span className="pill">Client's crew</span>}{" "}
+                    {r.missing.length ? <span className="pill warn">Needs {r.missing.length === 1 ? "1 thing" : `${r.missing.length} things`}</span> : <span className="pill ok">Meets the requirements</span>}{" "}
+                    <span className="muted">{r.days ? (r.free === r.days ? "Free all of it" : r.free ? `Free ${r.free} of ${r.days} days` : "Not free (booked, off or off rotation)") : "The job is over"}</span>
+                    {r.missing.length > 0 && <span style={{ display: "block" }} className="muted">{r.missing.join(" · ")}</span>}
+                  </span>
+                  <span className="row gap-sm">
+                    {!r.missing.length && r.free > 0 && <button type="button" className="btn sm primary" onClick={() => onBook(r.person.id, role)}>Book open days</button>}
+                    <button type="button" className="btn sm" onClick={() => toggleCrew(r.person, !r.regular)}>{r.regular ? "Off the crew" : "Add to crew"}</button>
+                  </span>
+                </div>
+              ))}
+              {rows.length === 0 && <p className="muted small">Nobody here.</p>}
+            </div>
+          </div>
+        );
+      })}
+      <p className="form-note">Book open days puts them on the days nobody has yet, on this job's rotation and within every limit; Save to keep it. The client's crew are picked first when the schedule is filled.</p>
+    </>
   );
 }
 
@@ -1289,7 +1487,7 @@ function AircraftDialog({ id, fix = {} }: Props) {
             </div>
           ) : <span className="small muted">{data.equipment.length ? `No equipment is listed for the ${type || "type"}.` : "No equipment set up yet."}</span>}
           <span className="hint">
-            What this tail has now. Jobs that need equipment check for it.{" "}
+            What this tail has now. Clients that need equipment check for it.{" "}
             <button type="button" className="link" onClick={() => { close(); useStore.getState().go("types"); }}>Set up equipment and types…</button>
           </span>
         </div>
@@ -1370,6 +1568,7 @@ function AircraftLog({ aircraft: a, onChange }: { aircraft: Aircraft; onChange: 
 }
 
 const NEW_TYPE = "\u0000new";
+const NEW_CLIENT = "\u0000client";
 
 // ---------------------------------------------------------------- aircraft type
 
@@ -1427,6 +1626,14 @@ function AircraftTypeDialog({ id }: Props) {
           </div>
           <span className="hint">Its tails pick from these. None ticked: any equipment.</span>
         </div>
+        <div className="field full" data-spot="qualifications">
+          <span>Qualifications for {name ? `the ${name}` : "this type"}</span>
+          <div className="picker-row">
+            {data.trainings.filter((x) => !x.everyone).map((x) => <Pick key={x.id} on={(t.requiredTrainingIds ?? []).includes(x.id)} onToggle={() => set({ requiredTrainingIds: toggled(t.requiredTrainingIds ?? [], x.id) })}>{qualLabel(x)}</Pick>)}
+            {data.trainings.length === 0 && <span className="small muted">No qualifications set up yet.</span>}
+          </div>
+          <span className="hint">Everyone rated on this type needs these (a type course, a recurrent check on it), and so does anyone booked on a job flying it.</span>
+        </div>
         <div className="field full" data-spot="rated">
           <span>Crew rated on {name ? `the ${name}` : "this type"}</span>
           {data.people.length === 0 ? <span className="small muted">No crew yet. Add pilots and maintainers under Crew.</span>
@@ -1483,7 +1690,7 @@ function EquipmentDialog({ id }: Props) {
   };
   return (
     <Dialog title={existing ? existing.name || "Equipment" : "Add equipment"} onClose={close} dirty={dirty}
-      meta={existing && <><span>On {plural(tails.length, "tail")}</span>·<span>Needed by {plural(missions.length, "job")}</span></>}
+      meta={existing && <><span>On {plural(tails.length, "tail")}</span>·<span>Needed by {plural(missions.length, "client")}</span></>}
       foot={<Foot isNew={!existing} label="equipment" problem={!name ? "Name the equipment first, like Rescue hoist." : taken && `There's already ${name}.`} onSave={save}
         onDelete={() => { useStore.getState().remove("equipment", e.id, `Deleted ${existing?.name ?? name}`); close(); }} />}>
       <div className="form-grid">
@@ -1510,10 +1717,10 @@ function EquipmentDialog({ id }: Props) {
           </div>
         </div>
         <div className="field full">
-          <span>Jobs that need it</span>
+          <span>Clients that need it</span>
           {missions.length ? (
             <div className="picker-row">{missions.map((m) => <button key={m.id} type="button" className="chip" onClick={() => open("mission", m.id, undefined, { tab: "equipment" })}>{m.name}</button>)}</div>
-          ) : <span className="small muted">None yet. Tick it on a job's Equipment tab.</span>}
+          ) : <span className="small muted">None yet. Tick it on a client's Equipment tab.</span>}
         </div>
         <Field label="Notes" full><textarea rows={2} value={e.notes} onChange={(x) => setE({ ...e, notes: x.target.value })} /></Field>
       </div>
@@ -1553,7 +1760,7 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
       </>}
       tabs={[
         { key: "details", label: "Details", alert: !p.name.trim() && tab !== "details" },
-        { key: "work", label: "Ratings and jobs" },
+        { key: "work", label: "Ratings and clients" },
         { key: "training", label: <>Qualifications <span className="chip">{p.training.length}</span></>, alert: notCurrent > 0 },
       ]}
       tab={tab} onTab={setTab}
@@ -1645,7 +1852,7 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
                 <span className="swatch" style={{ ...slotStyle(missionLook(m)), width: 10, height: 10 }} />{m.name}
               </Pick>
             ))}
-            {data.missions.length === 0 && <span className="muted">No jobs yet.</span>}
+            {data.missions.length === 0 && <span className="muted">No clients yet.</span>}
           </div>
           <p className="form-note"><NeedsLine person={p} /></p>
         </>
@@ -1701,10 +1908,10 @@ function SwapDialog({ id }: Props) {
     const b = all.find((x) => x.id === s.seasonId);
     const m = b && data.missions.find((x) => x.id === b.missionId);
     if (!b) return false;
-    return whoCanCover(data, role, ms(s.start), ms(s.end), seasonTypes(data, b), except, m ? requiredTraining(data, m, role) : [], b.missionId)
+    return whoCanCover(data, role, ms(s.start), ms(s.end), seasonTypes(data, b), except, m ? requiredTraining(data, b, role) : [], b.missionId)
       .some((c) => c.person.id === who && c.ok);
   };
-  const givers = whoCanCover(data, person.role, ms(shift.start), ms(shift.end), seasonTypes(data, season), [shift.id], mission ? requiredTraining(data, mission, person.role) : [], season.missionId)
+  const givers = whoCanCover(data, person.role, ms(shift.start), ms(shift.end), seasonTypes(data, season), [shift.id], mission ? requiredTraining(data, season, person.role) : [], season.missionId)
     .filter((c) => c.ok && c.person.id !== person.id);
   const near = 120 * DAY, now = Date.now();
   const trades = data.shifts
@@ -2119,7 +2326,7 @@ function TrainingRecords({ person, onChange, spot }: { person: Person; onChange:
       {person.training.length === 0 && <p className="muted" style={{ marginTop: 0 }}>No qualifications on record.</p>}
       {missing.length > 0 && (
         <>
-          <h4 className="form-section">Needed for their jobs, with no record</h4>
+          <h4 className="form-section">Needed for their clients, with no record</h4>
           <div className="picker-row">
             {missing.map((tid) => <button key={tid} className="btn sm" onClick={() => add(tid)}><Plus size={14} /> {trainings.find((x) => x.id === tid)?.name}</button>)}
           </div>
@@ -2145,12 +2352,13 @@ function TrainingDialog({ id }: Props) {
   const missions = data.missions.filter((m) => m.requiredTrainingIds.includes(id)).length;
   return (
     <Dialog title={existing ? t.name || "Qualifications" : "Add qualification"} onClose={close} dirty={dirty}
-      meta={existing && <><span>{plural(holders, "person", "people")} on record</span>·<span>{t.everyone ? `${everyoneWord(t).replace(/^./, (c) => c.toUpperCase())} needs it` : `Needed by ${plural(missions, "job")}`}</span></>}
+      meta={existing && <><span>{plural(holders, "person", "people")} on record</span>·<span>{t.everyone ? `${everyoneWord(t).replace(/^./, (c) => c.toUpperCase())} needs it` : `Needed by ${plural(missions, "client")}`}</span></>}
       foot={<Foot isNew={!existing} label="qualification" problem={!t.name.trim() && "Name the qualification first."}
         onSave={() => { upsert("trainings", t); if (!existing) showToast(`Added “${t.name}”`); close(); }}
         onDelete={() => { remove("trainings", t.id, `Deleted “${t.name}”${holders ? ` and ${plural(holders, "record")}` : ""}`); close(); }} />}>
       <div className="form-grid">
-        <Field label="Name" full><input autoFocus={autoFocusBox} value={t.name} placeholder="Night vision goggles (NVG)" onChange={(e) => set({ name: e.target.value })} /></Field>
+        <Field label="Name"><input autoFocus={autoFocusBox} value={t.name} placeholder="Night vision goggles" onChange={(e) => set({ name: e.target.value })} /></Field>
+        <Field label="Nickname" hint="A short name for tight spaces, like NVG or 293. Optional."><input value={t.nickname ?? ""} placeholder="NVG" maxLength={12} onChange={(e) => set({ nickname: e.target.value })} /></Field>
         {kindOf(t) === "medical" ? (
           <Field label="Privileges the work needs" hint="How long each class lasts follows from this and the pilot's age at the exam (FAA rules), to the end of the month.">
             <select value={t.privileges === "private" ? "private" : t.privileges ?? "commercial"} onChange={(e) => set({ privileges: e.target.value as Training["privileges"], validMonths: 12, endOfMonth: true })}>
@@ -2174,7 +2382,7 @@ function TrainingDialog({ id }: Props) {
         </Field>
         <div className="field full">
           <label className="check"><input type="checkbox" checked={!!t.everyone} onChange={(e) => set({ everyone: e.target.checked })} /> {everyoneWord(t).replace(/^./, (c) => c.toUpperCase())} needs it, whatever job they're on</label>
-          <span className="hint">{t.everyone ? "Like a pilot certificate or a medical: checked on every booking." : "Off: only people on jobs that ask for it need it (a job's Qualifications tab)."}</span>
+          <span className="hint">{t.everyone ? "Like a pilot certificate or a medical: checked on every booking." : "Off: only people on jobs that ask for it need it (Job requirements, on the client or on the job)."}</span>
           {t.validMonths > 0 && kindOf(t) !== "medical" && (
             <label className="check" style={{ marginTop: 6 }}><input type="checkbox" checked={!!t.endOfMonth} onChange={(e) => set({ endOfMonth: e.target.checked })} /> Runs out at the end of the month it's due</label>
           )}
@@ -2340,7 +2548,7 @@ function SupportDialog(_: Props) {
             ))}
             {answers.length === 0 && <div className="muted">Add aircraft first.</div>}
           </div>
-          <p className="form-note">Crew is checked day by day (pilots can rotate through the job), counting pilots who are rated on the type, current on the qualifications it needs, and not booked or off. Hitch lengths aren't counted here; the season checks them once it's booked.</p>
+          <p className="form-note">Crew is checked day by day (pilots can rotate through the job), counting pilots who are rated on the type, current on the qualifications it needs, and not booked or off. Hitch lengths aren't counted here; the job checks them once it's booked.</p>
         </>
       )}
     </Dialog>
@@ -2351,7 +2559,7 @@ function SupportDialog(_: Props) {
 function NeedsLine({ person }: { person: Person }) {
   const data = useStore((s) => s.data);
   const needs = neededTraining({ ...data, people: data.people.map((p) => (p.id === person.id ? person : p)) }, person);
-  if (!needs.size) return <>They don't need any qualifications for these jobs.</>;
+  if (!needs.size) return <>They don't need any qualifications for these clients.</>;
   const now = Date.now();
   return (
     <>

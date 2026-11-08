@@ -1,9 +1,10 @@
 import type { AppData, Person, Role, Rotation, Season, Shift } from "./types";
 import { dutyOf, missionCoverage, requiredTraining, trainingStatus } from "./coverage";
 import { onRotation, seasonTypes } from "./rotation";
-import { seasonRules, stricter } from "./limits";
+import { jobLimits, seasonRules, stricter } from "./limits";
 import { staleOn } from "./currency";
-import { flightLimits, flightSpans, overLimit, pilotHoursPerDay } from "./flight";
+import { flightSpans, pilotHoursPerDay, pilotOverLimit } from "./flight";
+import { booking } from "./bookings";
 import { DAY, dayAt, ms, overlaps, toWhen, uid } from "./time";
 
 /**
@@ -30,7 +31,9 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
   const off = Math.max(0, rotation?.off ?? opts.minDaysOff);
   const mission = data.missions.find((m) => m.id === season.missionId);
   const types = seasonTypes(data, season);
-  const training = mission ? requiredTraining(data, mission, role) : [];
+  // What this job asks for (its own requirements, else its client's), with what everyone and its aircraft types need.
+  const training = mission ? requiredTraining(data, booking(mission, season), role) : [];
+  const limits = jobLimits(data, season);
 
   let current = data;
   const added: Shift[] = [];
@@ -83,9 +86,9 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     return (x >= b || y <= a) && gap > 0 && gap < limitsOf(p).minDaysOff;
   });
   // Pilots: no more flight hours in any window than allowed (Settings), counting this job's flying.
-  const limited = role === "Pilot" && flightLimits(data).length > 0;
+  const limited = role === "Pilot" && limits.flightLimits.length > 0;
   const perDay = limited ? pilotHoursPerDay(data, season) : 0;
-  const flies = (p: Person, a: number, b: number) => !perDay || !overLimit(data, [...flightSpans(current, p.id), { a, b, perDay }]);
+  const flies = (p: Person, a: number, b: number) => !perDay || !pilotOverLimit(data, [...flightSpans(current, p.id), { a, b, perDay, limits: limits.flightLimits }]);
   const fits = (p: Person, a: number, b: number) => stretch(p, a, b) <= limitsOf(p).maxDaysOn && !shortRest(p, a, b) && flies(p, a, b);
 
   const pool = data.people
@@ -102,21 +105,27 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     if (!gap) break;
     const d = dayAt(Math.max(gap.a, skipUntil));
     if (d >= to) break;
-    const pick = pool
+    const candidates = pool
       // Not current on the type (Settings) counts like training that's run out: Fill won't book them.
       .filter((p) => canWork(p, d) && rested(p, d) && fits(p, d, dayAt(d, 1)) && !staleOn(current, p, types, d))
-      .sort((a, b) => Number(prefersOff(a, d)) - Number(prefersOff(b, d)) || Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)) || (worked.get(a.id) ?? 0) - (worked.get(b.id) ?? 0) || a.name.localeCompare(b.name))[0];
-    if (!pick) {
-      skipUntil = dayAt(d, 1); // nobody for this day: leave it open
-      continue;
-    }
-    let end = d;
+      .sort((a, b) => Number(prefersOff(a, d)) - Number(prefersOff(b, d)) || Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)) || (worked.get(a.id) ?? 0) - (worked.get(b.id) ?? 0) || a.name.localeCompare(b.name));
     // Up to the job's "on" days, but not past the open days (that would put more people on than seats).
     let last = Math.min(to, dayAt(d, on), gap.b);
     // Maintainers needed only some days: book just the days that count (the start or end, or the days a week still open).
     if (role === "Maintainer" && (season.maintainerNeed?.mode ?? "always") !== "always")
       last = Math.min(last, gap.days ? dayAt(d, gap.days) : Infinity);
-    while (end < last && canWork(pick, end) && fits(pick, d, dayAt(end, 1))) end = dayAt(end, 1);
+    // The best one who can stay at least the fewest days in a hitch (schedule limitations), unless the open days end sooner.
+    const shortest = Math.min(limits.minDaysOn, Math.round((last - d) / DAY));
+    let pick: Person | undefined, end = d;
+    for (const p of candidates) {
+      let e = d;
+      while (e < last && canWork(p, e) && fits(p, d, dayAt(e, 1))) e = dayAt(e, 1);
+      if (Math.round((e - d) / DAY) >= shortest) { pick = p; end = e; break; }
+    }
+    if (!pick) {
+      skipUntil = dayAt(d, 1); // nobody for this day: leave it open
+      continue;
+    }
     // Taking over from someone whose shift on this job ends today (in this role, not already handed over).
     const from_ = current.shifts.find((x) => x.seasonId === season.id && ms(x.end) === d && x.personId !== pick.id
       && current.people.find((p) => p.id === x.personId)?.role === role && !current.shifts.some((y) => y.after === x.id));

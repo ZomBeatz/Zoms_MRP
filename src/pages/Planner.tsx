@@ -144,14 +144,14 @@ function OneJob() {
   return (
     <>
       <p className="muted" style={{ marginTop: -8 }}>
-        How few pilots a job takes, and the rotation that does it. Put in the aircraft, how long each is staffed a day and the rules; the answer and the rotation update as you go. Book it on a season when it looks right.
+        How few pilots a job takes, and the rotation that does it. Put in the aircraft, how long each is staffed a day and the rules; the answer and the rotation update as you go. Book it on a job when it looks right.
       </p>
 
       <div className="planner">
         <div className="planner-form">
           <section className="panel">
             <h3>The job</h3>
-            <Field label="Start from a season" hint="Fills in its dates, aircraft, limits and charge. Or put in your own numbers.">
+            <Field label="Start from a job" hint="Fills in its dates, aircraft, limits and charge. Or put in your own numbers.">
               <select value={form.seasonId} onChange={(e) => {
                 const b = seasons.find((x) => x.id === e.target.value);
                 setForm(b ? fromSeason(data, b, form) : { ...form, seasonId: "" });
@@ -531,12 +531,12 @@ function Board({ plan, first, days, season, data, nightTrainingId }: { plan: Cre
           <>
             <button className="btn primary" disabled={!matches || twice.size > 0} onClick={book}><CalendarCheck size={16} /> Book on “{season.name}”</button>
             <span className="small muted">
-              {!matches ? "The dates differ from the season's: put them back to book it."
+              {!matches ? "The dates differ from the job's: put them back to book it."
                 : twice.size ? "Someone is on two lines."
                 : `Sets it to ${plural(plan.seats, "pilot")} at a time${hasPilots ? " and replaces its pilot shifts" : ""}${travel ? "; travel days aren't booked" : ""}. Undo puts it back.`}
             </span>
           </>
-        ) : <span className="small muted">Start from a season to book this plan with real pilots.</span>}
+        ) : <span className="small muted">Start from a job to book this plan with real pilots.</span>}
       </div>
     </div>
   );
