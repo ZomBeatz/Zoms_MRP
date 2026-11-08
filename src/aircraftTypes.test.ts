@@ -6,7 +6,7 @@ import type { AppData } from "./types";
 
 function data(): AppData {
   const d = emptyData();
-  d.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "" }, { id: "a2", tail: "N2", type: "AS350", base: "", status: "Ready", seats: 1, notes: "" }];
+  d.aircraft = [{ id: "a1", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "" }, { id: "a2", tail: "N2", type: "AS350", base: "", status: "Airworthy", seats: 1, notes: "" }];
   d.people = [{ id: "p1", name: "Alex", role: "Pilot", quals: ["Bell 412", "AW139"], training: [], missionIds: [], rotation: null, base: "", phone: "", notes: "", flew: { "Bell 412": "2026-10-01" } }];
   d.programs = [{ id: "x", type: "Bell 412", title: "100 hour", everyHours: 100, everyMonths: null, days: 1, grounds: true }];
   return d;
@@ -19,6 +19,20 @@ describe("aircraft types", () => {
     expect(d.aircraftTypes.find((t) => t.name === "AS350")?.seats).toBe(1);
     // Nothing missing: the same object back.
     expect(withTypes(d)).toBe(d);
+  });
+
+  it("an older save gets the new statuses, and costs and inspections off unless they're in use", () => {
+    const raw = { ...data(), settings: { ...emptyData().settings, costs: undefined, maintenance: { ...emptyData().settings.maintenance, enabled: true } } };
+    raw.aircraft = [{ ...raw.aircraft[0], status: "Ready" as never }, { ...raw.aircraft[1], status: "Grounded" as never }];
+    raw.programs = [];
+    const d = migrate(raw);
+    expect(d.aircraft.map((a) => a.status)).toEqual(["Airworthy", "AOG"]);
+    expect(d.settings.costs).toBe(false);
+    expect(d.settings.maintenance.enabled).toBe(false);
+    // Someone using them keeps them.
+    const used = migrate({ ...raw, programs: data().programs, aircraft: [{ ...raw.aircraft[0], hourCost: 900 }] });
+    expect(used.settings.costs).toBe(true);
+    expect(used.settings.maintenance.enabled).toBe(true);
   });
 
   it("an older save gets its types and empty equipment lists", () => {

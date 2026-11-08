@@ -230,13 +230,13 @@ function OneJob() {
             </div>
           </section>
 
-          <section className="panel">
+          {data.settings.costs && <section className="panel">
             <h3>Cost</h3>
             <div className="form-grid">
               <Field label="Pilot pay per day away" hint="Travel days included."><NumberInput min={0} max={100000} value={form.dayRate} onChange={(dayRate) => set({ dayRate })} /></Field>
               <Field label="Customer pays per day"><NumberInput min={0} max={1000000} value={form.dayCharge} onChange={(dayCharge) => set({ dayCharge })} /></Field>
             </div>
-          </section>
+          </section>}
         </div>
 
         <div className="planner-result">
@@ -334,7 +334,7 @@ function Answer({ plan, input, ifs, form, data }: { plan: CrewPlan; input: PlanI
             {more.map((w) => <div key={w.text} className="planner-if"><UserPlus size={15} /><span><b>{plural(w.pilots, "pilot")}</b> gives {w.text}</span></div>)}
           </div>
         )}
-        {(crew > 0 || flying > 0 || charged > 0) && (
+        {data.settings.costs && (crew > 0 || flying > 0 || charged > 0) && (
           <div className="planner-cost">
             {crew > 0 && <span>Crew: {plan.dutyDays} days away × {money(form.dayRate, sym)} = <b>{money(Math.round(crew), sym)}</b></span>}
             {flying > 0 && <span>Flying: {one(plan.flightHours)} hours = <b>{money(Math.round(flying), sym)}</b></span>}

@@ -136,7 +136,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
     const thisWeek = live.filter((m) => overlaps(ms(m.start), ms(m.end), d0, weekEnd));
     const gaps = issues.filter((i) => i.id.startsWith("pgap-")).length;
     const conflicts = issues.filter((i) => i.severity === "danger" && !i.id.startsWith("pgap-")).length;
-    const ready = data.aircraft.filter((a) => a.status === "Ready").length;
+    const ready = data.aircraft.filter((a) => a.status === "Airworthy").length;
     const onDuty = new Set(
       data.shifts.filter((s) => ms(s.start) <= now && ms(s.end) > now).map((s) => s.personId)
         .concat(data.jobs.filter((j) => !j.done && ms(j.start) <= now && ms(j.end) > now).flatMap((j) => j.maintainerIds)),
@@ -171,7 +171,7 @@ export function Overview({ issues }: { issues: Issue[] }) {
           <div className={`value ${stats.conflicts ? "danger" : "ok"}`}>{stats.conflicts}</div>
         </div>
         <button className="tile" onClick={() => go("aircraft")}>
-          <div className="label"><Wrench size={14} /> Aircraft ready</div>
+          <div className="label"><Wrench size={14} /> Aircraft airworthy</div>
           <div className="value">{stats.ready} <span className="muted small">of {data.aircraft.filter((a) => a.status !== "Retired").length}</span></div>
         </button>
         <button className="tile" onClick={() => go("people")}>
@@ -247,7 +247,7 @@ function FleetNow() {
                 <b style={{ fontFamily: "var(--zb-font-mono)" }}>{t.aircraft.tail}</b> <span className="small muted">{t.aircraft.type}</span>
               </span>
               <span className="grow small">
-                {now.kind === "mission" ? <>On <b>{now.mission.name}</b></> : now.kind === "maintenance" ? <>In maintenance ({now.job.title})</> : now.kind === "down" ? "Grounded" : <b style={{ color: "var(--zb-ok)" }}>Free today</b>}
+                {now.kind === "mission" ? <>On <b>{now.mission.name}</b></> : now.kind === "maintenance" ? <>In maintenance ({now.job.title})</> : now.kind === "down" ? <b style={{ color: now.status === "AOG" ? "var(--zb-danger)" : undefined }}>{now.status}{t.aircraft.backOn && now.status !== "Retired" ? `, back ${format(new Date(`${t.aircraft.backOn}T00:00`), "MMM d")}` : ""}</b> : <b style={{ color: "var(--zb-ok)" }}>Free today</b>}
                 <span className="muted">
                   {" · "}
                   {run ? (run[0] === from ? "free now" : `free from ${format(run[0], "MMM d")}`) : "booked all 30 days"}

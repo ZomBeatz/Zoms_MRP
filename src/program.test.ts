@@ -9,7 +9,7 @@ const t = (m: number, n: number) => new Date(d(m, n)).getTime();
 /** One Bell 412 flying a mission Nov 1–28, 2030, at 5 hours a flying day, with 1,000 hours on Nov 1. */
 function plan(): AppData {
   const data = emptyData();
-  data.aircraft = [{ id: "a", tail: "N1", type: "Bell 412", base: "", status: "Ready", seats: 2, notes: "", hours: { hours: 1000, on: "2030-11-01" }, hoursPerDay: 5 }];
+  data.aircraft = [{ id: "a", tail: "N1", type: "Bell 412", base: "", status: "Airworthy", seats: 2, notes: "", hours: { hours: 1000, on: "2030-11-01" }, hoursPerDay: 5 }];
   data.missions = [{ id: "m", name: "Fire", contact: "", location: "", requiredTrainingIds: [], color: "#c2410c", pattern: "solid", notes: "" }];
   data.seasons = [{ id: "s", missionId: "m", start: d(11, 1), end: d(11, 29), aircraftIds: ["a"], pilotsNeeded: 0, maintainersNeeded: 0, pilotRotation: null, maintainerRotation: null, status: "Confirmed", notes: "" }];
   data.programs = [

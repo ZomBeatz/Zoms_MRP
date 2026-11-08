@@ -54,6 +54,7 @@ export function fixesFor(data: AppData, i: Issue): Fix[] {
       { label: `Tick it on ${tail}`, kind: "aircraft", id: i.aircraftId!, spot: "equipment" },
       ...season("Pick another aircraft", "details", "aircraft"),
     ];
+    case "acback": return [{ label: `Update ${tail}'s status`, kind: "aircraft", id: i.aircraftId!, spot: "status" }];
     case "acjob": return [
       ...season("Pick another aircraft", "details", "aircraft"),
       ...job("Move the maintenance", "dates"),
