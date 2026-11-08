@@ -1,7 +1,8 @@
-import type { AppData, Booking } from "./types";
+import type { AppData, Booking, FlightLimit } from "./types";
 import { bookings } from "./bookings";
 import { hoursPerDay } from "./program";
 import { dayAt, ms } from "./time";
+import { jobLimits } from "./limits";
 
 /**
  * Pilot flight hours, for the "most flight hours in so many days" limits (Settings › Hitches and days off),
@@ -22,11 +23,12 @@ export function pilotHoursPerDay(data: AppData, b: Pick<Booking, "aircraftIds" |
   return b.pilotsNeeded > 0 ? hours / b.pilotsNeeded : 0;
 }
 
-export interface FlightSpan { a: number; b: number; perDay: number }
+/** Flying at `perDay` hours a day over [a, b), on a job whose flight-hour limits are `limits` (missing: Settings'). */
+export interface FlightSpan { a: number; b: number; perDay: number; limits?: FlightLimit[] }
 
 /** The first limit these spans go over, with how much they fly in that window. */
-export function overLimit(data: AppData, spans: FlightSpan[]) {
-  for (const l of flightLimits(data)) {
+export function overLimit(data: AppData, spans: FlightSpan[], limits: FlightLimit[] = flightLimits(data)) {
+  for (const l of limits) {
     const most = mostFlown(spans, l.days);
     if (most.hours > l.hours + 1e-6) return { limit: l, ...most };
   }
@@ -42,7 +44,7 @@ export function flightSpans(data: AppData, personId: string): FlightSpan[] {
     if (s.personId !== personId || !b || b.status === "Cancelled") continue;
     const days = Math.max(1, Math.round((ms(s.end) - ms(s.start)) / 86_400_000));
     const perDay = s.flown != null && s.flown >= 0 ? s.flown / days : pilotHoursPerDay(data, b);
-    if (perDay > 0) out.push({ a: ms(s.start), b: ms(s.end), perDay });
+    if (perDay > 0) out.push({ a: ms(s.start), b: ms(s.end), perDay, limits: jobLimits(data, b).flightLimits });
   }
   return out;
 }
@@ -62,4 +64,21 @@ export function mostFlown(spans: FlightSpan[], days: number): { hours: number; a
       if (hours > best.hours + 1e-9) best = { hours, at: from };
     }
   return { hours: Math.round(best.hours * 10) / 10, at: best.at };
+}
+
+/**
+ * The first flight-hour limit a pilot's flying goes over, checking each job's limits (its schedule
+ * limitations', else Settings') against all their flying: a pilot on an EMS job and a fire job is held to both.
+ */
+export function pilotOverLimit(data: AppData, spans: FlightSpan[]) {
+  const sets = new Map<string, FlightLimit[]>();
+  for (const s of spans) {
+    const ls = s.limits ?? flightLimits(data);
+    sets.set(JSON.stringify(ls), ls);
+  }
+  for (const ls of sets.values()) {
+    const over = overLimit(data, spans, ls);
+    if (over) return over;
+  }
+  return null;
 }

@@ -1,4 +1,4 @@
-import type { AppData, Limits, Mission, Person, Rules, Season } from "./types";
+import type { AppData, FlightLimit, Limits, Mission, Person, RuleSet, Rules, Season } from "./types";
 
 /**
  * How long someone can work in a row, and how many days off they need between, for one booking.
@@ -24,11 +24,19 @@ export function baseRules(data: AppData, mission?: Pick<Mission, "ruleSetId"> | 
   return set ? { maxDaysOn: set.maxDaysOn, minDaysOff: set.minDaysOff } : rules;
 }
 
+/** The schedule limitations a job follows: its own, else its client's, else none (Settings'). */
+export function ruleSetOf(data: AppData, season?: Pick<Season, "missionId" | "ruleSetId"> | null): RuleSet | undefined {
+  if (!season) return undefined;
+  const id = season.ruleSetId ?? data.missions.find((m) => m.id === season.missionId)?.ruleSetId;
+  return id ? data.settings.ruleSets?.find((r) => r.id === id) : undefined;
+}
+
 /** The rules for a season, before the person: Settings, then the mission, then the season (or the season alone, with override). */
-export function seasonRules(data: AppData, season?: Pick<Season, "missionId" | "limits"> | null, rules: Rules = data.settings.rules): Rules {
+export function seasonRules(data: AppData, season?: Pick<Season, "missionId" | "limits" | "ruleSetId"> | null, rules: Rules = data.settings.rules): Rules {
   if (!season) return rules;
   const mission = data.missions.find((m) => m.id === season.missionId);
-  const base = baseRules(data, mission, rules);
+  const set = ruleSetOf(data, season);
+  const base = set ? { maxDaysOn: set.maxDaysOn, minDaysOff: set.minDaysOff } : baseRules(data, mission, rules);
   if (season.limits?.override)
     return { maxDaysOn: season.limits.maxDaysOn || base.maxDaysOn, minDaysOff: season.limits.minDaysOff ?? base.minDaysOff };
   return stricter(stricter(base, mission?.limits), season.limits);
@@ -41,3 +49,25 @@ export function rulesFor(data: AppData, person: Pick<Person, "limits"> | undefin
 
 /** "14 days on, 10 off", for showing what applies. */
 export const fmtRules = (r: Rules) => `${r.maxDaysOn} days on, ${r.minDaysOff} off`;
+
+/** The other limits a job follows: its schedule limitations' where they set one, else Settings'. 0 or empty = not checked. */
+export interface JobLimits {
+  minDaysOn: number;
+  maxDutyHours: number;
+  minRestHours: number;
+  maxFlightHoursPerDay: number;
+  flightLimits: FlightLimit[];
+}
+
+export function jobLimits(data: AppData, season?: Pick<Season, "missionId" | "ruleSetId"> | null): JobLimits {
+  const set = ruleSetOf(data, season);
+  const st = data.settings;
+  const n = (x: number | null | undefined, d: number) => (x != null && x > 0 ? x : d);
+  return {
+    minDaysOn: n(set?.minDaysOn, 0),
+    maxDutyHours: n(set?.maxDutyHours, st.maxDutyHours ?? 0),
+    minRestHours: n(set?.minRestHours, st.minRestHours ?? 0),
+    maxFlightHoursPerDay: n(set?.maxFlightHoursPerDay, 0),
+    flightLimits: (set?.flightLimits?.length ? set.flightLimits : st.flightLimits ?? []).filter((l) => l.hours > 0 && l.days > 0),
+  };
+}

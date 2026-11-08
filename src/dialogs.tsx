@@ -700,7 +700,7 @@ function AircraftLines({ season, onChange, spot, needs }: { season: Season; onCh
 /** Pilots and maintainers the job needs at any time, across all its aircraft. */
 function CrewSize({ season, onChange }: { season: Season; onChange: (patch: Partial<Season>) => void }) {
   return (
-    <div className="full">
+    <div className="full" data-spot="crew">
       <div className="pair">
         <div className="field"><span>Pilots at a time</span><Stepper label="pilots" value={season.pilotsNeeded} onChange={(pilotsNeeded) => onChange({ pilotsNeeded })} /></div>
         <div className="field"><span>Maintainers at a time</span><Stepper label="maintainers" value={season.maintainersNeeded} onChange={(maintainersNeeded) => onChange({ maintainersNeeded })} /></div>

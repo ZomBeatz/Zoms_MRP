@@ -270,3 +270,49 @@ describe("days someone would rather not work", () => {
     expect(findIssues(shared).some((i) => i.id.startsWith("fly-"))).toBe(false);
   });
 });
+
+describe("job requirements and schedule limitations", () => {
+  it("a job's own qualifications replace its client's, and its aircraft types add theirs", () => {
+    const data = base();
+    data.trainings = [
+      { id: "nvg", name: "NVG", validMonths: 12, appliesTo: "Pilot", notes: "" },
+      { id: "hoist", name: "Hoist", validMonths: 12, appliesTo: "Pilot", notes: "" },
+      { id: "type412", name: "Bell 412 course", validMonths: 12, appliesTo: "Pilot", notes: "" },
+    ];
+    data.missions[0].requiredTrainingIds = ["nvg"];
+    data.shifts = [{ id: "s1", seasonId: "m1", personId: "p1", start: d(1), end: d(29) }];
+    const train = () => findIssues({ ...data }).filter((i) => i.id.startsWith("train-")).map((i) => i.trainingId).sort();
+    expect(train()).toEqual(["nvg"]);
+    data.seasons[0] = { ...data.seasons[0], requiredTrainingIds: ["hoist"] };
+    expect(train()).toEqual(["hoist"]);
+    data.aircraftTypes = [{ id: "t", name: "Bell 412", seats: 2, equipmentIds: [], requiredTrainingIds: ["type412"], notes: "" }];
+    expect(train()).toEqual(["hoist", "type412"]);
+    // Rated on the type: needed whatever they're booked on, named by the type.
+    expect(neededTraining({ ...data }, data.people[1]).get("type412")?.[0].name).toBe("the Bell 412");
+  });
+
+  it("follows the job's schedule limitations for duty, flight hours a day and the shortest hitch", () => {
+    const data = base();
+    data.settings.maxDutyHours = 14;
+    data.settings.ruleSets = [{ id: "ems", name: "EMS", maxDaysOn: 14, minDaysOff: 7, maxDutyHours: 12, maxFlightHoursPerDay: 4, minDaysOn: 7 }];
+    data.missions[0].ruleSetId = "ems";
+    data.seasons[0] = { ...data.seasons[0], dutyHours: 13 };
+    data.aircraft[0].hoursPerDay = 6;
+    data.shifts = [
+      { id: "s1", seasonId: "m1", personId: "p1", start: d(1), end: d(12) },
+      { id: "s2", seasonId: "m1", personId: "p2", start: d(12), end: d(15) },
+      { id: "s3", seasonId: "m1", personId: "p1", start: d(22), end: d(29) },
+    ];
+    const ids = () => findIssues({ ...data }).map((i) => i.id);
+    expect(ids()).toContain("dutyh-m1");
+    expect(ids()).toContain("flyday-m1");
+    expect(ids()).toContain("shorthitch-s2");
+    // The last hitch is cut by the job's end: fine.
+    expect(ids()).not.toContain("shorthitch-s3");
+    // A job's own schedule limitations replace its client's.
+    data.settings.ruleSets.push({ id: "fire", name: "Fire", maxDaysOn: 14, minDaysOff: 2 });
+    data.seasons[0] = { ...data.seasons[0], ruleSetId: "fire" };
+    expect(ids()).not.toContain("dutyh-m1");
+    expect(ids()).not.toContain("flyday-m1");
+  });
+});
