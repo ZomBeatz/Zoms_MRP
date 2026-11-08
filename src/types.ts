@@ -142,8 +142,15 @@ export type MissionStatus = "Planned" | "Confirmed" | "Flying" | "Done" | "Cance
 export interface Mission {
   id: ID;
   name: string;
-  /** Who to call at the customer. */
+  /** Who to call at the customer (a name). */
   contact: string;
+  /** The customer contact's phone and email. */
+  phone?: string;
+  email?: string;
+  /** Flying (aircraft and pilots) or ground duty: hangar on-call, standby, anything without an aircraft. */
+  kind?: "flight" | "ground";
+  /** Files about this customer's work (contracts, task orders), kept on this device. */
+  documents?: MissionDocument[];
   location: string;
   /** Training everyone on this mission needs (NVG, mountain flying…). */
   requiredTrainingIds: ID[];
@@ -161,6 +168,30 @@ export interface Mission {
   ruleSetId?: ID | null;
 }
 
+/** A file attached to a mission. The file itself is kept in the browser's file storage (src/docs.ts), by `id`. */
+export interface MissionDocument {
+  id: ID;
+  name: string;
+  /** Its type ("application/pdf"). */
+  type: string;
+  size: number;
+  /** The day it was added ("2026-11-08"). */
+  added: string;
+}
+
+/**
+ * One aircraft a season needs: its type, the tail once it's picked, and its own dates when it doesn't
+ * fly the whole season (empty = the season's). `Season.aircraftIds` lists the picked tails.
+ */
+export interface AircraftSlot {
+  id: ID;
+  /** The type it needs ("Bell 412"). Empty: any type. */
+  type: string;
+  aircraftId: ID | null;
+  start?: When | null;
+  end?: When | null;
+}
+
 /**
  * One stretch of dates a mission is flown: a fire season, a year of medevac standby. It can have
  * several aircraft, picked when they're known. Crew numbers are for the whole job at any time.
@@ -171,6 +202,8 @@ export interface Season {
   start: When;
   end: When;
   aircraftIds: ID[];
+  /** The aircraft it needs, one line each (type, tail, dates). Missing: one line per tail in `aircraftIds`. */
+  slots?: AircraftSlot[];
   /** Pilots working the job at every moment (across all its aircraft). */
   pilotsNeeded: number;
   /** Maintainers on the job at once, when they're needed. 0 = none. */
@@ -201,7 +234,7 @@ export interface MaintainerNeed {
  * A season together with its mission's details, which is what the schedule, the fleet and the checks
  * work with (see `bookings` in src/bookings.ts). Its `id` is the season's.
  */
-export type Booking = Season & Pick<Mission, "name" | "contact" | "location" | "requiredTrainingIds" | "requiredEquipmentIds" | "color" | "pattern">;
+export type Booking = Season & Pick<Mission, "name" | "contact" | "location" | "requiredTrainingIds" | "requiredEquipmentIds" | "color" | "pattern" | "kind">;
 
 /** One person covering part of a season. Pilots rotate by adding several of these. */
 export interface Shift {

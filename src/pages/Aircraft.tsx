@@ -5,6 +5,7 @@ import { bookings } from "../bookings";
 import { useStore } from "../store";
 import { fleetUse, freePerDay } from "../fleet";
 import { downSpan } from "../aircraftTypes";
+import { onTail } from "../slots";
 import { dayAt, fmtDates, ms, plural, toWhen, today } from "../time";
 import { missionLook, slotStyle } from "../look";
 import { Empty, StatusPill, usePref } from "../components/ui";
@@ -92,7 +93,7 @@ export function AircraftPage() {
                     <div className="g-group">{type} <span className="muted" style={{ fontWeight: 400 }}>· {plural(tails.length, "aircraft", "aircraft")}{t0 >= from && t0 < to ? `, ${freeNow} free today` : ""}</span></div>
                     {tails.map((t) => {
                       const a = t.aircraft;
-                      const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m.status) && ms(m.end) > from && ms(m.start) < to);
+                      const missions = bookings(data).filter((m) => m.aircraftIds.includes(a.id) && live(m.status) && m.kind !== "ground").map((m) => onTail(m, a.id)).filter((m) => ms(m.end) > from && ms(m.start) < to);
                       const jobs = data.jobs.filter((j) => j.aircraftId === a.id && ms(j.end) > from && ms(j.start) < to);
                       return (
                         <Fragment key={a.id}>
@@ -198,7 +199,7 @@ function FleetStatus() {
   const now = useMemo(() => new Map(fleetUse(data, t0, dayAt(t0, 1)).map((f) => [f.aircraft.id, f.days[0]])), [data, t0]);
   const day = (iso: string) => format(new Date(`${iso}T00:00`), "MMM d");
   const next = (a: Aircraft) => bookings(data)
-    .filter((b) => b.aircraftIds.includes(a.id) && b.status !== "Cancelled" && b.status !== "Done" && ms(b.start) > t0)
+    .filter((b) => b.aircraftIds.includes(a.id) && b.status !== "Cancelled" && b.status !== "Done").map((b) => onTail(b, a.id)).filter((b) => ms(b.start) > t0)
     .sort((x, y) => ms(x.start) - ms(y.start))[0];
   const last = (a: Aircraft) => [...(a.log ?? [])].sort((x, y) => x.on.localeCompare(y.on)).at(-1);
   const doing = (a: Aircraft) => {

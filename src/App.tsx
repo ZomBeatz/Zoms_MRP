@@ -108,6 +108,16 @@ export default function App() {
     if (jobs.length) useStore.getState().change((d) => ({ ...d, jobs: [...d.jobs, ...jobs] }), `Planned ${jobs.length === 1 ? "1 inspection" : `${jobs.length} inspections`} automatically`);
   }, [started, canEdit, mxOn, autoPlan]);
 
+  // Files no mission lists any more (taken off in an earlier session) are let go of when the app opens.
+  useEffect(() => {
+    if (!started) return;
+    const d = useStore.getState();
+    const keep = new Set(d.data.missions.flatMap((m) => (m.documents ?? []).map((x) => x.id)));
+    void import("./docs").then((m) => m.sweepFiles(d.demo, keep)).catch(() => {});
+    // Only once, as the app opens: switching to or from the demo swaps the plan, and a sweep then could
+    // run with one plan's list against the other's files.
+  }, [started]);
+
   // The desktop app looks for a new version once a day (only a build made with the updater key).
   useEffect(() => { if (started) void startUpdates(); }, [started]);
 

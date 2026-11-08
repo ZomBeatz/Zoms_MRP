@@ -249,7 +249,8 @@ export const useStore = create<State>((set, get) => ({
       }
       if (c === "aircraft") {
         next.jobs = next.jobs.filter((j) => j.aircraftId !== id);
-        next.seasons = next.seasons.map((m) => (m.aircraftIds.includes(id) ? { ...m, aircraftIds: m.aircraftIds.filter((a) => a !== id) } : m));
+        // Its lines on seasons stay, waiting for another tail of the type.
+        next.seasons = next.seasons.map((m) => (m.aircraftIds.includes(id) ? { ...m, aircraftIds: m.aircraftIds.filter((a) => a !== id), ...(m.slots ? { slots: m.slots.map((x) => (x.aircraftId === id ? { ...x, aircraftId: null } : x)) } : {}) } : m));
       }
       if (c === "equipment") {
         next.aircraft = next.aircraft.map((a) => ({ ...a, equipmentIds: (a.equipmentIds ?? []).filter((e) => e !== id) }));

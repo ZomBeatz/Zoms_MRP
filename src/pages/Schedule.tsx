@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import { LaneBackdrop, TimeHead, TimelineControls, TimelineHint, useTimeline } from "../components/timeline";
 import { StickyNote, Wrench } from "lucide-react";
 import { bookings } from "../bookings";
+import { onTail } from "../slots";
 import { byId, useStore } from "../store";
 import { missionCoverage, requiredTraining, trainingStatus, whoCanCover, type Issue } from "../coverage";
 import { fmtRotation, offRotationSpans, seasonTails, seasonTypes } from "../rotation";
@@ -423,7 +424,7 @@ function buildRows(
           onLabel: () => open("aircraft", a.id),
           addDefaults: { aircraftIds: [a.id] },
           bars: [
-            ...visibleMissions.filter((m) => m.aircraftIds.includes(a.id)).map(missionBar),
+            ...visibleMissions.filter((m) => m.aircraftIds.includes(a.id)).map((m) => missionBar(onTail(m, a.id))),
             ...data.jobs.filter((j) => j.aircraftId === a.id && !j.done && inView(j.start, j.end)).map(jobBar),
           ],
         })),

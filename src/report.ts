@@ -4,6 +4,7 @@ import { bookings } from "./bookings";
 import { dutyOf, findIssues, missionCoverage, neededTraining, trainingStatus, type Issue, type TrainingState } from "./coverage";
 import { daysIn, fleetUse, freePerDay, type TailUse } from "./fleet";
 import { DAY, ms } from "./time";
+import { tailSpan } from "./slots";
 
 /**
  * How the business and its resources are used over a period: days per mission (customer),
@@ -19,7 +20,7 @@ export function report(data: AppData, from: number, to: number) {
   const mDays = (m: Booking) => clip(ms(m.start), ms(m.end), from, to) / DAY;
 
   const fleet = data.aircraft.filter((a) => a.status !== "Retired").map((a) => {
-    const flying = missions.filter((m) => m.aircraftIds.includes(a.id)).reduce((t, m) => t + mDays(m), 0);
+    const flying = missions.filter((m) => m.aircraftIds.includes(a.id)).reduce((t, m) => t + clip(...tailSpan(m, a.id), from, to) / DAY, 0);
     const maint = data.jobs.filter((j) => j.aircraftId === a.id).reduce((t, j) => t + clip(ms(j.start), ms(j.end), from, to) / DAY, 0);
     return { a, flying, maint, idle: Math.max(0, days - flying - maint) };
   });

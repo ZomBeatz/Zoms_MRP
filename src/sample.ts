@@ -176,6 +176,8 @@ export function sampleData(settings = defaultSettings()): AppData {
     training: Training[]; location: string; crew: Person[];
     /** Equipment its aircraft need. */
     needs?: Equipment[];
+    /** Ground duty: no aircraft (hangar on-call). */
+    ground?: boolean;
     /** The seasons in a given year: [first day, midnight after the last day, label]. */
     seasons: (y: number) => [number, number, string][];
   }
@@ -223,6 +225,9 @@ export function sampleData(settings = defaultSettings()): AppData {
     { name: "Chugach Power line patrol", contact: "Grid operations, (907) 555-0170", color: "#9d174d", pattern: "solid", tails: [n408], pilots: 1, maint: 0, training: [],
       location: "Anchorage to Seward", crew: [P.jordan, P.casey, P.tess, P.sam, P.victor, P.luke],
       seasons: (y) => [3, 6, 9, 12].map((m): [number, number, string] => [date(y, m, 1), date(y, m, 22), format(date(y, m, 1), "MMM yyyy")]) },
+    // Ground duty: a maintainer on call in the hangar every day of the year for a state contract.
+    { name: "State hangar on-call", contact: "Facilities desk, (907) 555-0107", color: "#475569", pattern: "dots", tails: [], pilots: 0, maint: 1, training: [tFuel], ground: true,
+      location: "Anchorage hangar", crew: [P.drew, P.kai, P.rosa, P.sasha, P.felix], seasons: season(1, 1, 12, 31) },
     { name: "Kachemak Bay film shoot", contact: "Production office, (907) 555-0102", color: "#c026d3", pattern: "stripes", tails: [n408], pilots: 1, maint: 0, training: [tWater],
       location: "Homer", crew: [P.casey, P.victor, P.ana], seasons: season(7, 1, 7, 12) },
   ];
@@ -233,8 +238,11 @@ export function sampleData(settings = defaultSettings()): AppData {
   const seasons: Season[] = [];
   const contractOf = new Map<string, Contract>(); // by mission id and by season id
   for (const c of contracts) {
+    // "Fire dispatch, (907) 555-0142": who, and their phone; the email is made up from the customer's name.
+    const [who, phone] = c.contact.split(", ");
     const mission: Mission = {
-      id: `m-${missionList.length + 1}`, name: c.name, contact: c.contact, location: c.location, notes: "",
+      id: `m-${missionList.length + 1}`, name: c.name, contact: who, phone: phone ?? "", email: `${who.toLowerCase().replace(/\W+/g, ".")}@${c.name.split(" ")[0].toLowerCase()}.example.com`,
+      location: c.location, notes: "", ...(c.ground ? { kind: "ground" as const } : {}),
       requiredTrainingIds: c.training.map((t) => t.id), requiredEquipmentIds: (c.needs ?? []).map((e) => e.id), color: c.color, pattern: c.pattern,
     };
     missionList.push(mission);
@@ -254,6 +262,14 @@ export function sampleData(settings = defaultSettings()): AppData {
         seasons.push(season);
         contractOf.set(season.id, c);
       }
+  }
+  // The coming fire season wants a third aircraft, a Bell 412 for July and August only, its tail not picked yet.
+  for (const x of seasons.filter((y) => missionList.find((m) => m.id === y.missionId)?.name === "Interior Fire Service" && y.status === "Planned")) {
+    const y0 = new Date(x.start).getFullYear();
+    x.slots = [
+      ...x.aircraftIds.map((id) => ({ id: `${x.id}-${id}`, type: aircraft.find((a) => a.id === id)!.type, aircraftId: id })),
+      { id: `${x.id}-extra`, type: B412, aircraftId: null, start: toWhen(date(y0, 7, 1)), end: toWhen(date(y0, 9, 1)) },
+    ];
   }
   seasons.sort((x, y) => x.start.localeCompare(y.start));
   // The seasons with their mission's details, for the steps below.
@@ -360,7 +376,7 @@ export function sampleData(settings = defaultSettings()): AppData {
     for (const role of ["Pilot", "Maintainer"] as const) {
       const need = role === "Pilot" ? m.pilotsNeeded : m.maintainersNeeded;
       const pick = people
-        .filter((p) => p.role === role && types.some((t) => p.quals.includes(t)) && trainedFor(p, m, h, he) && free(p, h, he) && onRotationFor(p, h, he))
+        .filter((p) => p.role === role && (!types.length || types.some((t) => p.quals.includes(t))) && trainedFor(p, m, h, he) && free(p, h, he) && onRotationFor(p, h, he))
         .sort((x, y) => Number(regulars.includes(y)) - Number(regulars.includes(x)) || worked.get(x.id)! - worked.get(y.id)! || x.name.localeCompare(y.name))
         .slice(0, need);
       for (const p of pick) {
