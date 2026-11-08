@@ -135,4 +135,11 @@ export async function installUpdate() {
   }
 }
 
-const message = (e: unknown) => (e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.");
+const message = (e: unknown) => {
+  const text = e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.";
+  // The latest release has no latest.json (built without the update files): not the network's fault.
+  if (/release json|valid release|404|not found/i.test(text))
+    return "The latest release doesn't have update files yet, so there's nothing to install from here. Download it from the releases page, or wait for the next release.";
+  if (/network|connect|dns|timed out|offline|request/i.test(text)) return "Couldn't reach GitHub. Check the internet connection and try again.";
+  return text;
+};
