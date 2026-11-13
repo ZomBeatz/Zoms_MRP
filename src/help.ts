@@ -35,7 +35,7 @@ export const PAGE_HELP: PageHelp[] = [
   { page: "balance", label: "Balance", about: "How busy everyone is, and rebalancing the work", words: "workload busy fair rebalance", guide: "balance", docs: "balance" },
   { page: "planner", label: "Crew planner", about: "How few pilots a job takes, and the rotation that does it", words: "how many pilots crew math rotation hitch flight hour limit night", guide: "planner", docs: "crew-planner" },
   { page: "reports", label: "Reports", about: "Fleet use and workload, as PDF and Excel", words: "pdf excel week sheet print teams share", guide: "reports", docs: "reports" },
-  { page: "settings", label: "Settings", about: "Work limits, schedule limitations, your data and more", words: "limits hitches days off flight hours rest backup import export", docs: "settings" },
+  { page: "settings", label: "Settings", about: "Work limits, schedule limitations, your data and more", words: "limits hitches days off flight hours rest recency of experience currency backup import export", docs: "settings" },
   { page: "guide", label: "Guide", about: "How everything works, and how to do the everyday jobs", words: "help how do i", docs: "" },
 ];
 

@@ -28,7 +28,8 @@ export const RECIPES: { q: string; steps: ReactNode[] }[] = [
   {
     q: "Work out how many pilots a job needs",
     steps: [
-      <>Go to <b>Crew planner</b> and pick <b>One job</b>. To plan a job you have, pick it under <b>Start from a job</b> (or press <b>Work out the crew</b> on its <b>Pilots</b> tab).</>,
+      <>For a quick count, open the job: its <b>Pilots</b> and <b>Maintainers</b> tabs say how many people its rotation takes at least (2 at a time on 21 on, 7 off takes 3), and how many are rated and qualified. Fill the schedule staggers their hitches so that many covers it.</>,
+      <>For flight-hour limits, travel days and duty days too, go to <b>Crew planner</b> and pick <b>One job</b>. To plan a job you have, pick it under <b>Start from a job</b> (or press <b>Work out the crew</b> on its <b>Pilots</b> tab).</>,
       <>Put in the first and last day, and each aircraft with its type, <b>Hours staffed a day</b> and <b>Flight hours a day</b>.</>,
       <>Check the <b>Rules</b>: days in camp, days off, travel days, duty day, rest and flight-hour limits.</>,
       <>Read <b>Pilots needed</b> and the <b>Why</b> under it. Change a rule to see what it saves.</>,
@@ -41,6 +42,14 @@ export const RECIPES: { q: string; steps: ReactNode[] }[] = [
       <>Go to <b>Settings › Hitches and days off</b>.</>,
       <>Under <b>Most flight hours</b>, press <b>Add a limit</b> and type the hours and the days. Add as many as you need, such as 1,000 in 365.</>,
       <>Pilots who'd go over are flagged, and Fill the schedule, Rebalance and the Crew planner keep under it. Once a shift is flown, type its <b>Flight hours flown</b> so the real hours count.</>,
+    ],
+  },
+  {
+    q: "Turn off recency of experience",
+    steps: [
+      <>Go to <b>Settings › Hitches and days off</b>.</>,
+      <>Under <b>Recency of experience</b>, untick <b>Check it</b>. Pilots are then booked whenever they last flew a type, and nobody is flagged for it.</>,
+      <>To check it again, tick it and set the days (90 to start).</>,
     ],
   },
   {
@@ -409,10 +418,10 @@ export const SECTIONS: { id: string; title: string; tour?: string; body: ReactNo
     body: <p>Each aircraft type's maintenance program: its inspections every so many flight hours and/or months, whichever comes first. A job on the tail with the same name counts as doing it. <b>Due</b> lists every tail's inspections with when they were last done and when they're due; <b>Plan it…</b> books one in the latest free days before it's due. <b>Flight hours</b> takes readings, and between them counts job days × hours per flying day. Overdue and due-soon inspections show under Needs attention. It's off until you turn it on in <b>Settings › Maintenance programs</b>, where it can also plan by itself.</p>,
   },
   {
-    id: "currency", title: "Currency, preferences and notes",
+    id: "currency", title: "Recency, preferences and notes",
     body: (
       <>
-        <p><b>Currency:</b> a pilot is current on a type if they've flown it within the days set in Settings (90 to start). It comes from their shifts, or a <b>Last flew</b> date on their Ratings tab for flying done elsewhere. Booking someone who isn't current is a warning, Fill won't do it, and the Qualifications page's <b>Needs qualifications</b> list shows them.</p>
+        <p><b>Recency of experience:</b> a pilot is current on a type if they've flown it within the days set in Settings › Hitches and days off (90 to start; untick <b>Check it</b> to turn it off). It comes from their shifts, or a <b>Last flew</b> date on their Ratings tab for flying done elsewhere. Booking someone who isn't current is a warning, Fill won't do it, and the Qualifications page's <b>Needs qualifications</b> list shows them.</p>
         <p><b>Rather not:</b> time off can be <b>only a preference</b>. They can still be booked, it's never a problem, but Fill and Rebalance pick someone else when they can. It shows lighter on the Schedule.</p>
         <p><b>Notes:</b> a shift can have a note, shown on its bar on the Schedule and in the job.</p>
       </>

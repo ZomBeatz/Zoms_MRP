@@ -1,7 +1,7 @@
 import type { AppData, Person, Role, Rotation, Season, Shift } from "./types";
 import { dutyOf, missionCoverage, requiredTraining, trainingStatus } from "./coverage";
 import { onRotation, seasonTypes } from "./rotation";
-import { jobLimits, seasonRules, stricter } from "./limits";
+import { crewFor, jobLimits, seasonRules, stricter } from "./limits";
 import { staleOn } from "./currency";
 import { flightSpans, pilotHoursPerDay, pilotOverLimit } from "./flight";
 import { booking } from "./bookings";
@@ -15,6 +15,8 @@ import { DAY, dayAt, ms, overlaps, toWhen, uid } from "./time";
  * rotation if they have one, and rested for the job's days off since their last stretch here. They stay
  * on for the job's "on" days, or until they stop being available (time off, their own rotation, another
  * booking, or the flight-hour limit in Settings), whichever comes first. The mission's regular crew go first, then whoever has worked least.
+ * With several seats and enough people, hitch ends are staggered (a shorter first hitch), so the crew
+ * don't all need their days off at once: 2 at a time on 21 on, 7 off is covered by 3 people that way.
  * Days nobody can cover stay open, so the gaps show.
  */
 export function fillSeason(data: AppData, season: Season, role: Role, rotation: Rotation | null,
@@ -95,6 +97,12 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
     .filter((p) => p.role === role && !opts.skip?.has(p.id) && (!types.length || types.some((t) => p.quals.includes(t))))
     .sort((a, b) => Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)));
 
+  // Several at a time, with at least as many people as the rotation needs: keep hitch ends this many days
+  // apart, as a rotation with staggered starts would, so nobody's days off leave a seat nobody can take.
+  const roles = new Map(data.people.map((p) => [p.id, p.role]));
+  const crew = crewFor(need, { on, off }, Math.round((to - from) / DAY));
+  const stagger = need > 1 && pool.length >= crew ? Math.floor((on + off) / crew) : 0;
+
   // Walk the open stretches day by day, filling one seat at a time. Days before `skipUntil` are
   // either covered or have nobody who could take them.
   let skipUntil = from;
@@ -109,11 +117,23 @@ export function fillSeason(data: AppData, season: Season, role: Role, rotation: 
       // Not current on the type (Settings) counts like training that's run out: Fill won't book them.
       .filter((p) => canWork(p, d) && rested(p, d) && fits(p, d, dayAt(d, 1)) && !staleOn(current, p, types, d))
       .sort((a, b) => Number(prefersOff(a, d)) - Number(prefersOff(b, d)) || Number(b.missionIds.includes(season.missionId)) - Number(a.missionIds.includes(season.missionId)) || (worked.get(a.id) ?? 0) - (worked.get(b.id) ?? 0) || a.name.localeCompare(b.name));
-    // Up to the job's "on" days, but not past the open days (that would put more people on than seats).
-    let last = Math.min(to, dayAt(d, on), gap.b);
+    // Up to the job's "on" days, but not past the open days (that would put more people on than seats). Open
+    // stretches that follow on, with a different number of seats open, are still open days.
+    let open = gap.b;
+    for (const g of [...gaps].sort((x, y) => x.a - y.a)) if (g.a === open && !g.days) open = g.b;
+    let last = Math.min(to, dayAt(d, on), gap.days ? gap.b : open);
     // Maintainers needed only some days: book just the days that count (the start or end, or the days a week still open).
     if (role === "Maintainer" && (season.maintainerNeed?.mode ?? "always") !== "always")
       last = Math.min(last, gap.days ? dayAt(d, gap.days) : Infinity);
+    if (stagger && last < to) {
+      const ends = current.shifts.filter((x) => x.seasonId === season.id && roles.get(x.personId) === role && ms(x.start) <= d && ms(x.end) > d)
+        .map((x) => ms(x.end)).sort((x, y) => y - x);
+      for (const e of ends) {
+        if (Math.abs(Math.round((e - last) / DAY)) >= stagger) continue;
+        const sooner = dayAt(e, -stagger);
+        if (Math.round((sooner - d) / DAY) >= Math.max(1, limits.minDaysOn)) last = Math.min(last, sooner);
+      }
+    }
     // The best one who can stay at least the fewest days in a hitch (schedule limitations), unless the open days end sooner.
     const shortest = Math.min(limits.minDaysOn, Math.round((last - d) / DAY));
     let pick: Person | undefined, end = d;

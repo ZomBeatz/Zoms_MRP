@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { rulesFor, seasonRules } from "./limits";
-import { findIssues } from "./coverage";
+import { crewFor, jobHitch, rulesFor, seasonRules } from "./limits";
+import { findIssues, missionCoverage } from "./coverage";
 import { fillSeason } from "./fill";
 import { emptyData } from "./sample";
 import type { AppData, Person } from "./types";
@@ -56,5 +56,41 @@ describe("work limits", () => {
     expect(seasonRules(data, { missionId: "m" })).toEqual({ maxDaysOn: 21, minDaysOff: 14 });
     data.missions[0].limits = { maxDaysOn: 18 };
     expect(seasonRules(data, { missionId: "m" })).toEqual({ maxDaysOn: 18, minDaysOff: 14 });
+  });
+});
+
+describe("how many people a job's rotation needs", () => {
+  it("counts the fewest who can cover every day", () => {
+    expect(crewFor(1, { on: 21, off: 7 }, 365)).toBe(2);
+    expect(crewFor(2, { on: 21, off: 7 }, 365)).toBe(3);
+    expect(crewFor(1, { on: 14, off: 14 }, 365)).toBe(2);
+    expect(crewFor(1, { on: 7, off: 14 }, 365)).toBe(3);
+    // A job no longer than one hitch needs only the seats.
+    expect(crewFor(2, { on: 21, off: 7 }, 21)).toBe(2);
+    expect(crewFor(0, { on: 21, off: 7 }, 60)).toBe(0);
+  });
+
+  it("uses the job's rotation, kept within the limits", () => {
+    const data = plan();
+    const s = { ...data.seasons[0], pilotRotation: { on: 30, off: 3 }, maintainerRotation: null };
+    // Longer than the most days on, and fewer days off than the least: the limits win.
+    expect(jobHitch(data, s, "Pilot")).toEqual({ on: data.settings.rules.maxDaysOn, off: data.settings.rules.minDaysOff });
+    // No rotation: the hitch rules.
+    expect(jobHitch(data, s, "Maintainer")).toEqual({ on: data.settings.rules.maxDaysOn, off: data.settings.rules.minDaysOff });
+  });
+
+  // Fill staggers hitch ends so that many is enough. The job runs through the March clock change, which
+  // once cut a hitch short (an hour under three days counted as under three days).
+  it("is enough for Fill the schedule to cover the job", () => {
+    for (const [seats, on, off] of [[1, 21, 7], [2, 21, 7], [3, 21, 7], [2, 14, 14], [2, 7, 7], [3, 14, 14], [2, 21, 14]]) {
+      const data = plan();
+      const season = { ...data.seasons[0], start: "2031-01-01T00:00", end: "2031-05-01T00:00", pilotsNeeded: seats, pilotRotation: { on, off } };
+      data.seasons = [season];
+      data.shifts = [];
+      const n = crewFor(seats, jobHitch(data, season, "Pilot"), 120);
+      data.people = Array.from({ length: n }, (_, i) => pilot(`p${i}`));
+      const shifts = fillSeason(data, season, "Pilot", season.pilotRotation, data.settings.rules);
+      expect(missionCoverage({ ...data, shifts }, season).covered, `${seats} at a time, ${on} on, ${off} off`).toBe(1);
+    }
   });
 });
