@@ -5,7 +5,7 @@ import { autoDownload, checkForUpdate, installUpdate, setAutoDownload, useUpdate
 
 /** Settings › About in the desktop app: check for a new version, and whether to download them by itself. */
 export function UpdateSettings() {
-  const { mode, status, version, error, checkedAt } = useUpdates();
+  const { mode, status, version, error, failed, checkedAt } = useUpdates();
   const [auto, setAuto] = useState(autoDownload());
   if (mode === "off")
     return <p className="small muted" style={{ margin: "0 0 10px" }}>This copy doesn't update itself. New versions are on the <a href={RELEASES_URL} target="_blank" rel="noreferrer">releases page</a>.</p>;
@@ -22,10 +22,11 @@ export function UpdateSettings() {
       </div>
       <p className="small muted" style={{ margin: "6px 0 0" }}>
         {status === "none" ? "You have the latest version."
-          : status === "error" ? `Couldn't check. ${error}`
+          : status === "error" ? `${failed === "download" ? `${version} didn't download.` : failed === "install" ? `${version} didn't install, so this version is still running.` : "Couldn't check."} ${error}`
           : status === "downloading" ? `Downloading ${version}…`
           : status === "installing" ? `Installing ${version}…`
           : version ? `Version ${version} is out.`
+          : error ? `The last check didn't work. ${error}`
           : "Zom's MRP looks for a new version when it opens and every few hours while it's open."}
         {when && status !== "checking" ? ` Last checked ${when}.` : ""}
       </p>

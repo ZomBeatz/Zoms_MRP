@@ -4,7 +4,8 @@
 # The Mac app is ad-hoc signed, so it opens after Privacy & Security › Open Anyway. With the Apple
 # secrets set (see README, "Signing the Mac app"), it's signed with a Developer ID and notarized instead.
 # With the updater key set (README, "Updates"), the installers can update themselves: the release also
-# gets signed update files and latest.json, which the app checks once the release is published.
+# gets signed update files and latest.json (the "Update files" job), which the app checks once the
+# release is published. That job fails with the reason if a system is missing or signed with the wrong key.
 name: Desktop app
 
 on:
@@ -155,6 +156,8 @@ jobs:
           releaseBody: "Installers for Windows, macOS (Apple silicon and Intel, macOS 10.15 or later) and Linux. The server is the Docker image ghcr.io/zombeatz/zoms-mrp-server; see the README."
           releaseDraft: true
           prerelease: false
+          # latest.json comes from the "Update files" job below, once all three systems are in the release.
+          includeUpdaterJson: false
 
       - uses: actions/upload-artifact@v6
         with:
@@ -166,3 +169,33 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/rpm/*.rpm
           if-no-files-found: error
+
+  # latest.json, which installed copies read to find a new version: written once every system's files are
+  # in the draft release, with each signature checked against the key installed copies trust. A missing
+  # file or the wrong key fails here with the reason, instead of a release that quietly never updates.
+  update-files:
+    needs: desktop
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Write latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "No updater key: this release won't update installed copies."
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/update"
+          cd "$RUNNER_TEMP/update"
+          gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' > assets.txt
+          gh release download "$TAG" --repo "$REPO" --pattern '*.sig' --clobber
+          node "$GITHUB_WORKSPACE/.github/scripts/update-files.mjs" .
+          gh release upload "$TAG" latest.json --repo "$REPO" --clobber

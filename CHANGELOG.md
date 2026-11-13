@@ -8,6 +8,10 @@
 - **Add a pilot** and **Add a maintainer** book one hitch from the first open day, instead of one person for the whole job. Tapping an open seat does the same from that seat.
 - **Recency of experience** (Settings › Hitches and days off) has a **Check it** box to turn it off.
 
+**Updates**
+- 0.2.7 still went out without its update file, so installed copies didn't find it. The release tool couldn't match the file names because of the apostrophe in "Zom's MRP". Releases now write that file themselves, and the build stops with the reason if any system's update is missing or signed with the wrong key. Copies of 0.2.5, 0.2.6 and 0.2.7 find this version by themselves once it's published.
+- When a new version doesn't download or install, a note at the top says why, with **Try again** and **Download**. **Settings › About** shows why the last check didn't work, even one that ran in the background.
+
 **Fixes**
 - Fill no longer cuts a hitch short in the week the clocks change.
 

@@ -25,6 +25,8 @@ interface UpdateState {
   /** Downloaded so far, 0 to 1, while downloading. */
   progress: number;
   error: string | null;
+  /** What the error happened in: a check (often just offline), or downloading or installing a version that's out. */
+  failed: "check" | "download" | "install" | null;
   checkedAt: number | null;
 }
 
@@ -40,7 +42,7 @@ const LATER_KEY = "zoms-mrp:updates:later";
 const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* only a convenience */ } };
 
-export const useUpdates = create<UpdateState>(() => ({ mode: "off", status: "idle", version: null, progress: 0, error: null, checkedAt: Number(read(LAST_KEY)) || null }));
+export const useUpdates = create<UpdateState>(() => ({ mode: "off", status: "idle", version: null, progress: 0, error: null, failed: null, checkedAt: Number(read(LAST_KEY)) || null }));
 const set = (s: Partial<UpdateState>) => useUpdates.setState(s);
 
 /** Download new versions in the background (on unless switched off in Settings). */
@@ -84,7 +86,7 @@ export async function checkForUpdate(asked = false) {
   const { mode, status } = useUpdates.getState();
   if (mode === "off" || status === "checking" || status === "downloading" || status === "installing") return;
   if (status === "ready" && !asked) return;
-  set({ status: "checking", error: null });
+  set({ status: "checking", error: null, failed: null });
   try {
     const { check } = await import("@tauri-apps/plugin-updater");
     found = await check();
@@ -94,8 +96,9 @@ export async function checkForUpdate(asked = false) {
     set({ status: "available", version: found.version, checkedAt: now });
     if (mode === "auto" && autoDownload()) await downloadUpdate();
   } catch (e) {
-    // Offline or GitHub unreachable: say so only when someone asked, and try again tomorrow.
-    set({ status: asked ? "error" : "idle", error: message(e) });
+    // Offline or GitHub unreachable: Settings shows why, and it tries again within the hour. Only a
+    // check someone asked for turns into an error on the spot.
+    set({ status: asked ? "error" : "idle", error: message(e), failed: "check" });
   }
 }
 
@@ -111,7 +114,7 @@ export async function downloadUpdate() {
     });
     set({ status: "ready", progress: 1 });
   } catch (e) {
-    set({ status: "error", error: message(e) });
+    set({ status: "error", error: message(e), failed: "download" });
   }
 }
 
@@ -131,7 +134,7 @@ export async function installUpdate() {
     const { relaunch } = await import("@tauri-apps/plugin-process");
     await relaunch();
   } catch (e) {
-    set({ status: "error", error: message(e) });
+    set({ status: "error", error: message(e), failed: "install" });
   }
 }
 
@@ -140,6 +143,8 @@ const message = (e: unknown) => {
   // The latest release has no latest.json (built without the update files): not the network's fault.
   if (/release json|valid release|404|not found/i.test(text))
     return "The latest release doesn't have update files yet, so there's nothing to install from here. Download it from the releases page, or wait for the next release.";
+  if (/signature|verify/i.test(text))
+    return "The download didn't match the release's signature, so it wasn't installed. Download this version from the releases page instead.";
   if (/network|connect|dns|timed out|offline|request/i.test(text)) return "Couldn't reach GitHub. Check the internet connection and try again.";
   return text;
 };
