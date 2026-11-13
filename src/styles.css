@@ -286,6 +286,7 @@ button.line:hover { background: var(--zb-surface-2); }
 .shift-row select, .shift-row input { width: 100%; }
 .cov-bar { position: relative; height: 18px; border-radius: 5px; background: color-mix(in srgb, var(--zb-ok) 30%, var(--zb-surface-2)); overflow: hidden; margin: 6px 0 2px; }
 .cov-bar .gap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, var(--zb-danger) 0 4px, color-mix(in srgb, var(--zb-danger) 55%, transparent) 4px 8px); }
+.crew-need { margin: 8px 0 0; line-height: 1.6; }
 
 .phone-only { display: none; }
 

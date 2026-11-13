@@ -1,5 +1,16 @@
 # Changelog
 
+## Next version
+
+**Crew**
+- Each job says how many people its rotation takes, on its **Pilots** and **Maintainers** tabs and under the rotations on **Job requirements**: 2 at a time on 21 on, 7 off takes at least 3. It also says how many are rated and qualified.
+- **Fill the schedule** staggers hitches when a job needs two or more at a time, so the crew don't all go off together and that many people cover every day.
+- **Add a pilot** and **Add a maintainer** book one hitch from the first open day, instead of one person for the whole job. Tapping an open seat does the same from that seat.
+- **Recency of experience** (Settings › Hitches and days off) has a **Check it** box to turn it off.
+
+**Fixes**
+- Fill no longer cuts a hitch short in the week the clocks change.
+
 ## 0.2.7
 
 **Clients and jobs.** What was a job is now a **client** (the customer), and what was a season is now a **job** (one stretch of dates). Type of work is now **line of business**, and kind of contract is now **schedule limitations**. Your plan is kept as it was.

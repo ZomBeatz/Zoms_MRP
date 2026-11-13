@@ -1,4 +1,4 @@
-import type { AppData, FlightLimit, Limits, Mission, Person, RuleSet, Rules, Season } from "./types";
+import type { AppData, FlightLimit, Limits, Mission, Person, Rotation, RuleSet, Rules, Season } from "./types";
 
 /**
  * How long someone can work in a row, and how many days off they need between, for one booking.
@@ -45,6 +45,29 @@ export function seasonRules(data: AppData, season?: Pick<Season, "missionId" | "
 /** The rules for one person on one season (or on maintenance, with no season). */
 export function rulesFor(data: AppData, person: Pick<Person, "limits"> | undefined, season?: Pick<Season, "missionId" | "limits"> | null, rules: Rules = data.settings.rules): Rules {
   return stricter(seasonRules(data, season, rules), person?.limits);
+}
+
+/**
+ * The hitch a job's crew in this role work: its rotation (or, without one, the most days on), never longer
+ * than the most days on allowed and with at least the fewest days off. Fill the schedule rotates people on it.
+ */
+export function jobHitch(data: AppData, season: Pick<Season, "missionId" | "limits" | "ruleSetId" | "pilotRotation" | "maintainerRotation">, role: Person["role"]): Rotation {
+  const base = seasonRules(data, season);
+  const rot = role === "Pilot" ? season.pilotRotation : season.maintainerRotation;
+  return { on: Math.max(1, Math.min(rot?.on || base.maxDaysOn, base.maxDaysOn)), off: Math.max(0, rot?.off ?? base.minDaysOff, base.minDaysOff) };
+}
+
+/**
+ * The fewest people who can keep `seats` filled on every one of `days` days, each working at most `on` days
+ * in a row with `off` days between: 1 at a time on 21 on, 7 off takes 2, and 2 at a time takes 3. No one
+ * can work more than `on` days in every `on + off`, so fewer can't cover it; staggered starts make this many enough.
+ */
+export function crewFor(seats: number, hitch: Rotation, days: number): number {
+  if (seats <= 0 || days <= 0) return 0;
+  const on = Math.max(1, hitch.on), cycle = on + Math.max(0, hitch.off);
+  const full = Math.floor(days / cycle);
+  const most = full * on + Math.min(on, days - full * cycle);
+  return Math.ceil((seats * days) / most - 1e-9);
 }
 
 /** "14 days on, 10 off", for showing what applies. */

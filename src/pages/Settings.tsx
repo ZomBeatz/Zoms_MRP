@@ -182,9 +182,19 @@ export function SettingsPage({ onHelp }: { onHelp: () => void }) {
             <Field label="Most flight hours" full hint="Per pilot, in any stretch of that many days, such as 100 in 30 and 1,000 in 365. A job's flying is shared by its pilots, or the hours flown typed on a shift. The checks, Fill and the Crew planner keep under all of them.">
               <FlightLimitsEditor value={data.settings.flightLimits} onChange={(flightLimits) => updateSettings({ flightLimits })} />
             </Field>
-            <Field label="Current on a type" hint="Pilots must have flown it within this many days. 0 = don't check.">
-              <NumberInput min={0} max={730} value={data.settings.currencyDays} onChange={(currencyDays) => updateSettings({ currencyDays })} />
-            </Field>
+            <div className="field" data-spot="recency">
+              <span>Recency of experience</span>
+              <span className="row gap-sm">
+                <label className="check" style={{ whiteSpace: "nowrap" }}>
+                  <input type="checkbox" checked={data.settings.currencyDays > 0} onChange={(e) => updateSettings({ currencyDays: e.target.checked ? 90 : 0 })} />
+                  Check it
+                </label>
+                {data.settings.currencyDays > 0 && <><NumberInput min={1} max={730} aria-label="Days" style={{ width: 80 }} value={data.settings.currencyDays} onChange={(currencyDays) => updateSettings({ currencyDays })} /> days</>}
+              </span>
+              <span className="hint">{data.settings.currencyDays > 0
+                ? "Pilots must have flown an aircraft type within this many days to be booked on it."
+                : "Off: when someone last flew a type doesn't matter for booking them."}</span>
+            </div>
             <Field label="Warn before a qualification runs out" hint="Days ahead.">
               <NumberInput min={0} max={365} value={data.settings.expiryWarningDays} onChange={(expiryWarningDays) => updateSettings({ expiryWarningDays })} />
             </Field>

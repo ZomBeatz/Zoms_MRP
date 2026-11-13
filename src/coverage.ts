@@ -363,7 +363,7 @@ export function findIssues(data: AppData): Issue[] {
         issues.push({
           id: `curr-${s.id}`, severity: "warn", at: ms(s.start), seasonId: m.id, personId: p.id, shiftId: s.id,
           title: `${p.name} hasn't flown the ${stale.type} in ${stale.days} days`,
-          detail: `Before “${m.name}”, ${fmtRange(s.start, s.end)}. Current means within ${currencyDays(data)} days (Settings). Swap them out, plan a refresher flight, or record when they last flew it.`,
+          detail: `Before “${m.name}”, ${fmtRange(s.start, s.end)}. Recency of experience is ${currencyDays(data)} days (Settings › Hitches and days off, where it can be turned off). Swap them out, plan a refresher flight, or record when they last flew it.`,
         });
     }
 

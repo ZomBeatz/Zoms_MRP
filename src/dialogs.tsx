@@ -16,7 +16,7 @@ import { SWATCHES, missionLook, nextShade, shadesOf, slotStyle } from "./look";
 import { Avatar, Dialog, Field, autoFocusBox, LookPicker, NumberInput, StatusPill, Stepper, initials, useDirty, useGuardedClose, useSpot } from "./components/ui";
 import { booking, bookings, seasonsOf } from "./bookings";
 import { DateInput, DateRange } from "./components/dates";
-import { baseRules, fmtRuleSet, jobLimits, rulesFor, seasonRules, stricter } from "./limits";
+import { baseRules, crewFor, fmtRuleSet, jobHitch, jobLimits, rulesFor, seasonRules, stricter } from "./limits";
 import { flightHours } from "./program";
 import { daysSince } from "./currency";
 import { ConfirmButton, IssueList } from "./pages/Overview";
@@ -967,8 +967,13 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
       </Dialog>
     );
 
-  /** A new shift for whoever can take the given days, opened so it can be changed. */
-  const addShift = (role: Person["role"], a = from, b = to) => {
+  /**
+   * A new shift for whoever can take the given days, opened so it can be changed: one hitch from the first open
+   * day (or the open seat pressed), so a long job gets a rotation rather than one person for all of it.
+   */
+  const addShift = (role: Person["role"], at?: number, until = to) => {
+    const a = at ?? (role === "Pilot" ? cov.pilotGaps : cov.maintainerGaps)[0]?.a ?? from;
+    const b = Math.min(until, dayAt(a, jobHitch(draft, season, role).on));
     const free = whoCanCover(draft, role, a, b, types, [], required, season.missionId).find((c) => c.ok && !shifts.some((s) => s.personId === c.person.id && overlapsShift(s, a, b)));
     const personId = free?.person.id ?? data.people.find((p) => p.role === role)?.id;
     if (!personId) return;
@@ -1020,6 +1025,34 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
   };
   const updateShift = (sid: string, patch: Partial<Shift>) => setShifts((all) => all.map((x) => (x.id === sid ? { ...x, ...patch } : x)));
 
+  /**
+   * How many people this job's rotation takes in a role (src/limits.ts, crewFor), and how many meet its
+   * requirements. Maintainers needed only some days are booked as needed, so there's no count for them.
+   */
+  const crewNeeded = (role: Person["role"]) => {
+    const seats = role === "Pilot" ? season.pilotsNeeded : season.maintainersNeeded;
+    if (!mission || timeError || seats <= 0 || (role === "Maintainer" && (season.maintainerNeed?.mode ?? "always") !== "always")) return null;
+    const hitch = jobHitch(draft, season, role);
+    const n = crewFor(seats, hitch, Math.round((to - from) / DAY));
+    // Rated on its aircraft and qualified when it starts (or today): renewals during a long job are flagged on their own.
+    const at = Math.max(from, dayAt(Date.now(), 0)), need = requiredTraining(draft, booking(mission, season), role);
+    const meet = draft.people.filter((p) => p.role === role && (!types.length || types.some((t) => p.quals.includes(t)))
+      && need.every((id) => trainingStatus(p, id, at, dayAt(at, 1)).state !== "missing" && trainingStatus(p, id, at, dayAt(at, 1)).state !== "expired")).length;
+    return { seats, hitch, n, meet, own: !!(role === "Pilot" ? season.pilotRotation : season.maintainerRotation) };
+  };
+  const crewNote = (role: Person["role"]) => {
+    const c = crewNeeded(role);
+    if (!c) return null;
+    const word = role === "Pilot" ? "pilot" : "maintainer";
+    return (
+      <p className="small crew-need" data-spot={`crew-need:${role}`}>
+        <span className="muted">{fmtRotation(c.hitch)}{c.own ? "" : " (the hitch rules)"}, {c.seats} at a time: </span>
+        this job takes at least <b>{plural(c.n, word)}</b>.{" "}
+        {c.meet >= c.n ? <span className="pill ok">{c.meet} rated and qualified</span> : <span className="pill warn">Only {c.meet} rated and qualified</span>}
+      </p>
+    );
+  };
+
   const crewTab = (role: Person["role"]) => {
     const need = role === "Pilot" ? season.pilotsNeeded : season.maintainersNeeded;
     const gaps = role === "Pilot" ? cov.pilotGaps : cov.maintainerGaps;
@@ -1045,6 +1078,7 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
             <div className="cov-bar" aria-label={`${Math.round(share * 100)}% covered`}>
               {gaps.map((g) => <div key={g.a} className="gap" style={{ left: `${pct(g.a)}%`, width: `${pct(g.b) - pct(g.a)}%` }} title={`${plural(g.short, "seat")} open, ${fmtSpan(toWhen(g.a), toWhen(g.b))}`} />)}
             </div>
+            {crewNote(role)}
           </>
         )}
         <div className="toolbar">
@@ -1173,6 +1207,11 @@ function SeasonDialog({ id, defaults, fix = {} }: Props) {
           <CrewSize season={season} onChange={set} />
           <RotationField label="Pilot rotation" value={season.pilotRotation} onChange={(pilotRotation) => set({ pilotRotation })} />
           <RotationField label="Maintainer rotation" value={season.maintainerRotation} onChange={(maintainerRotation) => set({ maintainerRotation })} />
+          {(crewNeeded("Pilot") || crewNeeded("Maintainer")) && (
+            <p className="form-note full" data-spot="crew-needed">
+              On these rotations this job takes at least {[crewNeeded("Pilot"), crewNeeded("Maintainer")].map((c, i) => c && <b key={i}>{plural(c.n, i ? "maintainer" : "pilot")}</b>).filter(Boolean).reduce<ReactNode[]>((all, x, i) => (i ? [...all, " and ", x] : [x]), [])}, so nobody works past their days on.
+            </p>
+          )}
           {mission && (
             <div className="full">
               <h4 className="form-section">Qualifications and equipment</h4>
@@ -1842,7 +1881,7 @@ function PersonDialog({ id, defaults, fix = {} }: Props) {
                   </div>
                 );
               })}
-              <span className="hint">From the schedule, or a date typed here for flying done elsewhere (whichever is later). Current means within {data.settings.currencyDays} days (Settings).</span>
+              <span className="hint">From the schedule, or a date typed here for flying done elsewhere (whichever is later). Recency of experience is {data.settings.currencyDays} days (Settings › Hitches and days off, where it can be turned off).</span>
             </div>
           )}
           <h4 className="form-section">Works on</h4>
