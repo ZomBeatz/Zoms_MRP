@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version
+## 0.2.8
 
 **Crew**
 - Each job says how many people its rotation takes, on its **Pilots** and **Maintainers** tabs and under the rotations on **Job requirements**: 2 at a time on 21 on, 7 off takes at least 3. It also says how many are rated and qualified.
